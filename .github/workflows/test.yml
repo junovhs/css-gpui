@@ -1,0 +1,16 @@
+name: Rust tests
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo test --locked
+      - name: Inspect a component
+        run: |
+          cargo run --locked --example inspect -- fixtures/v0.1/stacked_info_card/source.html fixtures/v0.1/stacked_info_card/source.css > "$RUNNER_TEMP/scene.json"
+          python3 -c 'import json, sys; assert json.load(open(sys.argv[1]))["nodes"]' "$RUNNER_TEMP/scene.json"
