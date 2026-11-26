@@ -4,11 +4,14 @@ import { resolve } from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
-const [playwrightProject] = process.argv.slice(2);
+const [playwrightProject, scaleArg = "1", outputPath] = process.argv.slice(2);
 assert(playwrightProject, "Usage: node capture.mjs <project with Playwright installed>");
 const require = createRequire(resolve(playwrightProject, "package.json"));
 const { chromium } = require("playwright");
 const source = new URL("./source.html", import.meta.url);
+const output = name => outputPath ? resolve(outputPath, name) : fileURLToPath(new URL(name, import.meta.url));
+const scale = Number(scaleArg);
+assert(Number.isFinite(scale) && scale > 0, "Expected a positive device scale");
 const browser = await chromium.launch({
     channel: "chrome",
     args: ["--allow-file-access-from-files"],
@@ -21,7 +24,7 @@ const caseHeight = 64;
 try {
     const page = await browser.newPage({
         viewport: { width: 720, height: caseHeight * widths.length * titles.length },
-        deviceScaleFactor: 1,
+        deviceScaleFactor: scale,
     });
     await page.goto(source.href);
     const frames = await page.evaluate(async ({ widths, titles, toolbarHeight, caseHeight }) => {
@@ -67,11 +70,11 @@ try {
         assert.equal(button.y + button.height / 2, toolbarHeight / 2);
         assert(titleBounds.x + titleBounds.width < button.x);
     }
-    await page.screenshot({ path: fileURLToPath(new URL("./browser-reference.png", import.meta.url)) });
-    await writeFile(new URL("./browser-bounds.json", import.meta.url), JSON.stringify({
+    await page.screenshot({ path: output("browser-reference.png") });
+    await writeFile(output("browser-bounds.json"), JSON.stringify({
         chrome: browser.version(),
         font: "Arial",
-        scale: 1,
+        scale,
         cases: frames,
     }, null, 2) + "\n");
 } finally {

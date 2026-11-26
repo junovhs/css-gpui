@@ -1,0 +1,229 @@
+{
+  "chrome": "158.0.8127.36",
+  "gpui": "0.2.2",
+  "font": "Arial",
+  "deviceScaleFactor": 1.25,
+  "negativeControl": "2:5: source loss in .toolbar: property 'filter' is not supported in v0.1 and will be dropped",
+  "cases": [
+    {
+      "title": "Files",
+      "width": 360,
+      "gpuiBounds": {
+        "toolbar": {
+          "x": 0.0,
+          "y": 0.0,
+          "width": 360.0,
+          "height": 56.0
+        },
+        "titleBounds": {
+          "x": 16.0,
+          "y": 18.4,
+          "width": 36.8,
+          "height": 20.0
+        },
+        "button": {
+          "x": 283.2,
+          "y": 12.0,
+          "width": 60.8,
+          "height": 32.0
+        }
+      },
+      "edgeDeltas": {
+        "toolbar": {
+          "left": 0.0,
+          "top": 0.0,
+          "right": 0.0,
+          "bottom": 0.0
+        },
+        "titleBounds": {
+          "left": 0.0,
+          "top": 0.3999999999999986,
+          "right": 0.33124999999999716,
+          "bottom": 0.3999999999999986
+        },
+        "button": {
+          "left": -0.5500000000000114,
+          "top": 0.0,
+          "right": 0.0,
+          "bottom": 0.0
+        }
+      },
+      "pixels": {
+        "differentPixels": 1041,
+        "totalPixels": 31500,
+        "differentPixelBounds": [
+          0,
+          0,
+          450,
+          55
+        ]
+      },
+      "layoutWithinOneLogicalPixel": true
+    },
+    {
+      "title": "Files",
+      "width": 720,
+      "gpuiBounds": {
+        "toolbar": {
+          "x": 0.0,
+          "y": 0.0,
+          "width": 720.0,
+          "height": 56.0
+        },
+        "titleBounds": {
+          "x": 16.0,
+          "y": 18.4,
+          "width": 36.8,
+          "height": 20.0
+        },
+        "button": {
+          "x": 643.2,
+          "y": 12.0,
+          "width": 60.8,
+          "height": 32.0
+        }
+      },
+      "edgeDeltas": {
+        "toolbar": {
+          "left": 0.0,
+          "top": 0.0,
+          "right": 0.0,
+          "bottom": 0.0
+        },
+        "titleBounds": {
+          "left": 0.0,
+          "top": 0.3999999999999986,
+          "right": 0.33124999999999716,
+          "bottom": 0.3999999999999986
+        },
+        "button": {
+          "left": -0.5499999999999545,
+          "top": 0.0,
+          "right": 0.0,
+          "bottom": 0.0
+        }
+      },
+      "pixels": {
+        "differentPixels": 1041,
+        "totalPixels": 63000,
+        "differentPixelBounds": [
+          0,
+          0,
+          900,
+          55
+        ]
+      },
+      "layoutWithinOneLogicalPixel": true
+    },
+    {
+      "title": "Recently opened files",
+      "width": 360,
+      "gpuiBounds": {
+        "toolbar": {
+          "x": 0.0,
+          "y": 0.0,
+          "width": 360.0,
+          "height": 56.0
+        },
+        "titleBounds": {
+          "x": 16.0,
+          "y": 18.4,
+          "width": 164.8,
+          "height": 20.0
+        },
+        "button": {
+          "x": 283.2,
+          "y": 12.0,
+          "width": 60.8,
+          "height": 32.0
+        }
+      },
+      "edgeDeltas": {
+        "toolbar": {
+          "left": 0.0,
+          "top": 0.0,
+          "right": 0.0,
+          "bottom": 0.0
+        },
+        "titleBounds": {
+          "left": 0.0,
+          "top": 0.3999999999999986,
+          "right": 0.30000000000001137,
+          "bottom": 0.3999999999999986
+        },
+        "button": {
+          "left": -0.5500000000000114,
+          "top": 0.0,
+          "right": 0.0,
+          "bottom": 0.0
+        }
+      },
+      "pixels": {
+        "differentPixels": 2126,
+        "totalPixels": 31500,
+        "differentPixelBounds": [
+          0,
+          0,
+          450,
+          55
+        ]
+      },
+      "layoutWithinOneLogicalPixel": true
+    },
+    {
+      "title": "Recently opened files",
+      "width": 720,
+      "gpuiBounds": {
+        "toolbar": {
+          "x": 0.0,
+          "y": 0.0,
+          "width": 720.0,
+          "height": 56.0
+        },
+        "titleBounds": {
+          "x": 16.0,
+          "y": 18.4,
+          "width": 164.8,
+          "height": 20.0
+        },
+        "button": {
+          "x": 643.2,
+          "y": 12.0,
+          "width": 60.8,
+          "height": 32.0
+        }
+      },
+      "edgeDeltas": {
+        "toolbar": {
+          "left": 0.0,
+          "top": 0.0,
+          "right": 0.0,
+          "bottom": 0.0
+        },
+        "titleBounds": {
+          "left": 0.0,
+          "top": 0.3999999999999986,
+          "right": 0.30000000000001137,
+          "bottom": 0.3999999999999986
+        },
+        "button": {
+          "left": -0.5499999999999545,
+          "top": 0.0,
+          "right": 0.0,
+          "bottom": 0.0
+        }
+      },
+      "pixels": {
+        "differentPixels": 2126,
+        "totalPixels": 63000,
+        "differentPixelBounds": [
+          0,
+          0,
+          900,
+          55
+        ]
+      },
+      "layoutWithinOneLogicalPixel": true
+    }
+  ]
+}
