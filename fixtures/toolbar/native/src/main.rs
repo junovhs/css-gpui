@@ -1,3 +1,5 @@
+use std::{borrow::Cow, env, fs};
+
 use gpui::prelude::*;
 use gpui::{
     App, Application, Bounds, Context, Render, Window, WindowBounds, WindowOptions, px, size,
@@ -14,12 +16,28 @@ impl Render for Toolbar {
 }
 
 fn main() {
-    let width = std::env::args()
+    let width = env::args()
         .nth(1)
         .map(|arg| arg.parse::<f32>().expect("window width must be a number"))
         .unwrap_or(720.0);
+    let height = env::var("CSS_GPUI_HOST_HEIGHT")
+        .ok()
+        .map(|arg| arg.parse::<f32>().expect("window height must be a number"))
+        .unwrap_or(100.0);
     Application::new().run(move |cx: &mut App| {
-        let bounds = Bounds::centered(None, size(px(width), px(100.0)), cx);
+        if let Some(directory) = env::var_os("CSS_GPUI_HOST_FONTS") {
+            let fonts = fs::read_dir(directory)
+                .expect("read host font directory")
+                .map(|entry| {
+                    let path = entry.expect("read font entry").path();
+                    Cow::Owned(fs::read(path).expect("read font bytes"))
+                })
+                .collect();
+            cx.text_system()
+                .add_fonts(fonts)
+                .expect("register fonts in GPUI");
+        }
+        let bounds = Bounds::centered(None, size(px(width), px(height)), cx);
         cx.open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),

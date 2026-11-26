@@ -1,0 +1,751 @@
+{
+  "losses": [
+    {
+      "path": "/html/body/div[1]/aside[1]",
+      "property": "z-index",
+      "value": "10"
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/div[1]/button[1]/span[1]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/div[1]/button[1]/strong[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.665px"
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/div[1]/button[1]/strong[1]/text()[2]",
+      "property": "letter-spacing",
+      "value": "-0.665px"
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/div[1]/p[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "0.11px"
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/div[1]/p[1]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/div[1]/p[1]/text()[2]",
+      "property": "letter-spacing",
+      "value": "0.11px"
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/nav[1]",
+      "property": "transform",
+      "value": "matrix(1, 0, 0, 1, -338, 0)"
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/nav[1]/a[1]",
+      "property": "corner-specific border-radius",
+      "value": "2px 0px 0px 2px"
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/nav[1]/a[1]::before",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/nav[1]/a[1]::after",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/nav[1]/a[1]/span[1]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/nav[1]/a[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "1.43px"
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/nav[1]/a[1]/span[2]",
+      "property": "corner-specific border-radius",
+      "value": "2px 0px 0px 2px"
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/nav[1]/a[1]/span[2]::before",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/nav[1]/button[1]::before",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/nav[1]/button[1]::after",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/nav[1]/button[1]/span[1]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/nav[1]/button[1]/span[2]/span[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "1.43px"
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/nav[1]/button[1]/span[3]::before",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/nav[1]/div[1]::before",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/nav[1]/div[1]/button[1]",
+      "property": "corner-specific border-radius",
+      "value": "2px 0px 0px 2px"
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/nav[1]/div[1]/button[1]::before",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/nav[1]/div[1]/button[1]/span[1]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/nav[1]/div[1]/button[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "1.43px"
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/nav[1]/div[1]/button[1]/span[2]",
+      "property": "corner-specific border-radius",
+      "value": "2px 0px 0px 2px"
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/nav[1]/div[1]/button[1]/span[2]::before",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/div[2]/div[1]/button[1]/span[1]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/div[2]/div[1]/button[1]/span[2]::before",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/aside[1]/div[2]/div[1]/button[1]/span[2]/text()[1]",
+      "property": "letter-spacing",
+      "value": "0.72px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/header[1]",
+      "property": "z-index",
+      "value": "2"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]",
+      "property": "z-index",
+      "value": "1"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[1]/button[1]/span[1]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[1]/button[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "2.04px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[1]/div[1]/button[1]/span[1]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[1]/div[1]/button[2]/span[1]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[2]/h1[1]/span[1]/span[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.896px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[2]/h1[1]/span[1]/span[2]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.896px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[2]/h1[1]/span[1]/span[3]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.896px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[2]/h1[1]/span[1]/span[4]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.896px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[2]/h1[1]/span[1]/span[5]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.896px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[2]/h1[1]/span[1]/span[6]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.896px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[2]/h1[1]/span[1]/span[7]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.896px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[2]/h1[1]/span[1]/span[8]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.896px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[2]/h1[1]/span[1]/span[9]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.896px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[2]/h1[1]/span[1]/span[10]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.896px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[2]/h1[1]/span[1]/span[11]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.896px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[2]/h1[1]/span[1]/span[13]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.896px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[2]/h1[1]/span[1]/span[14]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.896px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[2]/h1[1]/span[1]/span[15]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.896px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[2]/h1[1]/span[1]/span[17]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.896px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[2]/h1[1]/span[1]/span[18]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.896px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[2]/h1[1]/span[2]",
+      "property": "transform",
+      "value": "matrix(1, 0, 0, 1, -9, -15)"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[1]/div[2]/h1[1]/span[2]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]",
+      "property": "z-index",
+      "value": "1"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/header[1]/div[1]/strong[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "2.56px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/header[1]/div[1]/p[1]/span[1]/span[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.34px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/header[1]/div[1]/p[1]/span[1]/span[2]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.34px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/header[1]/div[1]/p[1]/span[2]/span[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.34px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/header[1]/div[1]/p[1]/span[3]/span[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.34px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/header[1]/div[1]/p[1]/span[3]/span[2]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.34px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/header[1]/div[1]/p[1]/span[4]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.34px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/header[1]/div[2]::after",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/header[1]/div[2]/span[1]",
+      "property": "transform",
+      "value": "matrix(0.111111, 0, 0, 1, 0, 0)"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/header[1]/div[2]/span[1]::before",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/header[1]/div[2]/span[1]::after",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/header[1]/button[2]::before",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/header[1]/button[2]/span[1]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/header[1]/button[2]/text()[1]",
+      "property": "letter-spacing",
+      "value": "1.43px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[1]/button[1]::after",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[1]/button[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "1.76px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[2]::after",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[2]/article[1]::before",
+      "property": "generated content",
+      "value": "counter(ncrow, decimal-leading-zero)"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[2]/article[1]::after",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[2]/article[1]/button[1]",
+      "property": "z-index",
+      "value": "3"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[2]/article[1]/button[2]::before",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[2]/article[1]/button[2]::after",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[2]/article[1]/button[2]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[2]/article[1]/button[3]/span[1]::after",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[2]/article[1]/button[3]/span[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.085px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[2]/article[1]/button[3]/span[2]/span[1]/span[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "0.6px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[2]/article[1]/button[3]/span[2]/span[1]/span[3]/text()[1]",
+      "property": "letter-spacing",
+      "value": "0.6px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[2]/article[1]/button[3]/span[3]",
+      "property": "opacity",
+      "value": "0.45"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[2]/article[1]/button[3]/span[3]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[2]/article[1]/button[4]/span[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "1.1px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[2]/article[1]/button[4]/span[2]/text()[1]",
+      "property": "letter-spacing",
+      "value": "1.1px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[2]/article[1]/div[1]/button[1]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[3]",
+      "property": "transform",
+      "value": "matrix(1, 0, 0, 1, 0, 0)"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[3]/p[1]/span[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "1.4px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[3]/p[2]/span[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "1.4px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[3]/p[2]/button[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "0.66px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[3]/p[2]/button[1]/span[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "0.66px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[1]::before",
+      "property": "generated content",
+      "value": "counter(ncrow, decimal-leading-zero)"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[1]::after",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[1]/button[1]",
+      "property": "z-index",
+      "value": "3"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[1]/button[2]::after",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[1]/button[2]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[1]/button[3]/span[1]::after",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[1]/button[3]/span[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.085px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[1]/button[3]/span[2]/span[1]/span[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "0.6px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[1]/button[3]/span[2]/span[1]/span[3]/text()[1]",
+      "property": "letter-spacing",
+      "value": "0.6px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[1]/button[3]/span[3]",
+      "property": "opacity",
+      "value": "0.45"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[1]/button[3]/span[3]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[1]/div[1]/button[1]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[2]::before",
+      "property": "generated content",
+      "value": "counter(ncrow, decimal-leading-zero)"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[2]::after",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[2]/button[1]",
+      "property": "z-index",
+      "value": "3"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[2]/button[2]::after",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[2]/button[2]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[2]/button[3]/span[1]::after",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[2]/button[3]/span[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.085px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[2]/button[3]/span[2]/span[1]/span[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "0.6px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[2]/button[3]/span[2]/span[1]/span[3]/text()[1]",
+      "property": "letter-spacing",
+      "value": "0.6px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[2]/button[3]/span[3]",
+      "property": "opacity",
+      "value": "0.45"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[2]/button[3]/span[3]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[2]/div[1]/button[1]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[3]::before",
+      "property": "generated content",
+      "value": "counter(ncrow, decimal-leading-zero)"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[3]::after",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[3]/button[1]",
+      "property": "z-index",
+      "value": "3"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[3]/button[2]::after",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[3]/button[2]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[3]/button[3]/span[1]::after",
+      "property": "generated content",
+      "value": "\"\""
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[3]/button[3]/span[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "-0.085px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[3]/button[3]/span[2]/span[1]/span[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "0.6px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[3]/button[3]/span[2]/span[1]/span[3]/text()[1]",
+      "property": "letter-spacing",
+      "value": "0.6px"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[3]/button[3]/span[3]",
+      "property": "opacity",
+      "value": "0.45"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[3]/button[3]/span[3]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[3]/div[1]/button[1]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/button[1]",
+      "property": "z-index",
+      "value": "90"
+    },
+    {
+      "path": "/html/body/button[1]/span[2]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/button[1]/span[2]/span[1]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/button[1]/span[2]/span[2]/svg[1]",
+      "property": "element artwork",
+      "value": "svg"
+    },
+    {
+      "path": "/html/body/button[1]/span[3]/span[1]/text()[1]",
+      "property": "letter-spacing",
+      "value": "1.43px"
+    },
+    {
+      "path": "/html/body/div[5]",
+      "property": "z-index",
+      "value": "45"
+    },
+    {
+      "path": "/html/body/div[6]",
+      "property": "z-index",
+      "value": "45"
+    },
+    {
+      "path": "/html/body/div[7]",
+      "property": "z-index",
+      "value": "46"
+    }
+  ],
+  "loadedFonts": [
+    {
+      "family": "DM Sans",
+      "weight": "400"
+    },
+    {
+      "family": "DM Sans",
+      "weight": "500"
+    },
+    {
+      "family": "DM Sans",
+      "weight": "600"
+    },
+    {
+      "family": "DM Sans",
+      "weight": "700"
+    },
+    {
+      "family": "DM Sans",
+      "weight": "800"
+    },
+    {
+      "family": "DM Sans",
+      "weight": "900"
+    },
+    {
+      "family": "JetBrains Mono",
+      "weight": "400"
+    },
+    {
+      "family": "JetBrains Mono",
+      "weight": "500"
+    },
+    {
+      "family": "JetBrains Mono",
+      "weight": "600"
+    },
+    {
+      "family": "JetBrains Mono",
+      "weight": "700"
+    }
+  ],
+  "scale": 1.25,
+  "chrome": "158.0.8127.36",
+  "appRevision": "a1375b8a54f77f6ecdb18a24081980aab16c1190",
+  "gpui": "0.2.2",
+  "logicalViewport": [
+    1280,
+    900
+  ],
+  "framePixels": [
+    1600,
+    1125
+  ],
+  "nativeNodeCount": 92,
+  "webfontsLoaded": 2,
+  "pixels": {
+    "differentPixels": 208104,
+    "totalPixels": 1800000,
+    "differentPixelBounds": [
+      0,
+      0,
+      1600,
+      1125
+    ]
+  },
+  "pixelParity": false
+}
