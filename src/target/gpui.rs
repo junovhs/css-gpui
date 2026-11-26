@@ -31,14 +31,41 @@ impl TargetEmitter for GpuiTarget {
              \x20   div().flex().flex_col().w_full()\n",
         );
         let mut declared_loss = Vec::new();
-        for root in scene.nodes.iter().filter(|node| node.parent_id.is_none()) {
-            emit_child(&mut rust, scene, root, None, 8, &mut declared_loss);
-        }
+        emit_children(&mut rust, scene, None, 8, &mut declared_loss);
         rust.push_str("}\n");
+        emit_assets(&mut rust, scene);
         TargetEmission {
             artifact: rust,
             declared_loss,
         }
+    }
+}
+
+// A long builder chain stores each intermediate Div on the Windows debug
+// stack. Wide sibling lists build and erase each element in its own closure.
+fn emit_children(
+    rust: &mut String,
+    scene: &SceneIr,
+    parent: Option<&IrNode>,
+    indent: usize,
+    losses: &mut Vec<CapabilityGap>,
+) {
+    let parent_id = parent.map(|node| node.id.as_str());
+    let children: Vec<_> = scene
+        .nodes
+        .iter()
+        .filter(|node| node.parent_id.as_deref() == parent_id)
+        .collect();
+    if children.len() <= 16 {
+        for child in children {
+            emit_child(rust, scene, child, parent, indent, losses, false);
+        }
+    } else {
+        writeln!(rust, "{:indent$}.children([", "").unwrap();
+        for child in children {
+            emit_child(rust, scene, child, parent, indent + 4, losses, true);
+        }
+        writeln!(rust, "{:indent$}])", "").unwrap();
     }
 }
 
@@ -49,6 +76,7 @@ fn emit_child(
     parent: Option<&IrNode>,
     indent: usize,
     losses: &mut Vec<CapabilityGap>,
+    array_item: bool,
 ) {
     let positioned_text = node.kind == NodeKind::Text && node.layout.position == Position::Absolute;
     if node.kind == NodeKind::Text
@@ -57,14 +85,24 @@ fn emit_child(
             || parent.and_then(|p| p.typography.as_ref()) == node.typography.as_ref())
     {
         let text = node.text_content.as_deref().unwrap_or_default();
-        writeln!(rust, "{:indent$}.child({text:?})", "").unwrap();
+        if array_item {
+            writeln!(rust, "{:indent$}{text:?}.into_any_element(),", "").unwrap();
+        } else {
+            writeln!(rust, "{:indent$}.child({text:?})", "").unwrap();
+        }
         return;
     }
 
-    writeln!(rust, "{:indent$}.child(", "").unwrap();
+    let (opening, closing) = if array_item {
+        ("(|| {", "})().into_any_element(),")
+    } else {
+        (".child(", ")")
+    };
+    writeln!(rust, "{:indent$}{opening}", "").unwrap();
     let element = match &node.kind {
-        NodeKind::Svg(markup) => format!(
-            "gpui::img(std::sync::Arc::new(gpui::Image::from_bytes(gpui::ImageFormat::Svg, {markup:?}.as_bytes().to_vec())))"
+        NodeKind::Svg(_) => format!(
+            "gpui::img(gpui::ImageSource::Resource(gpui::Resource::Embedded({:?}.into())))",
+            svg_asset_path(node)
         ),
         _ => "div()".to_owned(),
     };
@@ -115,20 +153,62 @@ fn emit_child(
         ));
     }
     if matches!(&node.kind, NodeKind::Svg(_)) {
-        writeln!(rust, "{:indent$})", "").unwrap();
+        writeln!(rust, "{:indent$}{closing}", "").unwrap();
         return;
     }
     if let Some(text) = &node.text_content {
         method(&format!("child({text:?})"));
     }
-    for child in scene
+    emit_children(rust, scene, Some(node), style_indent, losses);
+    writeln!(rust, "{:indent$}{closing}", "").unwrap();
+}
+
+fn svg_asset_path(node: &IrNode) -> String {
+    format!("css-gpui/{}.svg", node.id)
+}
+
+fn emit_assets(rust: &mut String, scene: &SceneIr) {
+    let artwork: Vec<_> = scene
         .nodes
         .iter()
-        .filter(|child| child.parent_id.as_deref() == Some(node.id.as_str()))
-    {
-        emit_child(rust, scene, child, Some(node), style_indent, losses);
+        .filter_map(|node| match &node.kind {
+            NodeKind::Svg(markup) => Some((svg_asset_path(node), markup)),
+            _ => None,
+        })
+        .collect();
+    if artwork.is_empty() {
+        rust.push_str("\npub fn scene_assets() -> impl gpui::AssetSource {\n    ()\n}\n");
+        return;
     }
-    writeln!(rust, "{:indent$})", "").unwrap();
+
+    rust.push_str(
+        "\nstruct SceneAssets;\n\n\
+         pub fn scene_assets() -> impl gpui::AssetSource {\n\
+         \x20   SceneAssets\n\
+         }\n\n\
+         impl gpui::AssetSource for SceneAssets {\n\
+         \x20   fn load(&self, path: &str) -> gpui::Result<Option<std::borrow::Cow<'static, [u8]>>> {\n\
+         \x20       let bytes: Option<&'static [u8]> = match path {\n",
+    );
+    for (path, markup) in &artwork {
+        writeln!(rust, "            {path:?} => Some({markup:?}.as_bytes()),").unwrap();
+    }
+    rust.push_str(
+        "            _ => None,\n\
+         \x20       };\n\
+         \x20       Ok(bytes.map(std::borrow::Cow::Borrowed))\n\
+         \x20   }\n\n\
+         \x20   fn list(&self, path: &str) -> gpui::Result<Vec<gpui::SharedString>> {\n\
+         \x20       Ok([\n",
+    );
+    for (path, _) in &artwork {
+        writeln!(rust, "            {path:?},").unwrap();
+    }
+    rust.push_str(
+        "        ].into_iter().filter(|asset| asset.starts_with(path)).map(gpui::SharedString::from).collect())\n\
+         \x20   }\n\
+         }\n",
+    );
 }
 
 fn emit_layout(

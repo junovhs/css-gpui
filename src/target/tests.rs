@@ -345,7 +345,7 @@ fn standalone_svg_reaches_both_renderers_as_the_original_artwork() {
     assert!(scene_capabilities(&scene).contains(&Capability::SvgArtwork));
     let rust = gpui::GpuiTarget.emit(&scene);
     assert!(rust.declared_loss.is_empty());
-    assert!(rust.artifact.contains("gpui::ImageFormat::Svg"));
+    assert!(rust.artifact.contains("gpui::Resource::Embedded"));
     assert!(rust.artifact.contains(&format!("{markup:?}.as_bytes()")));
 
     let reference = crate::emitter::emit(&scene);

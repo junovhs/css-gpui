@@ -32,7 +32,7 @@ export function snapshotScene() {
         nodes.push({
             id: "n" + nodes.length,
             parent_id,
-            kind: content.singleLine ? "text" : "box",
+            kind: content.svg ? { svg: content.svg } : content.singleLine ? "text" : "box",
             layout: {
                 position: parent_id ? "absolute" : "static",
                 display: "block",
@@ -243,12 +243,74 @@ export function snapshotScene() {
         addNode(path, rect, {}, { text: visibleText, typography, singleLine: boxes.length === 1 });
     }
 
+    function visibleSvg(element, path, rect) {
+        const namespace = "http://www.w3.org/2000/svg";
+        const allowed = new Set([
+            "svg", "g", "defs", "clipPath", "mask", "linearGradient", "radialGradient", "stop",
+            "path", "rect", "circle", "ellipse", "polygon", "polyline", "line",
+        ]);
+        const artwork = [element, ...element.querySelectorAll("*")];
+        if (artwork.some(part => !allowed.has(part.localName))) {
+            loss(path, "SVG artwork", "unsupported SVG element");
+            return;
+        }
+        const presentation = [
+            "fill", "fill-opacity", "fill-rule", "stroke", "stroke-width", "stroke-opacity",
+            "stroke-linecap", "stroke-linejoin", "stroke-miterlimit", "stroke-dasharray",
+            "stroke-dashoffset", "stop-color", "stop-opacity", "opacity", "clip-rule",
+            "clip-path", "mask", "display", "visibility", "vector-effect",
+        ];
+        const copy = element.cloneNode(true);
+        const copies = [copy, ...copy.querySelectorAll("*")];
+        for (const [index, original] of artwork.entries()) {
+            const clone = copies[index];
+            for (const attribute of [...clone.attributes]) {
+                if (/^(?:on|data-)/i.test(attribute.name) || ["class", "style", "href", "xlink:href"].includes(attribute.name)) {
+                    clone.removeAttributeNode(attribute);
+                } else if (/url\(/i.test(attribute.value) && !/^url\(#[-\w:.]+\)$/.test(attribute.value)) {
+                    loss(path, "SVG attribute reference", attribute.name);
+                    return;
+                }
+            }
+            const style = getComputedStyle(original);
+            for (const property of presentation) {
+                let value = style.getPropertyValue(property);
+                if (!value) continue;
+                if (/^currentcolor$/i.test(value)) value = style.color;
+                if (value.includes("url(")) {
+                    const match = /^url\("?(?:[^#"]*)#([-\w:.]+)"?\)$/.exec(value);
+                    if (!match || !artwork.some(part => part.id === match[1])) {
+                        loss(path, "SVG computed reference", property);
+                        return;
+                    }
+                    value = "url(#" + match[1] + ")";
+                }
+                clone.setAttribute(property, value);
+            }
+        }
+        if (!copy.hasAttribute("viewBox")) {
+            copy.setAttribute("viewBox", "0 0 " + rect.width + " " + rect.height);
+        }
+        copy.setAttribute("width", String(rect.width * devicePixelRatio));
+        copy.setAttribute("height", String(rect.height * devicePixelRatio));
+        const markup = new XMLSerializer().serializeToString(copy);
+        if (copy.namespaceURI !== namespace) {
+            loss(path, "SVG namespace", copy.namespaceURI);
+            return;
+        }
+        addNode(path, rect, {}, { svg: markup });
+    }
+
     function walk(element, path) {
         const style = getComputedStyle(element);
         if (style.display === "none" || style.visibility !== "visible" || Number(style.opacity) === 0 || fullyClipped(style)) return;
         const rect = element.getBoundingClientRect();
+        if (element.localName === "svg") {
+            if (inFrame(rect)) visibleSvg(element, path, rect);
+            return;
+        }
         if (inFrame(rect)) {
-            if (["svg", "img", "canvas", "video", "input", "textarea"].includes(element.localName)) {
+            if (["img", "canvas", "video", "input", "textarea"].includes(element.localName)) {
                 loss(path, "element artwork", element.localName);
                 return;
             }
@@ -257,7 +319,7 @@ export function snapshotScene() {
             if (Number(getComputedStyle(element, "::after").zIndex) < 0) {
                 pseudoBox(element, rect, style, path, "::after");
             }
-        } else if (["svg", "img", "canvas", "video", "input", "textarea"].includes(element.localName)) {
+        } else if (["img", "canvas", "video", "input", "textarea"].includes(element.localName)) {
             return;
         }
         const indices = new Map();

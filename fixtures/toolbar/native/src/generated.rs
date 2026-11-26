@@ -42,3 +42,7 @@ pub fn render_scene(on_action: fn(&str, &mut gpui::Window, &mut gpui::App)) -> i
                 )
         )
 }
+
+pub fn scene_assets() -> impl gpui::AssetSource {
+    ()
+}
