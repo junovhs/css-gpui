@@ -115,13 +115,14 @@ fn parse_css_declarations(
             });
         }
 
+        let declaration_start = block_offset + cursor + segment_len - segment.trim_start().len();
         declarations.push(CssDeclaration {
             property: property.to_owned(),
             value: value.to_owned(),
             span: span_for(
                 full_source,
-                block_offset + cursor,
-                block_offset + cursor + segment_len,
+                declaration_start,
+                declaration_start + trimmed.len(),
             ),
         });
         cursor += segment_len + 1;
