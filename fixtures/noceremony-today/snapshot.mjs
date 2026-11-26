@@ -28,11 +28,11 @@ export function snapshotScene() {
             && rect.x + rect.width > 0 && rect.y + rect.height > 0;
     }
 
-    function addNode(path, rect, paint = {}, text, typography, parent_id = "n0") {
+    function addNode(path, rect, paint = {}, content = {}, parent_id = "n0") {
         nodes.push({
             id: "n" + nodes.length,
             parent_id,
-            kind: "box",
+            kind: content.singleLine ? "text" : "box",
             layout: {
                 position: parent_id ? "absolute" : "static",
                 display: "block",
@@ -45,8 +45,8 @@ export function snapshotScene() {
                 padding: edges,
             },
             paint,
-            text_content: text,
-            typography,
+            text_content: content.text,
+            typography: content.typography,
             source: { doc_id: 0, dom_path: path },
         });
     }
@@ -59,9 +59,9 @@ export function snapshotScene() {
     // The captured fixed viewport uses the browser's used layout boxes.
     // The Scene IR carries native rectangles and text, independently of the PNG.
     const documentBackground = color(getComputedStyle(document.documentElement).backgroundColor) || "#ffffff";
-    addNode("/html/body", viewport, { background_color: documentBackground }, undefined, undefined, null);
+    addNode("/html/body", viewport, { background_color: documentBackground }, undefined, null);
 
-    function box(element, path, style, rect) {
+    function box(path, style, rect, resolvedTransform = false) {
         const paint = {};
         const fill = color(style.backgroundColor);
         if (fill) paint.background_color = fill;
@@ -111,7 +111,7 @@ export function snapshotScene() {
             ["opacity", style.opacity, "1"],
             ["filter", style.filter, "none"],
             ["text-shadow", style.textShadow, "none"],
-            ["transform", style.transform, "none"],
+            ["transform", resolvedTransform ? "none" : style.transform, "none"],
             ["mask-image", style.maskImage, "none"],
             ["clip-path", style.clipPath, "none"],
             ["mix-blend-mode", style.mixBlendMode, "normal"],
@@ -120,10 +120,94 @@ export function snapshotScene() {
             if (value !== initial) loss(path, property, value);
         }
 
-        for (const pseudo of ["::before", "::after"]) {
-            const content = getComputedStyle(element, pseudo).content;
-            if (content !== "none" && content !== "normal") loss(path + pseudo, "generated content", content);
+    }
+
+    function fullyClipped(style) {
+        const coordinates = /^rect\(([-\d.]+)px, ([-\d.]+)px, ([-\d.]+)px, ([-\d.]+)px\)$/.exec(style.clip);
+        return ((style.position === "absolute" || style.position === "fixed") && coordinates
+                && (Number(coordinates[2]) <= Number(coordinates[4]) || Number(coordinates[3]) <= Number(coordinates[1])))
+            || style.clipPath === "inset(50%)";
+    }
+
+    function pseudoBox(element, owner, style, path, name) {
+        const pseudo = getComputedStyle(element, name);
+        if (pseudo.content === "none" || pseudo.content === "normal" || pseudo.display === "none"
+            || pseudo.visibility !== "visible" || Number(pseudo.opacity) === 0 || fullyClipped(pseudo)) return;
+
+        const pseudoPath = path + name;
+        if (pseudo.content !== '""') {
+            loss(pseudoPath, "generated content", pseudo.content);
+            return;
         }
+        const hasPaint = color(pseudo.backgroundColor)
+            || pseudo.backgroundImage !== "none"
+            || pseudo.boxShadow !== "none"
+            || ["Top", "Right", "Bottom", "Left"].some(side => parseFloat(pseudo["border" + side + "Width"]) > 0);
+        if (!hasPaint) return;
+
+        const pixels = value => /^[-\d.]+px$/.test(value) ? parseFloat(value) : NaN;
+        const width = pixels(pseudo.width);
+        const height = pixels(pseudo.height);
+        const left = pixels(pseudo.left);
+        const top = pixels(pseudo.top);
+        const right = pixels(pseudo.right);
+        const bottom = pixels(pseudo.bottom);
+        if (pseudo.position !== "absolute" || style.position === "static"
+            || !Number.isFinite(width) || !Number.isFinite(height)
+            || (!Number.isFinite(left) && !Number.isFinite(right))
+            || (!Number.isFinite(top) && !Number.isFinite(bottom))) {
+            loss(pseudoPath, "generated box", pseudo.position);
+            return;
+        }
+
+        const ownerLeft = owner.x + pixels(style.borderLeftWidth);
+        const ownerTop = owner.y + pixels(style.borderTopWidth);
+        const ownerRight = owner.x + owner.width - pixels(style.borderRightWidth);
+        const ownerBottom = owner.y + owner.height - pixels(style.borderBottomWidth);
+        const inlineExtra = pseudo.boxSizing === "border-box" ? 0
+            : pixels(pseudo.paddingLeft) + pixels(pseudo.paddingRight)
+                + pixels(pseudo.borderLeftWidth) + pixels(pseudo.borderRightWidth);
+        const blockExtra = pseudo.boxSizing === "border-box" ? 0
+            : pixels(pseudo.paddingTop) + pixels(pseudo.paddingBottom)
+                + pixels(pseudo.borderTopWidth) + pixels(pseudo.borderBottomWidth);
+        const rect = {
+            width: width + inlineExtra,
+            height: height + blockExtra,
+            x: 0,
+            y: 0,
+        };
+        rect.x = Number.isFinite(left)
+            ? ownerLeft + left + (pixels(pseudo.marginLeft) || 0)
+            : ownerRight - right - (pixels(pseudo.marginRight) || 0) - rect.width;
+        rect.y = Number.isFinite(top)
+            ? ownerTop + top + (pixels(pseudo.marginTop) || 0)
+            : ownerBottom - bottom - (pixels(pseudo.marginBottom) || 0) - rect.height;
+        if (pseudo.transform !== "none") {
+            const transform = new DOMMatrixReadOnly(pseudo.transform);
+            if (!transform.is2D || transform.b !== 0 || transform.c !== 0) {
+                loss(pseudoPath, "transform", pseudo.transform);
+                return;
+            }
+            const [originX, originY] = pseudo.transformOrigin.split(/\s+/);
+            const used = (value, length) => value.endsWith("%")
+                ? length * parseFloat(value) / 100
+                : pixels(value);
+            const transformX = used(originX, rect.width);
+            const transformY = used(originY, rect.height);
+            rect.x += transform.e + (1 - transform.a) * transformX;
+            rect.y += transform.f + (1 - transform.d) * transformY;
+            rect.width *= transform.a;
+            rect.height *= transform.d;
+            if (rect.width < 0) {
+                rect.x += rect.width;
+                rect.width = -rect.width;
+            }
+            if (rect.height < 0) {
+                rect.y += rect.height;
+                rect.height = -rect.height;
+            }
+        }
+        if (inFrame(rect)) box(pseudoPath, pseudo, rect, true);
     }
 
     function textNode(node, path, style) {
@@ -149,25 +233,30 @@ export function snapshotScene() {
         const visibleText = style.textTransform === "uppercase" ? collapsed.toUpperCase()
             : style.textTransform === "lowercase" ? collapsed.toLowerCase() : collapsed;
         if (!["none", "uppercase", "lowercase"].includes(style.textTransform)) loss(path, "text-transform", style.textTransform);
-        addNode(path, rect, {}, visibleText, {
+        const typography = {
             font_family: nativeFamilies,
             font_size: parseFloat(style.fontSize),
             font_weight: Math.round(Number(style.fontWeight)) || 400,
             line_height: { kind: "length", value: rect.height },
             color: ink,
-        });
+        };
+        addNode(path, rect, {}, { text: visibleText, typography, singleLine: boxes.length === 1 });
     }
 
     function walk(element, path) {
         const style = getComputedStyle(element);
-        if (style.display === "none" || style.visibility !== "visible" || Number(style.opacity) === 0) return;
+        if (style.display === "none" || style.visibility !== "visible" || Number(style.opacity) === 0 || fullyClipped(style)) return;
         const rect = element.getBoundingClientRect();
         if (inFrame(rect)) {
             if (["svg", "img", "canvas", "video", "input", "textarea"].includes(element.localName)) {
                 loss(path, "element artwork", element.localName);
                 return;
             }
-            box(element, path, style, rect);
+            box(path, style, rect);
+            pseudoBox(element, rect, style, path, "::before");
+            if (Number(getComputedStyle(element, "::after").zIndex) < 0) {
+                pseudoBox(element, rect, style, path, "::after");
+            }
         } else if (["svg", "img", "canvas", "video", "input", "textarea"].includes(element.localName)) {
             return;
         }
@@ -180,6 +269,9 @@ export function snapshotScene() {
             const childPath = path + "/" + name + "[" + index + "]";
             if (child.nodeType === Node.ELEMENT_NODE) walk(child, childPath);
             else textNode(child, childPath, style);
+        }
+        if (inFrame(rect) && !(Number(getComputedStyle(element, "::after").zIndex) < 0)) {
+            pseudoBox(element, rect, style, path, "::after");
         }
     }
 

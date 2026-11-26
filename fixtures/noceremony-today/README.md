@@ -31,7 +31,7 @@ check and a pixel comparison answer separate questions.
 
 The adjacent `source.html` and `source.css` are a reduced compiler diagnostics
 case. Their Rust test checks text order and reports unsupported CSS Grid. The
-native conversion and visual comparison are pending.
+direct responsive conversion is pending.
 
 ## Compile the real app's fixed browser frame
 
@@ -48,10 +48,25 @@ loads the sample day. Browser layout determines the fixed coordinates. GPUI
 receives native rectangles, borders, and text. The reference PNG is saved
 separately and is never passed to the generator. `losses.json` identifies
 unrepresented CSS effects and elements by DOM path, including the SVG artwork
-and layered backgrounds. Downloaded font files are collected locally for a
+and gradient fills. Downloaded font files are collected locally for a
 native host to load.
 
 The direct source compiler currently stops at the bare `crossorigin` attribute
 in noceremony's original `index.html`. The browser-resolved path allows a visual
 comparison for one viewport while work on direct, responsive conversion remains
 open.
+
+## Compare Chrome and GPUI on Windows
+
+With the pinned app running locally, install Pillow, windows-capture 2.0.1,
+FontTools and Brotli for Python, then run:
+
+```text
+python fixtures/noceremony-today/compare_windows.py <path-to-noceremony>
+```
+
+[Comparison image](comparison.png) shows the original browser frame, the native
+GPUI capture, and all changed RGB pixels in pink. [The report](comparison.json)
+records the exact count and source paths for remaining losses. The native
+preview reproduces the dark first task plate and excludes CSS-clipped text.
+SVGs, gradient fills, letter spacing, and text rasterization still differ.

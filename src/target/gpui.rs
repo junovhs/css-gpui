@@ -50,7 +50,9 @@ fn emit_child(
     indent: usize,
     losses: &mut Vec<CapabilityGap>,
 ) {
+    let positioned_text = node.kind == NodeKind::Text && node.layout.position == Position::Absolute;
     if node.kind == NodeKind::Text
+        && !positioned_text
         && (node.typography.is_none()
             || parent.and_then(|p| p.typography.as_ref()) == node.typography.as_ref())
     {
@@ -64,6 +66,9 @@ fn emit_child(
     let style_indent = indent + 8;
     let mut method = |call: &str| writeln!(rust, "{:style_indent$}.{call}", "").unwrap();
     emit_layout(node, parent, &mut method, losses);
+    if positioned_text {
+        method("whitespace_nowrap()");
+    }
     if let Some(color) = &node.paint.background_color {
         emit_color(
             node,
