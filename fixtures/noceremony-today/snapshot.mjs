@@ -1,5 +1,5 @@
 // Run in the browser after the original application renders its sample day.
-export function snapshotScene() {
+export function snapshotScene(generatedText = {}) {
     const viewport = { x: 0, y: 0, width: innerWidth, height: innerHeight };
     const nodes = [];
     const losses = new Map();
@@ -233,7 +233,14 @@ export function snapshotScene() {
 
         const pseudoPath = path + name;
         if (pseudo.content !== '""') {
-            loss(pseudoPath, "generated content", pseudo.content);
+            const fragments = generatedText[pseudoPath];
+            if (fragments) {
+                for (const fragment of fragments) {
+                    if (inFrame(fragment)) paintText(pseudoPath, fragment, pseudo, fragment.text, true);
+                }
+            } else {
+                loss(pseudoPath, "generated content", pseudo.content);
+            }
             return;
         }
         const hasPaint = color(pseudo.backgroundColor)
@@ -313,8 +320,7 @@ export function snapshotScene() {
     function textNode(node, path, style) {
         const text = node.nodeValue;
         const content = text.trim();
-        const ink = color(style.color);
-        if (!content || !ink) return;
+        if (!content) return;
         const range = document.createRange();
         range.setStart(node, text.length - text.trimStart().length);
         range.setEnd(node, text.trimEnd().length);
@@ -322,6 +328,16 @@ export function snapshotScene() {
         if (!boxes.some(inFrame)) return;
         if (boxes.length !== 1) loss(path, "multiple text fragments", String(boxes.length));
         const rect = range.getBoundingClientRect();
+        const collapsed = /^(normal|nowrap|pre-line)$/.test(style.whiteSpace) ? content.replace(/\s+/g, " ") : content;
+        const visibleText = style.textTransform === "uppercase" ? collapsed.toUpperCase()
+            : style.textTransform === "lowercase" ? collapsed.toLowerCase() : collapsed;
+        if (!["none", "uppercase", "lowercase"].includes(style.textTransform)) loss(path, "text-transform", style.textTransform);
+        paintText(path, rect, style, visibleText, boxes.length === 1);
+    }
+
+    function paintText(path, rect, style, text, singleLine) {
+        const ink = color(style.color);
+        if (!ink) return;
         const families = style.fontFamily.split(",").map(name => name.trim().replace(/^['"]|['"]$/g, ""));
         const nativeFamilies = families.filter(name => !/^(?:ui-.+|system-ui|sans-serif|serif|monospace)$/.test(name));
         if (!nativeFamilies.length) nativeFamilies.push(families.includes("monospace") ? "Consolas" : "Segoe UI");
@@ -329,10 +345,6 @@ export function snapshotScene() {
         if (style.textDecorationLine !== "none") loss(path, "text-decoration", style.textDecorationLine);
         if (style.fontStyle !== "normal") loss(path, "font-style", style.fontStyle);
 
-        const collapsed = /^(normal|nowrap|pre-line)$/.test(style.whiteSpace) ? content.replace(/\s+/g, " ") : content;
-        const visibleText = style.textTransform === "uppercase" ? collapsed.toUpperCase()
-            : style.textTransform === "lowercase" ? collapsed.toLowerCase() : collapsed;
-        if (!["none", "uppercase", "lowercase"].includes(style.textTransform)) loss(path, "text-transform", style.textTransform);
         const typography = {
             font_family: nativeFamilies,
             font_size: parseFloat(style.fontSize),
@@ -340,7 +352,7 @@ export function snapshotScene() {
             line_height: { kind: "length", value: rect.height },
             color: ink,
         };
-        addNode(path, rect, {}, { text: visibleText, typography, singleLine: boxes.length === 1 });
+        addNode(path, rect, {}, { text, typography, singleLine });
     }
 
     function visibleSvg(element, path, rect) {
@@ -409,14 +421,20 @@ export function snapshotScene() {
             if (inFrame(rect)) visibleSvg(element, path, rect);
             return;
         }
-        if (inFrame(rect)) {
+        const visible = inFrame(rect);
+        const afterZ = visible ? Number(getComputedStyle(element, "::after").zIndex) || 0 : 0;
+        if (visible) {
             if (["img", "canvas", "video", "input", "textarea"].includes(element.localName)) {
                 loss(path, "element artwork", element.localName);
                 return;
             }
             box(path, style, rect);
+            const beforeZ = Number(getComputedStyle(element, "::before").zIndex) || 0;
+            if (afterZ < 0 && afterZ < beforeZ) {
+                pseudoBox(element, rect, style, path, "::after");
+            }
             pseudoBox(element, rect, style, path, "::before");
-            if (Number(getComputedStyle(element, "::after").zIndex) < 0) {
+            if (afterZ < 0 && afterZ >= beforeZ) {
                 pseudoBox(element, rect, style, path, "::after");
             }
         } else if (["img", "canvas", "video", "input", "textarea"].includes(element.localName)) {
@@ -432,7 +450,7 @@ export function snapshotScene() {
             if (child.nodeType === Node.ELEMENT_NODE) walk(child, childPath);
             else textNode(child, childPath, style);
         }
-        if (inFrame(rect) && !(Number(getComputedStyle(element, "::after").zIndex) < 0)) {
+        if (visible && afterZ >= 0) {
             pseudoBox(element, rect, style, path, "::after");
         }
     }

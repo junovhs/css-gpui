@@ -48,7 +48,8 @@ loads the sample day. Browser layout determines the fixed coordinates. GPUI
 receives native rectangles, borders, and text. The reference PNG is saved
 separately and is never passed to the generator. `losses.json` identifies
 unrepresented CSS effects and elements by DOM path. The snapshot includes the
-original inline SVG artwork and supported single-layer linear gradients.
+original inline SVG artwork, supported single-layer linear gradients, and
+the task-rank text resolved by Chromium's layout snapshot.
 Downloaded font files are collected locally for a native host to load.
 
 The direct compiler parses the original `index.html` and stops at the first
@@ -69,6 +70,6 @@ python fixtures/noceremony-today/compare_windows.py <path-to-noceremony>
 GPUI capture, and all changed RGB pixels in pink. [The report](comparison.json)
 records the exact count and source paths for remaining losses. The native
 preview reproduces the dark first task plate and excludes CSS-clipped text.
-The recorded 1600 × 1125 frames differ at 107,262 out of 1,800,000 RGB pixels
-(5.96%). Remaining differences include letter spacing, text and SVG
-rasterization, generated task ranks, and stacking of effects.
+The recorded 1600 × 1125 frames differ at 107,374 out of 1,800,000 RGB pixels
+(5.97%). Remaining differences include letter spacing, text and SVG
+rasterization, and stacking of effects.

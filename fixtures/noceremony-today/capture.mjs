@@ -18,6 +18,52 @@ const require = createRequire(resolve(noceremony, "package.json"));
 const { chromium } = require("playwright");
 const browser = await chromium.launch({ channel: "chrome" });
 
+async function generatedText(page) {
+    const session = await page.context().newCDPSession(page);
+    try {
+        const { documents: [document], strings } = await session.send("DOMSnapshot.captureSnapshot", {
+            computedStyles: [],
+        });
+        const { nodes, layout } = document;
+        const pseudos = nodes.pseudoType ?? { index: [], value: [] };
+        const pseudoTypes = new Map(pseudos.index.map((index, position) => [
+            index, strings[pseudos.value[position]],
+        ]));
+        const counts = new Map();
+        const paths = [];
+        for (const [index, nameIndex] of nodes.nodeName.entries()) {
+            const name = strings[nameIndex].toLowerCase();
+            const parent = nodes.parentIndex[index];
+            const parentPath = paths[parent];
+            const type = pseudoTypes.get(index);
+            let path;
+            if (name === "html") path = "/html";
+            else if (name === "body" && parentPath === "/html") path = "/html/body";
+            else if (parentPath && type) path = parentPath + "::" + type;
+            else if (parentPath && nodes.nodeType[index] === 1) {
+                const siblingKey = parent + "\0" + name;
+                const ordinal = (counts.get(siblingKey) || 0) + 1;
+                counts.set(siblingKey, ordinal);
+                path = parentPath + "/" + name + "[" + ordinal + "]";
+            }
+            paths.push(path);
+        }
+        const fragments = {};
+        for (const [index, node] of layout.nodeIndex.entries()) {
+            if (!pseudoTypes.has(node) || !paths[node]) continue;
+            const text = strings[layout.text[index]];
+            if (!text?.trim()) continue;
+            const [x, y, width, height] = layout.bounds[index];
+            (fragments[paths[node]] ??= []).push({
+                text, x: x - (document.scrollOffsetX ?? 0), y: y - (document.scrollOffsetY ?? 0), width, height,
+            });
+        }
+        return fragments;
+    } finally {
+        await session.detach();
+    }
+}
+
 try {
     const captures = [];
     let matched;
@@ -49,7 +95,7 @@ try {
             await page.mouse.move(0, 0);
             captures.push(await page.screenshot({ animations: "disabled" }));
             if (outputDirectory) {
-                snapshots.push(await page.evaluate(snapshotScene));
+                snapshots.push(await page.evaluate(snapshotScene, await generatedText(page)));
                 await Promise.all(fontRequests);
             }
         } finally {

@@ -231,14 +231,14 @@
       "value": "-1"
     },
     {
-      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[2]/article[1]::before",
-      "property": "generated content",
-      "value": "counter(ncrow, decimal-leading-zero)"
-    },
-    {
       "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[2]/article[1]::after",
       "property": "z-index",
       "value": "-1"
+    },
+    {
+      "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[2]/article[1]::before",
+      "property": "letter-spacing",
+      "value": "0.52px"
     },
     {
       "path": "/html/body/div[1]/main[1]/section[2]/div[1]/div[2]/article[1]/button[1]",
@@ -297,8 +297,8 @@
     },
     {
       "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[1]::before",
-      "property": "generated content",
-      "value": "counter(ncrow, decimal-leading-zero)"
+      "property": "letter-spacing",
+      "value": "0.52px"
     },
     {
       "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[1]/button[1]",
@@ -322,8 +322,8 @@
     },
     {
       "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[2]::before",
-      "property": "generated content",
-      "value": "counter(ncrow, decimal-leading-zero)"
+      "property": "letter-spacing",
+      "value": "0.52px"
     },
     {
       "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[2]/button[1]",
@@ -347,8 +347,8 @@
     },
     {
       "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[3]::before",
-      "property": "generated content",
-      "value": "counter(ncrow, decimal-leading-zero)"
+      "property": "letter-spacing",
+      "value": "0.52px"
     },
     {
       "path": "/html/body/div[1]/main[1]/section[2]/div[1]/section[1]/div[1]/article[3]/button[1]",
@@ -450,10 +450,10 @@
     1600,
     1125
   ],
-  "nativeNodeCount": 123,
-  "webfontsLoaded": 2,
+  "nativeNodeCount": 127,
+  "webfontsLoaded": 4,
   "pixels": {
-    "differentPixels": 107262,
+    "differentPixels": 107374,
     "totalPixels": 1800000,
     "differentPixelBounds": [
       0,
