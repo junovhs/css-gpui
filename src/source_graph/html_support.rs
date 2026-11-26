@@ -89,10 +89,7 @@ fn parse_attribute_value(
         *index += 1;
     }
     if *index >= bytes.len() || bytes[*index] != b'=' {
-        return Err(SourceGraphError::UnsupportedHtml {
-            reason: format!("attribute `{name}` must use quoted `name=\"value\"` syntax"),
-            offset,
-        });
+        return Ok(String::new());
     }
     *index += 1;
     while *index < bytes.len() && bytes[*index].is_ascii_whitespace() {

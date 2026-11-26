@@ -1,5 +1,28 @@
 use super::*;
 use crate::FixtureManifest;
+
+#[test]
+fn bare_html_attributes_keep_following_attribute_values() {
+    let graph = SceneSourceGraph::from_strings(
+        "bare-attributes",
+        r#"<button disabled data-action="open" autofocus>Open</button>"#,
+        "",
+    )
+    .unwrap();
+    let button = graph
+        .html_nodes
+        .iter()
+        .find(|node| node.name.as_deref() == Some("button"))
+        .unwrap();
+    assert_eq!(
+        button.attributes,
+        [
+            ("disabled".to_owned(), String::new()),
+            ("data-action".to_owned(), "open".to_owned()),
+            ("autofocus".to_owned(), String::new()),
+        ]
+    );
+}
 use std::path::PathBuf;
 
 fn repo_root() -> PathBuf {

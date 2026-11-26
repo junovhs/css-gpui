@@ -51,10 +51,10 @@ unrepresented CSS effects and elements by DOM path. The snapshot includes the
 original inline SVG artwork and supported single-layer linear gradients.
 Downloaded font files are collected locally for a native host to load.
 
-The direct source compiler currently stops at the bare `crossorigin` attribute
-in noceremony's original `index.html`. The browser-resolved path allows a visual
-comparison for one viewport while work on direct, responsive conversion remains
-open.
+The direct compiler parses the original `index.html` and stops at the first
+`@import` in `src/style.css`. The task list is populated by the running app.
+The browser-resolved path captures that state and supports a visual comparison
+for one viewport. Direct, responsive conversion remains open.
 
 ## Compare Chrome and GPUI on Windows
 
