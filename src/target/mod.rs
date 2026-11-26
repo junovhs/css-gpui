@@ -100,6 +100,8 @@ pub enum Capability {
     Typography,
     /// A native button control.
     ButtonControl,
+    /// Standalone SVG artwork with its original colors and shapes.
+    SvgArtwork,
 }
 
 impl Capability {
@@ -115,6 +117,7 @@ impl Capability {
             Background,
             Typography,
             ButtonControl,
+            SvgArtwork,
         ]
     }
 }
@@ -170,7 +173,10 @@ fn node_capabilities(node: &IrNode) -> BTreeSet<Capability> {
         NodeKind::Text => {
             caps.insert(Capability::Typography);
         }
-        NodeKind::Box | NodeKind::Control => {
+        NodeKind::Box | NodeKind::Control | NodeKind::Svg(_) => {
+            if matches!(node.kind, NodeKind::Svg(_)) {
+                caps.insert(Capability::SvgArtwork);
+            }
             match node.layout.display {
                 Display::Block => {
                     caps.insert(Capability::BlockLayout);

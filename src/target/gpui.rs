@@ -62,7 +62,13 @@ fn emit_child(
     }
 
     writeln!(rust, "{:indent$}.child(", "").unwrap();
-    writeln!(rust, "{:width$}div()", "", width = indent + 4).unwrap();
+    let element = match &node.kind {
+        NodeKind::Svg(markup) => format!(
+            "gpui::img(std::sync::Arc::new(gpui::Image::from_bytes(gpui::ImageFormat::Svg, {markup:?}.as_bytes().to_vec())))"
+        ),
+        _ => "div()".to_owned(),
+    };
+    writeln!(rust, "{:width$}{element}", "", width = indent + 4).unwrap();
     let style_indent = indent + 8;
     let mut method = |call: &str| writeln!(rust, "{:style_indent$}.{call}", "").unwrap();
     emit_layout(node, parent, &mut method, losses);
@@ -107,6 +113,10 @@ fn emit_child(
             "on_click(move |_, window, cx| on_action({:?}, window, cx))",
             node.id
         ));
+    }
+    if matches!(&node.kind, NodeKind::Svg(_)) {
+        writeln!(rust, "{:indent$})", "").unwrap();
+        return;
     }
     if let Some(text) = &node.text_content {
         method(&format!("child({text:?})"));

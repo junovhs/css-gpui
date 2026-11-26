@@ -1,5 +1,7 @@
 //! HTML generation from IR nodes.
 
+use std::fmt::Write;
+
 use crate::ir::{ControlKind, IrNode, NodeKind, SceneIr};
 
 /// Emit a full HTML document (with an embedded `<link>` to `styles.css`).
@@ -31,10 +33,18 @@ fn render_children(parent_id: Option<&str>, nodes: &[IrNode], depth: usize) -> S
 
 fn render_node(node: &IrNode, all_nodes: &[IrNode], depth: usize) -> String {
     let indent = "  ".repeat(depth);
-    match node.kind {
+    match &node.kind {
         NodeKind::Text => {
             let text = node.text_content.as_deref().unwrap_or("");
             format!("{indent}{}", escape_html(text))
+        }
+        NodeKind::Svg(markup) => {
+            let class = escape_html(&node.id).replace('"', "&quot;");
+            let mut uri = String::with_capacity(markup.len() * 3);
+            for byte in markup.bytes() {
+                write!(uri, "%{byte:02X}").unwrap();
+            }
+            format!("{indent}<img class=\"{class}\" src=\"data:image/svg+xml,{uri}\" alt=\"\">")
         }
         NodeKind::Box | NodeKind::Control => {
             let tag = element_tag(node);

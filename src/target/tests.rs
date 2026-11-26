@@ -211,7 +211,14 @@ fn collect_resources_merges_font_weights_and_sorts_colors() {
 #[test]
 fn scene_capabilities_reports_every_required_family() {
     let caps: Vec<Capability> = scene_capabilities(&sample_scene()).into_iter().collect();
-    assert_eq!(caps, Capability::all().to_vec());
+    assert_eq!(
+        caps,
+        Capability::all()
+            .iter()
+            .copied()
+            .filter(|capability| *capability != Capability::SvgArtwork)
+            .collect::<Vec<_>>()
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -301,7 +308,11 @@ fn expected_conformance_strips_provenance_and_round_trips_through_json() {
     assert_eq!(conformance.conventions, Conventions::v0_1());
     assert_eq!(
         conformance.required_capabilities,
-        Capability::all().to_vec()
+        Capability::all()
+            .iter()
+            .copied()
+            .filter(|capability| *capability != Capability::SvgArtwork)
+            .collect::<Vec<_>>()
     );
     // Pre-order, provenance dropped.
     let ids: Vec<&str> = conformance.nodes.iter().map(|n| n.id.as_str()).collect();
@@ -314,4 +325,33 @@ fn expected_conformance_strips_provenance_and_round_trips_through_json() {
     );
     let restored: ConformanceScene = serde_json::from_str(&json).expect("deserializable");
     assert_eq!(restored, conformance);
+}
+
+#[test]
+fn standalone_svg_reaches_both_renderers_as_the_original_artwork() {
+    let markup = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" fill="#123456"/></svg>"##;
+    let mut json = serde_json::to_value(sample_scene()).unwrap();
+    let node = json["nodes"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|node| node["id"] == "n1")
+        .unwrap();
+    node["kind"] = serde_json::json!({ "svg": markup });
+    node.as_object_mut().unwrap().remove("text_content");
+    node.as_object_mut().unwrap().remove("typography");
+    let scene: SceneIr = serde_json::from_value(json).unwrap();
+
+    assert!(scene_capabilities(&scene).contains(&Capability::SvgArtwork));
+    let rust = gpui::GpuiTarget.emit(&scene);
+    assert!(rust.declared_loss.is_empty());
+    assert!(rust.artifact.contains("gpui::ImageFormat::Svg"));
+    assert!(rust.artifact.contains(&format!("{markup:?}.as_bytes()")));
+
+    let reference = crate::emitter::emit(&scene);
+    assert!(
+        reference
+            .html
+            .contains("src=\"data:image/svg+xml,%3C%73%76%67")
+    );
 }

@@ -77,6 +77,8 @@ pub enum NodeKind {
     Text,
     /// Native UI control. Always has `control_kind` set.
     Control,
+    /// A standalone SVG leaf with its original vector markup.
+    Svg(String),
 }
 
 /// Specific kind of a native UI control node.
