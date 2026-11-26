@@ -46,6 +46,7 @@ pub enum AlignItems {
 #[serde(rename_all = "snake_case")]
 pub enum JustifyContent {
     Center,
+    SpaceBetween,
 }
 
 /// CSS `align-self` value supported in v0.1.

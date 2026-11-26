@@ -179,6 +179,7 @@ fn align_items_val(ai: &AlignItems) -> &'static str {
 fn justify_val(jc: &JustifyContent) -> &'static str {
     match jc {
         JustifyContent::Center => "center",
+        JustifyContent::SpaceBetween => "space-between",
     }
 }
 

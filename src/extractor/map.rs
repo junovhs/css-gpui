@@ -109,10 +109,10 @@ fn to_align_items(s: &str) -> Option<AlignItems> {
 }
 
 fn to_justify_content(s: &str) -> Option<JustifyContent> {
-    if s == "center" {
-        Some(JustifyContent::Center)
-    } else {
-        None
+    match s {
+        "center" => Some(JustifyContent::Center),
+        "space-between" => Some(JustifyContent::SpaceBetween),
+        _ => None,
     }
 }
 

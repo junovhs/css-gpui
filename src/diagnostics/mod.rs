@@ -180,6 +180,12 @@ fn unsupported_value_message(property: &str, value: &str) -> Option<String> {
                 "position: '{value}' is not supported in v0.1; treated as static"
             )),
         },
+        "justify-content" => match value {
+            "center" | "space-between" | "normal" | "flex-start" => None,
+            _ => Some(format!(
+                "justify-content: '{value}' is not supported in v0.1; using default justification"
+            )),
+        },
         "display" => match value {
             "block" | "flex" | "inline-flex" | "inherit" => None,
             _ => Some(format!(
