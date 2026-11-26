@@ -1,0 +1,105 @@
+body {
+    margin: 0;
+    background-color: #f6f6f4;
+    color: #191917;
+    font-family: Arial;
+}
+
+.today {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 540px;
+    margin: 32px auto;
+    padding: 24px;
+    background-color: #fdfdfc;
+    border: 1px solid #e6e5e1;
+    border-radius: 12px;
+}
+
+.masthead, .heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.wordmark {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.accent, .command-label {
+    color: #ff8a5c;
+}
+
+.date, .count, .command-label {
+    font-family: monospace;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.date, .count, .menu {
+    color: #66665e;
+}
+
+h1 {
+    margin: 0;
+    font-size: 44px;
+    font-weight: 700;
+}
+
+.command-card {
+    padding: 14px 14px 2px;
+    background-color: #191917;
+    border-radius: 4px;
+}
+
+.command-label {
+    margin-bottom: 2px;
+}
+
+.task-row {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) 32px;
+    column-gap: 8px;
+    align-items: center;
+    min-height: 52px;
+}
+
+.queue .task-row {
+    border-bottom: 1px solid #eeedea;
+}
+
+.toggle {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 1px solid #807f77;
+    border-radius: 13px;
+    background-color: transparent;
+}
+
+.command-toggle {
+    border-color: #b9b8b0;
+}
+
+.task-title {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.command-title {
+    color: #ffffff;
+}
+
+.menu {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    background-color: transparent;
+}
+
+.command-menu {
+    color: #b9b8b0;
+}

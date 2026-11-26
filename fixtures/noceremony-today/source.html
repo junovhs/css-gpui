@@ -1,0 +1,44 @@
+<!doctype html>
+<!-- Adapted from noceremony at a1375b8 (index.html and src/style.css).
+     The static sample keeps the Today hierarchy, reversed first task and
+     three-column task-row grid. Task text and date are fixture data. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Today — noceremony</title>
+  <link rel="stylesheet" href="source.css">
+</head>
+<body>
+  <main class="today">
+    <div class="masthead">
+      <span class="wordmark">noceremony<span class="accent">.</span></span>
+      <span class="date">WED / NOV 25</span>
+    </div>
+    <div class="heading">
+      <h1>Today</h1>
+      <span class="count">0 / 3</span>
+    </div>
+    <div class="command-card">
+      <div class="command-label">UP NEXT</div>
+      <div class="task-row">
+        <button class="toggle command-toggle" aria-label="Complete Review the campaign proof"></button>
+        <span class="task-title command-title">Review the campaign proof</span>
+        <button class="menu command-menu" aria-label="Options for Review the campaign proof">•••</button>
+      </div>
+    </div>
+    <div class="queue">
+      <div class="task-row">
+        <button class="toggle" aria-label="Complete Send the revised brief"></button>
+        <span class="task-title">Send the revised brief</span>
+        <button class="menu" aria-label="Options for Send the revised brief">•••</button>
+      </div>
+      <div class="task-row">
+        <button class="toggle" aria-label="Complete Pick Friday’s launch image"></button>
+        <span class="task-title">Pick Friday’s launch image</span>
+        <button class="menu" aria-label="Options for Pick Friday’s launch image">•••</button>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
