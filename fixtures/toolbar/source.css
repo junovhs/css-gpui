@@ -1,0 +1,36 @@
+body {
+    margin: 0;
+}
+
+.toolbar {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    box-sizing: border-box;
+    height: 56px;
+    padding: 0 16px;
+    background-color: #151922;
+    color: #f4f5f8;
+    font-family: Arial;
+    font-size: 16px;
+    line-height: 20px;
+}
+
+.title {
+    font-weight: 700;
+}
+
+.action {
+    appearance: none;
+    margin: 0;
+    padding: 6px 12px;
+    border: 1px solid #8298cf;
+    border-radius: 6px;
+    background-color: #263653;
+    color: #ffffff;
+    font-family: Arial;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 18px;
+}
