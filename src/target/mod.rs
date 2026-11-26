@@ -19,6 +19,8 @@
 //! 5. [`ConformanceScene`] — the runtime-neutral conformance fixture format that
 //!    `RET-03` compares a target's observed output against.
 
+pub mod gpui;
+
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
