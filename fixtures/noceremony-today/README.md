@@ -47,9 +47,9 @@ This path reads the app's live DOM and computed styles after its own JavaScript
 loads the sample day. Browser layout determines the fixed coordinates. GPUI
 receives native rectangles, borders, and text. The reference PNG is saved
 separately and is never passed to the generator. `losses.json` identifies
-unrepresented CSS effects and elements by DOM path, including the SVG artwork
-and gradient fills. Downloaded font files are collected locally for a
-native host to load.
+unrepresented CSS effects and elements by DOM path. The snapshot includes the
+original inline SVG artwork and supported single-layer linear gradients.
+Downloaded font files are collected locally for a native host to load.
 
 The direct source compiler currently stops at the bare `crossorigin` attribute
 in noceremony's original `index.html`. The browser-resolved path allows a visual
@@ -69,4 +69,6 @@ python fixtures/noceremony-today/compare_windows.py <path-to-noceremony>
 GPUI capture, and all changed RGB pixels in pink. [The report](comparison.json)
 records the exact count and source paths for remaining losses. The native
 preview reproduces the dark first task plate and excludes CSS-clipped text.
-SVGs, gradient fills, letter spacing, and text rasterization still differ.
+The recorded 1600 × 1125 frames differ at 107,262 out of 1,800,000 RGB pixels
+(5.96%). Remaining differences include letter spacing, text and SVG
+rasterization, generated task ranks, and stacking of effects.

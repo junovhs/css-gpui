@@ -61,11 +61,104 @@ export function snapshotScene() {
     const documentBackground = color(getComputedStyle(document.documentElement).backgroundColor) || "#ffffff";
     addNode("/html/body", viewport, { background_color: documentBackground }, undefined, null);
 
-    function box(path, style, rect, resolvedTransform = false) {
+    function gradientStops(source, length) {
+        // Chromium resolves colors to rgb(a). Keep other CSS forms as losses.
+        const pattern = /\s*(rgba?\([^)]*\)|transparent)(?:\s+([-+.\d]+)(%|px))?\s*(,|$)/gy;
+        const stops = [];
+        while (pattern.lastIndex < source.length) {
+            const match = pattern.exec(source);
+            if (!match) return;
+            const [, css, value, unit] = match;
+            const rgba = /^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/.exec(css);
+            const hex = rgba
+                ? "#" + rgba.slice(1, 4).map(channel => Number(channel).toString(16).padStart(2, "0")).join("")
+                : color(css);
+            const alpha = rgba ? Number(rgba[4]) : hex ? 1 : 0;
+            const position = unit ? Number(value) / (unit === "%" ? 100 : length) : null;
+            if (position !== null && !Number.isFinite(position)) return;
+            stops.push({ hex, alpha, position });
+        }
+        if (stops.length < 2) return;
+        const visible = stops.filter(stop => stop.alpha > 0);
+        if (!visible.length) return [];
+        if (new Set(visible.map(stop => stop.hex)).size > 1
+            && new Set(stops.map(stop => stop.alpha)).size > 1) return;
+        // Preserve the visible channel when interpolating into transparency.
+        for (const stop of stops) {
+            if (!stop.alpha) stop.hex = visible[0].hex;
+        }
+        stops[0].position ??= 0;
+        stops.at(-1).position ??= 1;
+        let anchor = 0;
+        for (let index = 1; index < stops.length; index++) {
+            if (stops[index].position === null) continue;
+            const from = stops[anchor].position;
+            const to = Math.max(stops[index].position, from);
+            for (let step = anchor + 1; step <= index; step++) {
+                stops[step].position = from + (to - from) * (step - anchor) / (index - anchor);
+            }
+            anchor = index;
+        }
+        return stops;
+    }
+
+    function gradientBox(path, style, rect, radius, clip) {
+        const source = /^(repeating-)?linear-gradient\((.*)\)$/.exec(style.backgroundImage);
+        if (!source || !["auto", "auto auto"].includes(style.backgroundSize)
+            || style.backgroundPositionX !== "0%" || style.backgroundPositionY !== "0%"
+            || style.backgroundClip !== "border-box" || style.maskImage !== "none") return false;
+
+        let args = source[2];
+        const angle = /^([-+.\d]+)deg,\s*/.exec(args);
+        const direction = /^to (top|right|bottom|left),\s*/.exec(args);
+        const degrees = angle ? Number(angle[1]) : direction
+            ? ({ top: 0, right: 90, bottom: 180, left: 270 })[direction[1]] : 180;
+        if (!Number.isFinite(degrees)) return false;
+        if (angle || direction) args = args.slice((angle || direction)[0].length);
+
+        const radians = degrees * Math.PI / 180;
+        const dx = Math.sin(radians);
+        const dy = -Math.cos(radians);
+        const { width, height } = rect;
+        const length = Math.abs(width * dx) + Math.abs(height * dy);
+        const stops = gradientStops(args, length);
+        if (!stops) return false;
+        if (!stops.length) return true;
+        const first = stops[0].position;
+        const last = stops.at(-1).position;
+        if (first === last) return false;
+        const at = position => [
+            width / 2 + dx * length * (position - 0.5),
+            height / 2 + dy * length * (position - 0.5),
+        ];
+        const [x1, y1] = at(first);
+        const [x2, y2] = at(last);
+        const repeat = source[1] ? ' spreadMethod="repeat"' : "";
+        const stopMarkup = stops.map(stop => {
+            const offset = (stop.position - first) / (last - first);
+            return `<stop offset="${offset}" stop-color="${stop.hex}" stop-opacity="${stop.alpha}"/>`;
+        }).join("");
+        const visible = clip ? {
+            x: Math.max(rect.x, clip.x),
+            y: Math.max(rect.y, clip.y),
+            width: Math.min(rect.x + width, clip.x + clip.width) - Math.max(rect.x, clip.x),
+            height: Math.min(rect.y + height, clip.y + clip.height) - Math.max(rect.y, clip.y),
+        } : rect;
+        if (!inFrame(visible)) return true;
+        const viewBox = [visible.x - rect.x, visible.y - rect.y, visible.width, visible.height].join(" ");
+        const markup = `<svg xmlns="http://www.w3.org/2000/svg" width="${visible.width * devicePixelRatio}"
+            height="${visible.height * devicePixelRatio}" viewBox="${viewBox}"><defs>
+            <linearGradient id="fill" gradientUnits="userSpaceOnUse" x1="${x1}" y1="${y1}"
+                x2="${x2}" y2="${y2}"${repeat}>${stopMarkup}</linearGradient></defs>
+            <rect width="${width}" height="${height}" rx="${radius || 0}" opacity="${Number(style.opacity)}" fill="url(#fill)"/></svg>`;
+        addNode(path, visible, {}, { svg: markup });
+        return true;
+    }
+
+    function box(path, style, rect, resolvedTransform = false, clip) {
         const paint = {};
         const fill = color(style.backgroundColor);
         if (fill) paint.background_color = fill;
-        if (style.backgroundImage !== "none") loss(path, "background-image", style.backgroundImage);
         if (style.boxShadow !== "none") loss(path, "box-shadow", style.boxShadow);
 
         const sides = ["Top", "Right", "Bottom", "Left"].map(side => ({
@@ -90,6 +183,10 @@ export function snapshotScene() {
             }
         }
         if (Object.keys(paint).length) addNode(path, rect, paint);
+        if (style.backgroundImage !== "none"
+            && (sides.some(side => side.width) || !gradientBox(path, style, rect, paint.border_radius, clip))) {
+            loss(path, "background-image", style.backgroundImage);
+        }
         if (sides.some(side => side.width && side.style !== "solid")) {
             loss(path, "border-style", sides.map(side => side.style).join(" "));
         }
@@ -207,7 +304,10 @@ export function snapshotScene() {
                 rect.height = -rect.height;
             }
         }
-        if (inFrame(rect)) box(pseudoPath, pseudo, rect, true);
+        const clip = ["hidden", "clip"].includes(style.overflowX) && ["hidden", "clip"].includes(style.overflowY)
+            ? { x: ownerLeft, y: ownerTop, width: ownerRight - ownerLeft, height: ownerBottom - ownerTop }
+            : undefined;
+        if (inFrame(rect)) box(pseudoPath, pseudo, rect, true, clip);
     }
 
     function textNode(node, path, style) {
