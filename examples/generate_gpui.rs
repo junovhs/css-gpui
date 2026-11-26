@@ -1,14 +1,24 @@
 use std::{env, error::Error, fs, io, path::PathBuf};
 
 use css_gpui::{
-    SceneSourceGraph, diagnostics, extractor, layout, resolver,
+    SceneSourceGraph, diagnostics, extractor,
+    ir::SceneIr,
+    layout, resolver,
     target::{TargetEmitter, gpui::GpuiTarget},
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
     let paths: Vec<PathBuf> = env::args_os().skip(1).map(PathBuf::from).collect();
+    if let [mode, scene_path] = paths.as_slice()
+        && mode.as_os_str() == "--scene-json"
+    {
+        let scene = SceneIr::from_json(&fs::read_to_string(scene_path)?)?;
+        return emit_scene(&scene, scene_path);
+    }
     let [html_path, css_path] = paths.as_slice() else {
-        return Err("usage: generate_gpui <source.html> <source.css>".into());
+        return Err(
+            "usage: generate_gpui <source.html> <source.css> | --scene-json <scene.json>".into(),
+        );
     };
     let html = fs::read_to_string(html_path)?;
     let css = fs::read_to_string(css_path)?;
@@ -46,7 +56,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     let resolved = resolver::resolve_scene(&graph)?;
     let scene = extractor::extract_ir(&layout::compute_layout(&resolved), &graph)?;
-    let emission = GpuiTarget.emit(&scene);
+    emit_scene(&scene, html_path)
+}
+
+fn emit_scene(scene: &SceneIr, source_path: &std::path::Path) -> Result<(), Box<dyn Error>> {
+    let emission = GpuiTarget.emit(scene);
     if !emission.declared_loss.is_empty() {
         for gap in &emission.declared_loss {
             let source = scene
@@ -56,7 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .map_or(gap.node_id.as_str(), |node| node.source.dom_path.as_str());
             eprintln!(
                 "{}: GPUI target loss at {source}: {:?}",
-                html_path.display(),
+                source_path.display(),
                 gap.capability
             );
         }

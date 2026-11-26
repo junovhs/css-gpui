@@ -32,3 +32,26 @@ check and a pixel comparison answer separate questions.
 The adjacent `source.html` and `source.css` are a reduced compiler diagnostics
 case. Their Rust test checks text order and reports unsupported CSS Grid. The
 native conversion and visual comparison are pending.
+
+## Compile the real app's fixed browser frame
+
+Pass an output directory and monitor scale to capture a browser-resolved
+Scene IR and its browser PNG in the same run:
+
+```text
+node fixtures/noceremony-today/capture.mjs <path-to-noceremony> http://127.0.0.1:4176/ target/today 1.25
+cargo run --locked --example generate_gpui -- --scene-json target/today/scene.json
+```
+
+This path reads the app's live DOM and computed styles after its own JavaScript
+loads the sample day. Browser layout determines the fixed coordinates. GPUI
+receives native rectangles, borders, and text. The reference PNG is saved
+separately and is never passed to the generator. `losses.json` identifies
+unrepresented CSS effects and elements by DOM path, including the SVG artwork
+and layered backgrounds. Downloaded font files are collected locally for a
+native host to load.
+
+The direct source compiler currently stops at the bare `crossorigin` attribute
+in noceremony's original `index.html`. The browser-resolved path allows a visual
+comparison for one viewport while work on direct, responsive conversion remains
+open.
