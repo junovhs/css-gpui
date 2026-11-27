@@ -4,7 +4,11 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 
-[dev-dependencies]
+[dependencies]
+css-gpui = { path = "../../.." }
+image = { version = "=0.25.10", default-features = false, features = ["jpeg", "png"] }
+serde_json = "1.0"
+
 gpui = { version = "=0.2.2", default-features = false, features = ["test-support", "windows-manifest"] }
 
 [build-dependencies]
@@ -14,3 +18,9 @@ serde_json = "1.0"
 [profile.dev]
 debug = 0
 incremental = false
+
+[profile.dev.package.css-gpui]
+opt-level = 2
+
+[profile.dev.package.css-gpui-neon-reference]
+opt-level = 2

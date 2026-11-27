@@ -1,3 +1,5 @@
+pub mod effects;
+
 #[cfg(test)]
 mod geometry {
     use gpui::prelude::*;

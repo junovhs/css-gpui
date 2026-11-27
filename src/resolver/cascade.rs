@@ -22,6 +22,29 @@ pub(super) fn apply_with_lengths(
         return;
     }
 
+    if matches!(
+        property,
+        "left"
+            | "top"
+            | "right"
+            | "bottom"
+            | "width"
+            | "height"
+            | "aspect-ratio"
+            | "z-index"
+            | "border-top-right-radius"
+            | "border-bottom-left-radius"
+    ) {
+        let positioned = lengths
+            .pixels(value)
+            .map_or_else(|| value.to_owned(), |value| format!("{value}px"));
+        style
+            .paint_placement
+            .insert(property.to_owned(), positioned);
+    } else if property == "inset" {
+        record_inset(&mut style.paint_placement, value, lengths);
+    }
+
     match property {
         // --- Shorthands ---
         "margin" => expand_edges(
@@ -40,7 +63,17 @@ pub(super) fn apply_with_lengths(
             value,
             lengths,
         ),
-        "background" => style.background_color = parse_color(value),
+        "background" => {
+            style.background_color = parse_color(value);
+            style
+                .paint_effects
+                .retain(|name, _| !name.starts_with("background"));
+            if style.background_color.is_none() && value != "none" {
+                style
+                    .paint_effects
+                    .insert(property.to_owned(), value.to_owned());
+            }
+        }
         "border" => expand_border(style, value, lengths),
         // `appearance: none` is an accepted source-level reset. It has no IR
         // field because controls are always emitted with the canonical reset.
@@ -78,6 +111,27 @@ pub(super) fn apply_with_lengths(
 
         // --- Paint longhands ---
         "background-color" => style.background_color = parse_color(value),
+        "background-image"
+        | "background-position"
+        | "background-size"
+        | "background-repeat"
+        | "background-blend-mode"
+        | "backdrop-filter"
+        | "box-shadow"
+        | "filter"
+        | "opacity"
+        | "content"
+        | "mask"
+        | "mask-size"
+        | "mask-mode"
+        | "mask-clip"
+        | "mask-composite"
+        | "mask-repeat"
+        | "mix-blend-mode" => {
+            style
+                .paint_effects
+                .insert(property.to_owned(), value.to_owned());
+        }
         "border-width" => style.border_width = lengths.pixels(value).unwrap_or(0.0),
         "border-color" => style.border_color = parse_color(value),
         "border-radius" => style.border_radius = lengths.pixels(value).unwrap_or(0.0),
@@ -168,7 +222,14 @@ pub fn parse_color(value: &str) -> Option<String> {
         _ => return None,
     };
     let ratio = |value: &str| -> Option<f32> {
-        Some(value.strip_suffix('%')?.parse::<f32>().ok()? / 100.0)
+        Some(
+            value
+                .strip_suffix('%')
+                .unwrap_or(value)
+                .parse::<f32>()
+                .ok()?
+                / 100.0,
+        )
     };
     let hue = hue.trim_end_matches("deg").parse::<f32>().ok()?;
     let saturation = ratio(saturation)?.clamp(0.0, 1.0);
@@ -206,6 +267,27 @@ pub fn parse_color(value: &str) -> Option<String> {
 // ---------------------------------------------------------------------------
 // Shorthand helpers
 // ---------------------------------------------------------------------------
+
+fn record_inset(
+    placement: &mut std::collections::BTreeMap<String, String>,
+    value: &str,
+    lengths: LengthContext,
+) {
+    let values: Vec<_> = value_parts(value).collect();
+    let edges = match values.as_slice() {
+        [all] => [*all; 4],
+        [tb, lr] => [*tb, *lr, *tb, *lr],
+        [top, lr, bottom] => [*top, *lr, *bottom, *lr],
+        [top, right, bottom, left] => [*top, *right, *bottom, *left],
+        _ => return,
+    };
+    for (side, length) in ["top", "right", "bottom", "left"].into_iter().zip(edges) {
+        let value = lengths
+            .pixels(length)
+            .map_or_else(|| length.to_owned(), |pixels| format!("{pixels}px"));
+        placement.insert(side.to_owned(), value);
+    }
+}
 
 fn expand_edges(
     top: &mut f32,

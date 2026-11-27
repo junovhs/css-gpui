@@ -4,8 +4,9 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 
-const [playwrightRoot, outputPath] = process.argv.slice(2);
-assert(playwrightRoot && outputPath, 'Usage: node capture.mjs <Playwright installation directory> <output directory>');
+const [playwrightRoot, outputPath, mode] = process.argv.slice(2);
+const recordEffects = mode === "--effects";
+assert(playwrightRoot && outputPath && (!mode || recordEffects), 'Usage: node capture.mjs <Playwright installation directory> <output directory> [--effects]');
 const require = createRequire(resolve(playwrightRoot, 'package.json'));
 const { chromium } = require('playwright');
 assert.equal(require('playwright/package.json').version, '1.60.0');
@@ -83,6 +84,7 @@ const browser = await chromium.launch({ args: ['--force-color-profile=srgb', '--
 const errors = [];
 const frames = [];
 const geometry = [];
+const effects = [];
 try {
     for (const viewport of [{ width: 1100, height: 760 }, { width: 390, height: 844 }]) {
         const context = await browser.newContext({ viewport, deviceScaleFactor: 1, locale: 'en-US', colorScheme: 'dark' });
@@ -172,6 +174,37 @@ try {
             await settle(page);
             await capture('closed');
         }
+        if (recordEffects && viewport.width === 1100) {
+            await page.addStyleTag({
+                content: '#app, .social-icon, #menu .inner { opacity: 0 !important; pointer-events: none !important }',
+            });
+            const placements = [
+                { shift: 0, x: 80, y: 120 },
+                { shift: 90, x: 1092, y: 752 },
+            ];
+            for (const [index, { shift, x, y }] of placements.entries()) {
+                await page.mouse.click(2, 2);
+                await menu.waitFor({ state: 'hidden' });
+                await page.evaluate((shift) => {
+                    document.body.style.backgroundPosition = 'calc(50% + ' + shift + 'px) center, center';
+                }, shift);
+                await settle(page);
+                await page.screenshot({
+                    path: resolve(output, 'chrome-stage-' + index + '.png'),
+                    animations: 'disabled',
+                });
+                await page.mouse.click(x, y, { button: 'right' });
+                await page.mouse.move(2, 2);
+                await menu.waitFor({ state: 'visible' });
+                await settle(page);
+                const panel = await menu.boundingBox();
+                await page.screenshot({
+                    path: resolve(output, 'chrome-effects-' + index + '.png'),
+                    animations: 'disabled',
+                });
+                effects.push({ ...viewport, shift, panel });
+            }
+        }
         await context.close();
     }
     assert.deepEqual(errors, []);
@@ -182,6 +215,13 @@ try {
     await writeFile(resolve(output, 'shared.css'), shared);
     await writeFile(resolve(output, 'linked.css'), Buffer.concat([normalize, Buffer.from('\n'), Buffer.from(shared)]));
     await writeFile(resolve(output, 'geometry.json'), JSON.stringify(geometry, null, 2) + '\n');
+    if (recordEffects) {
+        for (const file of ['abstract-light.jpg', 'noise-base.png']) {
+            const url = 'https://assets.codepen.io/13471/' + file;
+            await writeFile(resolve(output, file), (await resources.get(url)).body);
+        }
+        await writeFile(resolve(output, 'effects.json'), JSON.stringify(effects, null, 2) + '\n');
+    }
     await writeFile(resolve(output, 'frames.json'), JSON.stringify({
         platform: process.platform, chromium: chromiumVersion, sourceSha256: sha256(source), frames,
     }, null, 2) + '\n');

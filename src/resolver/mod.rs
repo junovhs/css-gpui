@@ -7,7 +7,7 @@
 //!
 //! This is the output contract consumed by `EXT-01`.
 
-mod cascade;
+pub(crate) mod cascade;
 mod model;
 pub(crate) mod selector;
 mod values;
@@ -89,18 +89,11 @@ fn resolve(
     let initial_variables = Variables::new();
     let mut root_font_size = 16.0;
 
-    let rules: Vec<_> = graph
-        .css_rules
-        .iter()
-        .map(|rule| {
-            let selectors: Vec<_> = rule
-                .selectors
-                .iter()
-                .filter_map(|text| Selector::parse(text))
-                .collect();
-            (rule, selectors)
-        })
-        .collect();
+    let rules = parse_rules(graph, None);
+    let decoration_rules = [
+        ("before", parse_rules(graph, Some("::before"))),
+        ("after", parse_rules(graph, Some("::after"))),
+    ];
 
     for node in &graph.html_nodes {
         if node.kind != HtmlNodeKind::Element {
@@ -128,6 +121,52 @@ fn resolve(
         } else if node.name.as_deref() == Some("html") {
             root_font_size = style.font_size.unwrap_or(16.0);
         }
+        for (name, rules) in &decoration_rules {
+            if !rules.iter().any(|(_, selectors)| {
+                selectors
+                    .iter()
+                    .any(|selector| selector.matches(node, &graph.html_nodes))
+            }) {
+                continue;
+            }
+            let (decoration, _) = cascade_for_node(
+                node,
+                &graph.html_nodes,
+                rules,
+                &variables,
+                LengthContext {
+                    em: style.font_size.unwrap_or(lengths.em),
+                    ..lengths
+                },
+            );
+            let content = decoration.paint_effects.get("content").map(String::as_str);
+            if matches!(content, None | Some("none" | "normal")) {
+                continue;
+            }
+            let mut placement = decoration.paint_placement;
+            for corner in ["border-top-right-radius", "border-bottom-left-radius"] {
+                if !placement.contains_key(corner)
+                    && let Some(inherited) = style.paint_placement.get(corner)
+                {
+                    placement.insert(corner.to_owned(), inherited.clone());
+                }
+            }
+            style.decorations.push(crate::ir::paint::Decoration {
+                pseudo: (*name).to_owned(),
+                placement,
+                effects: decoration.paint_effects,
+                border_width: if decoration.border_width > 0.0 {
+                    decoration.border_width
+                } else {
+                    style.border_width
+                },
+                radius: if decoration.border_radius > 0.0 {
+                    decoration.border_radius
+                } else {
+                    style.border_radius
+                },
+            });
+        }
         styles[node.id] = Some((style, variables));
     }
 
@@ -147,6 +186,30 @@ fn resolve(
         scene_id: graph.scene_id.clone(),
         nodes,
     })
+}
+
+fn parse_rules<'a>(
+    graph: &'a SceneSourceGraph,
+    suffix: Option<&str>,
+) -> Vec<(&'a crate::CssRule, Vec<Selector<'a>>)> {
+    graph
+        .css_rules
+        .iter()
+        .filter_map(|rule| {
+            let selectors: Vec<_> = rule
+                .selectors
+                .iter()
+                .filter_map(|text| {
+                    let origin = match suffix {
+                        Some(suffix) => text.strip_suffix(suffix)?,
+                        None => text,
+                    };
+                    Selector::parse(origin)
+                })
+                .collect();
+            (!selectors.is_empty()).then_some((rule, selectors))
+        })
+        .collect()
 }
 
 /// Apply cascade for a single element node and return its raw computed style

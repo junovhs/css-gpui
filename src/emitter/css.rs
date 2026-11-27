@@ -144,6 +144,11 @@ fn paint_decls(p: &Paint) -> Vec<String> {
     if let Some(ref c) = p.cursor {
         d.push(format!("cursor: {}", cursor_val(c)));
     }
+    d.extend(
+        p.effects
+            .iter()
+            .map(|(property, value)| format!("{property}: {value}")),
+    );
     d
 }
 

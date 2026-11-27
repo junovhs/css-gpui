@@ -29,6 +29,9 @@ fn default_layout() -> Layout {
 
 fn default_paint() -> Paint {
     Paint {
+        effects: Default::default(),
+        placement: Default::default(),
+        decorations: Vec::new(),
         background_color: None,
         border: None,
         border_radius: None,
@@ -46,6 +49,7 @@ fn source_ref() -> SourceRef {
 
 fn minimal_scene(nodes: Vec<IrNode>) -> SceneIr {
     SceneIr {
+        canvas: None,
         schema_version: 1,
         scene_id: "test".to_owned(),
         corpus: "v0.1".to_owned(),

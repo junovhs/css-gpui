@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use super::layout::Cursor;
@@ -18,6 +20,16 @@ pub struct Border {
     pub color: Color,
 }
 
+/// Source-resolved placement and paint of a generated pseudo-element.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct Decoration {
+    pub pseudo: String,
+    pub placement: BTreeMap<String, String>,
+    pub effects: BTreeMap<String, String>,
+    pub border_width: f32,
+    pub radius: f32,
+}
+
 /// Resolved paint properties for an [`super::IrNode`].
 ///
 /// Foreground text color is on [`super::Typography`], not here. `Paint` covers
@@ -34,4 +46,12 @@ pub struct Paint {
     pub border_radius: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cursor: Option<Cursor>,
+    /// Cascaded paint effects with custom properties already substituted.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub effects: BTreeMap<String, String>,
+    /// Positioning of a composited decorative layer.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub placement: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub decorations: Vec<Decoration>,
 }

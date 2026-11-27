@@ -27,6 +27,9 @@ pub(super) fn minimal_layout() -> Layout {
 
 pub(super) fn minimal_paint() -> Paint {
     Paint {
+        effects: Default::default(),
+        placement: Default::default(),
+        decorations: Vec::new(),
         background_color: None,
         border: None,
         border_radius: None,
@@ -36,6 +39,7 @@ pub(super) fn minimal_paint() -> Paint {
 
 pub(super) fn minimal_scene() -> SceneIr {
     SceneIr {
+        canvas: None,
         schema_version: 1,
         scene_id: "test_scene".to_string(),
         corpus: "v0.1".to_string(),
@@ -48,6 +52,9 @@ pub(super) fn minimal_scene() -> SceneIr {
             text_content: None,
             layout: minimal_layout(),
             paint: Paint {
+                effects: Default::default(),
+                placement: Default::default(),
+                decorations: Vec::new(),
                 background_color: Some(Color("#ffffff".to_string())),
                 ..minimal_paint()
             },

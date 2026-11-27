@@ -49,6 +49,15 @@ pub fn to_paint(style: &ComputedStyle) -> Paint {
         border,
         border_radius: (style.border_radius > 0.0).then_some(style.border_radius),
         cursor: style.cursor.as_deref().and_then(to_cursor),
+        effects: style.paint_effects.clone(),
+        placement: if style.position == "absolute"
+            && (!style.paint_effects.is_empty() || !style.decorations.is_empty())
+        {
+            style.paint_placement.clone()
+        } else {
+            Default::default()
+        },
+        decorations: style.decorations.clone(),
     }
 }
 
@@ -229,6 +238,9 @@ pub fn to_paint_default() -> Paint {
         border: None,
         border_radius: None,
         cursor: None,
+        effects: Default::default(),
+        placement: Default::default(),
+        decorations: Vec::new(),
     }
 }
 

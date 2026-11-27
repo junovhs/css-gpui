@@ -140,6 +140,9 @@ pub struct SceneIr {
     pub corpus: String,
     pub execution_mode: ExecutionMode,
     /// Pre-order node list. Index 0 is always the scene root.
+    /// Document canvas paint, for scenes with layered backdrops.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas: Option<Paint>,
     pub nodes: Vec<IrNode>,
 }
 

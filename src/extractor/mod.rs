@@ -110,6 +110,14 @@ pub fn extract_ir(
         scene_id: laid_out.scene_id.clone(),
         corpus: "v0.1".to_owned(),
         execution_mode: ExecutionMode::Static,
+        canvas: laid_out
+            .nodes
+            .iter()
+            .find(|node| {
+                node.node.name.as_deref() == Some("body")
+                    && node.style.paint_effects.contains_key("background-image")
+            })
+            .map(|node| map::to_paint(&node.style)),
         nodes: ir_nodes,
     })
 }

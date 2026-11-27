@@ -64,6 +64,9 @@ fn sample_scene() -> SceneIr {
             ..base_layout()
         },
         paint: Paint {
+            effects: Default::default(),
+            placement: Default::default(),
+            decorations: Vec::new(),
             background_color: Some(Color("#ffffff".to_string())),
             border: Some(Border {
                 width: 1.0,
@@ -83,6 +86,9 @@ fn sample_scene() -> SceneIr {
         text_content: Some("Hello".to_string()),
         layout: base_layout(),
         paint: Paint {
+            effects: Default::default(),
+            placement: Default::default(),
+            decorations: Vec::new(),
             background_color: None,
             border: None,
             border_radius: None,
@@ -110,6 +116,9 @@ fn sample_scene() -> SceneIr {
             ..base_layout()
         },
         paint: Paint {
+            effects: Default::default(),
+            placement: Default::default(),
+            decorations: Vec::new(),
             background_color: Some(Color("#2563eb".to_string())),
             border: None,
             border_radius: None,
@@ -125,6 +134,7 @@ fn sample_scene() -> SceneIr {
         source: source("body > div > button"),
     };
     SceneIr {
+        canvas: None,
         schema_version: 1,
         scene_id: "sample".to_string(),
         corpus: "v0.1".to_string(),

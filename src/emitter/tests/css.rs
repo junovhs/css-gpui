@@ -32,6 +32,9 @@ fn default_layout() -> Layout {
 
 fn default_paint() -> Paint {
     Paint {
+        effects: Default::default(),
+        placement: Default::default(),
+        decorations: Vec::new(),
         background_color: None,
         border: None,
         border_radius: None,
@@ -213,6 +216,9 @@ fn asymmetric_margin_uses_four_value_shorthand() {
 #[test]
 fn border_emits_shorthand() {
     let paint = Paint {
+        effects: Default::default(),
+        placement: Default::default(),
+        decorations: Vec::new(),
         border: Some(Border {
             width: 1.0,
             color: Color("#ff0000".to_owned()),
@@ -226,6 +232,9 @@ fn border_emits_shorthand() {
 #[test]
 fn background_color_emitted() {
     let paint = Paint {
+        effects: Default::default(),
+        placement: Default::default(),
+        decorations: Vec::new(),
         background_color: Some(Color("#fff".to_owned())),
         ..default_paint()
     };

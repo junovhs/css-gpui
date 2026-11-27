@@ -1,3 +1,7 @@
+use std::collections::BTreeMap;
+
+use crate::ir::paint::Decoration;
+
 /// Fully resolved CSS properties for a single HTML element node in the v0.1 subset.
 ///
 /// All lengths are in CSS pixels (`f32`). Colors are normalized lowercase hex strings.
@@ -47,6 +51,9 @@ pub struct ComputedStyle {
     pub border_color: Option<String>,
     pub border_radius: f32,
     pub cursor: Option<String>,
+    pub paint_effects: BTreeMap<String, String>,
+    pub paint_placement: BTreeMap<String, String>,
+    pub decorations: Vec<Decoration>,
 
     // --- Typography — inheritable ---
     pub color: Option<String>,
@@ -89,6 +96,9 @@ impl Default for ComputedStyle {
             border_color: None,
             border_radius: 0.0,
             cursor: None,
+            paint_effects: BTreeMap::new(),
+            paint_placement: BTreeMap::new(),
+            decorations: Vec::new(),
             color: None,
             font_family: None,
             font_size: None,

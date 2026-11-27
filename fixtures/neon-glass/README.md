@@ -52,6 +52,38 @@ To emit the Rust with diagnostics for features beyond the current renderer:
 cargo run --example generate_gpui -- --allow-loss --viewport 390x844 fixtures/neon-glass/source.html (Join-Path $frames 'linked.css')
 ```
 
+## Compare the glass and glow
+
+Run the capture with `--effects` to record both placements, the stage without UI text, and the verified assets. Then run the native compositor comparison and its GPUI gesture test:
+
+```powershell
+node fixtures/neon-glass/capture.mjs $browser $frames --effects
+$env:NEON_GLASS_REFERENCE = $frames
+cargo run --locked --manifest-path fixtures/neon-glass/native/Cargo.toml --example effects
+cargo test --locked --manifest-path fixtures/neon-glass/native/Cargo.toml --all-targets -- --include-ignored
+```
+
+The comparison isolates paint by using the same panel bounds in both renderers. It writes the Chromium PNGs, the raster textures painted by GPUI, amplified RGB difference images, and error metrics to the capture directory. The compositor covers the authored image and hard-light gradient, sampled blur, panel gradients and border, outer shadows, and conic and luminance-masked glow layers. Its Gaussian blur uses three sliding box passes. The comparison measures channels in sRGB on a 0–255 scale.
+
+| Comparison region | Original backdrop | Backdrop shifted 90 px |
+| --- | ---: | ---: |
+| Stage mean RGB error | 0.734 | 0.856 |
+| Glass interior mean RGB error | 0.487 | 0.349 |
+| Panel and glow mean RGB error | 1.585 | 1.470 |
+| Panel and glow largest channel error | 98 | 102 |
+
+The remaining differences concentrate at the panel edges and around the brightest glow. The compositor approximates corner antialiasing, noise resampling, shadow kernels, and OkLCh interpolation. The test isolates the static settled effects from animated opening and hover styles. The color-space conversion follows the OKLab matrices in [CSS Color 4](https://www.w3.org/TR/css-color-4/#color-conversion-code).
+
+Add `-- --window` to the `cargo run` command to preview the textures in GPUI. Click in the preview to move the backdrop under the stationary panel. The gesture rerenders from the underlying asset and recalculates the blurred sample.
+
+The standalone blur probe uses synthetic color bands and compares the interior against Chromium at two offsets:
+
+```powershell
+$env:NEON_BACKDROP_REFERENCE = Join-Path $env:TEMP 'css-gpui-blur-probe'
+node fixtures/neon-glass/backdrop-reference.mjs $browser $env:NEON_BACKDROP_REFERENCE
+cargo test --locked --test backdrop -- --include-ignored --nocapture
+```
+
 ## Input inventory
 
 - HTML uses a stage with header and hue controls and a fixed menu aside. The menu has six decorative shine and glow spans, a search label and text input, and two sections of focusable list rows separated by a rule.

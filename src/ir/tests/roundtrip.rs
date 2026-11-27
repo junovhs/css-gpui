@@ -15,6 +15,7 @@ fn scene_ir_json_round_trip_minimal() -> Result<(), serde_json::Error> {
 #[test]
 fn full_scene_round_trip_with_text_and_control() -> Result<(), serde_json::Error> {
     let ir = SceneIr {
+        canvas: None,
         schema_version: 1,
         scene_id: "action_row_variants".to_string(),
         corpus: "v0.1".to_string(),
@@ -46,6 +47,9 @@ fn full_scene_round_trip_with_text_and_control() -> Result<(), serde_json::Error
                     gap: Some(8.0),
                 },
                 paint: Paint {
+                    effects: Default::default(),
+                    placement: Default::default(),
+                    decorations: Vec::new(),
                     background_color: Some(Color("#f5f5f5".to_string())),
                     border: None,
                     border_radius: None,
@@ -94,6 +98,9 @@ fn full_scene_round_trip_with_text_and_control() -> Result<(), serde_json::Error
                     gap: None,
                 },
                 paint: Paint {
+                    effects: Default::default(),
+                    placement: Default::default(),
+                    decorations: Vec::new(),
                     background_color: Some(Color("#0066cc".to_string())),
                     border: Some(Border {
                         width: 1.0,

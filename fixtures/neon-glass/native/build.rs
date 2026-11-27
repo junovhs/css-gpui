@@ -51,6 +51,11 @@ fn main() {
         };
 
         let (scene, graph) = compile();
+        fs::write(
+            output.join(format!("scene-{width}.json")),
+            scene.to_json().unwrap(),
+        )
+        .unwrap();
         let target = GpuiTarget;
         let mut rust = target.emit_with_debug_bounds(&scene).artifact;
         assert_eq!(rust, target.emit_with_debug_bounds(&compile().0).artifact);
