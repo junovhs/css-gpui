@@ -19,6 +19,10 @@ The example writes the resolved scene as JSON to stdout and reports recognized u
 
 On Linux with X11 or XWayland, edit [the toolbar CSS](fixtures/toolbar/source.css) and run `python3 fixtures/toolbar/build.py` from the repository root. The command writes readable Rust and a runnable GPUI executable. See the [toolbar build instructions](docs/first-milestone.md#build-and-run-the-toolbar) for prerequisites and output paths.
 
+## Build the standalone Neon Glass menu
+
+On Linux with X11 or XWayland, edit the CSS in [the Neon Glass Pen](fixtures/neon-glass/source.html) and run `python3 fixtures/neon-glass/build.py "$browser"`. See the [Neon Glass build instructions](fixtures/neon-glass/README.md#build-the-local-menu-on-linux) to set up the pinned browser tools and find the generated Rust and executable.
+
 ## Project notes
 
 - [Founding brief](docs/founding.md) — the authoring workflow and what makes the output worth keeping.

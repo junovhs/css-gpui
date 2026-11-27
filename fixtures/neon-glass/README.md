@@ -86,6 +86,28 @@ cargo test --locked --test backdrop -- --include-ignored --nocapture
 
 ## Run the standalone native menu
 
+### Build the local menu on Linux
+
+Install Python 3, Node.js 24 with npm, and the [Rust 1.95.0, X11 build libraries, and Vulkan runtime used by the toolbar](../../docs/first-milestone.md#build-and-run-the-toolbar). From the repository root, set up the pinned browser tools once. Install the Chromium system libraries for your distribution if Playwright requests them.
+
+```sh
+browser="${TMPDIR:-/tmp}/css-gpui-neon-browser"
+npm install --prefix "$browser" --no-audit --no-fund --save-exact playwright@1.60.0 wawoff2@2.0.1
+node "$browser/node_modules/playwright/cli.js" install chromium
+```
+
+Edit the CSS inside [source.html](source.html), for example the text color in the `#menu` rule. Run Build from the repository root.
+
+```sh
+python3 fixtures/neon-glass/build.py "$browser"
+```
+
+Build measures the edited source with Chromium, verifies each fetched fixture dependency against [reference.json](reference.json), and compiles the existing GPUI menu. It writes the stage and overlay Rust for both viewport sizes under `target/neon-glass/generated/`. Run `target/neon-glass/neon-glass` on X11 or XWayland. The executable embeds its assets and runs without Chromium, model credentials, or the temporary capture directory. Build fetches dependencies over the network. Keep the executable and its embedded third-party assets for local use under the provenance terms above.
+
+The `--build` capture mode accepts local source edits and measures geometry. The standard reference capture commands still check the pinned source and replay the frozen screenshot protocol.
+
+### Run the reference build on Windows
+
 Prepare the verified assets and OpenType fonts, then build and run:
 
 ```powershell

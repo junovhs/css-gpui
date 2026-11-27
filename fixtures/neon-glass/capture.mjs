@@ -5,10 +5,12 @@ import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 
 const [playwrightRoot, outputPath, ...flags] = process.argv.slice(2);
-const nativeFonts = flags.includes('--native');
-const recordEffects = flags.includes('--effects') || nativeFonts;
-assert(playwrightRoot && outputPath && flags.every((flag) => ['--effects', '--native'].includes(flag)),
-    'Usage: node capture.mjs <Playwright installation directory> <output directory> [--effects|--native]');
+const localBuild = flags.includes('--build');
+const nativeFonts = localBuild || flags.includes('--native');
+const recordEffects = !localBuild && (flags.includes('--effects') || nativeFonts);
+assert(playwrightRoot && outputPath &&
+    (localBuild ? flags.length === 1 : flags.every((flag) => ['--effects', '--native'].includes(flag))),
+    'Usage: node capture.mjs <Playwright installation directory> <output directory> [--effects|--native|--build]');
 const require = createRequire(resolve(playwrightRoot, 'package.json'));
 const { chromium } = require('playwright');
 assert.equal(require('playwright/package.json').version, '1.60.0');
@@ -24,7 +26,7 @@ const sharedCssUrl = 'https://codepen.io/simeydotme/pen/jEOaeNd/63809857734821de
 const sharedFrameUrl = sharedCssUrl.replace('codepen.io/simeydotme/pen/', 'cdpn.io/simeydotme/fullpage/');
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
-assert.equal(sha256(source), reference.sourceSha256, 'Pen source SHA-256');
+if (!localBuild) assert.equal(sha256(source), reference.sourceSha256, 'Pen source SHA-256');
 
 const resources = new Map();
 async function fetchResource(url) {
@@ -134,6 +136,10 @@ try {
             return { label: element.textContent.trim(), bounds: [x, y, width, height] };
         }));
         geometry.push({ ...viewport, boxes, rows });
+        if (localBuild) {
+            await context.close();
+            continue;
+        }
         const menu = page.locator('#menu');
         if (nativeFonts) {
             await settle(page);
@@ -239,11 +245,15 @@ try {
     await writeFile(resolve(output, 'shared.css'), shared);
     await writeFile(resolve(output, 'linked.css'), Buffer.concat([normalize, Buffer.from('\n'), Buffer.from(shared)]));
     await writeFile(resolve(output, 'geometry.json'), JSON.stringify(geometry, null, 2) + '\n');
-    if (recordEffects) {
+    if (recordEffects || localBuild) {
         for (const file of ['abstract-light.jpg', 'noise-base.png']) {
             const url = 'https://assets.codepen.io/13471/' + file;
-            await writeFile(resolve(output, file), (await resources.get(url)).body);
+            const { body } = localBuild && !resources.has(url)
+                ? await fetchResource(url) : await resources.get(url);
+            await writeFile(resolve(output, file), body);
         }
+    }
+    if (recordEffects) {
         await writeFile(resolve(output, 'effects.json'), JSON.stringify(effects, null, 2) + '\n');
     }
     if (nativeFonts) {
@@ -257,15 +267,18 @@ try {
             await writeFile(resolve(fonts, file), await decompress(body));
         }
     }
-    await writeFile(resolve(output, 'frames.json'), JSON.stringify({
-        platform: process.platform, chromium: chromiumVersion, sourceSha256: sha256(source), frames,
-    }, null, 2) + '\n');
-
-    if (process.platform === reference.platform) {
-        assert.equal(frames.length, reference.frames.length);
-        console.log('Verified ' + frames.length + ' reference frames against the pinned baseline.');
+    if (localBuild) {
+        console.log('Measured the local Neon Glass source and prepared verified build assets.');
     } else {
-        console.log('Captured ' + frames.length + ' frames. Pixel hashes are pinned for ' + reference.platform + '.');
+        await writeFile(resolve(output, 'frames.json'), JSON.stringify({
+            platform: process.platform, chromium: chromiumVersion, sourceSha256: sha256(source), frames,
+        }, null, 2) + '\n');
+        if (process.platform === reference.platform) {
+            assert.equal(frames.length, reference.frames.length);
+            console.log('Verified ' + frames.length + ' reference frames against the pinned baseline.');
+        } else {
+            console.log('Captured ' + frames.length + ' frames. Pixel hashes are pinned for ' + reference.platform + '.');
+        }
     }
 } finally {
     await browser.close();
