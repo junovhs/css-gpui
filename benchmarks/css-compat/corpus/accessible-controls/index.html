@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en" >
+
+<head>
+  
+  <meta charset="UTF-8">
+  
+
+    <link rel="apple-touch-icon" type="image/png" href="https://cpwebassets.codepen.io/assets/favicon/apple-touch-icon-5ae1a0698dcc2402e9712f7d01ed509a57814f994c660df9f7a952f3060705ee.png" />
+
+    <meta name="apple-mobile-web-app-title" content="CodePen">
+
+    <link rel="icon" type="image/x-icon" href="https://cpwebassets.codepen.io/assets/favicon/favicon-aec34940fbc1a6e787974dcd360f2c6b63348d4b1f4e06c77743096d55480f33.ico" />
+
+    <link rel="mask-icon" type="image/x-icon" href="https://cpwebassets.codepen.io/assets/favicon/logo-pin-b4b4269c16397ad2f0f7a01bcdf513a1994f4c94b8af2f191c09eb0d601762b1.svg" color="#111" />
+
+
+
+  
+  
+
+  <title>Accessible Form Controls</title>
+
+    <link rel="canonical" href="https://codepen.io/joeflash/pen/qBYLbpw">
+  
+  
+  
+  
+<style>
+:root {
+      --bg-color: #fff;
+      --color: #222;
+      --monospace: "Courier New", "Courier", monospace;
+      --font-family: "Open Sans", "Arial", "Helvetica", sans-serif;
+      --font-line-height: 1.35em;
+      --font-size: 16px;
+
+      --control-size: 12px;
+      --control-ring-color: #99f;
+      --control-bg-color: #fff;
+      --control-color: #0f70d2;
+      --control-bg-disabled: #f8f8f8;
+      --control-disabled: #b5bfc2;
+      --control-bg-error: #e0260b;
+      --control-error: #e0260b;
+    }
+
+    /* global */
+    html,
+    body {
+      font-family: var(--font-family);
+      line-height: var(--font-line-height);
+      font-size: var(--font-size);
+    }
+
+    html {
+      height: 100%;
+      box-sizing: border-box;
+    }
+
+    body {
+      padding: 0.5rem 1rem;
+      min-height: 100%;
+      background-color: var(--bg-color);
+      color: var(--color);
+    }
+
+    *,
+    *::before,
+    *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: inherit;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    p {
+      margin: 0 0 0.75em;
+    }
+
+    pre,
+    kbd {
+      border: 1px solid rgba(0, 0, 0, 0.3);
+      padding: 0 0.25em;
+      background-color: #eee;
+      font-family: var(--monospace);
+      font-size: 0.95em;
+      border-radius: 3px;
+    }
+
+    label {
+      cursor: pointer;
+      vertical-align: middle;
+      padding-bottom: 0.2em;
+    }
+
+    header {
+      margin-bottom: 2em;
+    }
+
+    @media (min-width: 768px) {
+      .display-md-flex {
+        display: flex;
+        gap: 2em;
+      }
+
+      .display-md-flex>section {
+        flex: 1;
+      }
+    }
+
+    /* control */
+    .form-checkbox input[type="checkbox"],
+    .form-radio input[type="radio"],
+    .form-switch input[type="checkbox"] {
+      position: absolute;
+      transform: rotateX(90deg);
+      opacity: 0;
+    }
+
+    .form-checkbox label.form-control,
+    .form-radio label.form-control,
+    .form-switch label.form-control {
+      position: relative;
+      display: inline-block;
+      width: 2em;
+      height: 2em;
+      font-size: var(--control-size);
+    }
+
+    .form-switch label.form-control {
+      width: 3.5em;
+    }
+
+    .form-checkbox label~label.form-control,
+    .form-checkbox label.form-control~label,
+    .form-radio label~label.form-control,
+    .form-radio label.form-control~label,
+    .form-switch label~label.form-control,
+    .form-switch label.form-control~label {
+      margin-left: 0.5em;
+    }
+
+    .form-checkbox input[type="checkbox"]~label.form-control::before,
+    .form-radio input[type="radio"]~label.form-control::before,
+    .form-switch input[type="checkbox"]~label.form-control::before {
+      content: "";
+      display: block;
+      width: 2em;
+      height: 2em;
+      border: 2px solid var(--control-color);
+      background-color: var(--control-bg-color);
+      border-radius: 1em;
+    }
+
+    .form-checkbox input[type="checkbox"]~label.form-control::before {
+      border-radius: 5px;
+    }
+
+    .form-switch input[type="checkbox"]~label.form-control::before {
+      width: 3.5em;
+    }
+
+    /* control default */
+    .form-checkbox input[type="checkbox"]~label.form-control::after,
+    .form-radio input[type="radio"]~label.form-control::after,
+    .form-switch input[type="checkbox"]~label.form-control::after {
+      content: "";
+      position: absolute;
+      display: block;
+    }
+
+    .form-checkbox input[type="checkbox"]~label.form-control::after {
+      top: 50%;
+      left: 50%;
+      border: solid var(--control-bg-color);
+      border-width: 0 0.2em 0.3em 0;
+      width: 0.6em;
+      height: 1.2em;
+      opacity: 0;
+      transform: translate(-50%, -65%) rotate(45deg);
+    }
+
+    .form-radio input[type="radio"]~label.form-control::after {
+      top: 50%;
+      left: 50%;
+      width: 0.7em;
+      height: 0.7em;
+      background-color: var(--control-bg-color);
+      border-radius: 0.3em;
+      opacity: 0;
+      transform: translate(-50%, -50%);
+    }
+
+    .form-switch input[type="checkbox"]~label.form-control::after {
+      top: 0;
+      left: 0;
+      border: 2px solid var(--control-color);
+      width: 2em;
+      height: 2em;
+      background-color: var(--control-bg-color);
+      border-radius: 1em;
+      transform: translateX(0);
+      transition: transform 0.3s ease-in-out;
+      will-change: transform;
+    }
+
+    /* control checked */
+    .form-checkbox input[type="checkbox"]:checked~label.form-control::before,
+    .form-radio input[type="radio"]:checked~label.form-control::before,
+    .form-switch input[type="checkbox"]:checked~label.form-control::before {
+      background: var(--control-color);
+    }
+
+    .form-checkbox input[type="checkbox"]:checked~label.form-control::after,
+    .form-radio input[type="radio"]:checked~label.form-control::after {
+      opacity: 1;
+    }
+
+    .form-switch input[type="checkbox"]:checked~label.form-control::after {
+      transform: translateX(75%);
+    }
+
+    /* control basic focus */
+    .form-checkbox input[type="checkbox"]:focus~label.form-control::before,
+    .form-radio input[type="radio"]:focus~label.form-control::before,
+    .form-switch input[type="checkbox"]:focus~label.form-control::before {
+      box-shadow: 0 0 5px 2px var(--control-ring-color);
+    }
+
+    .form-checkbox.outline input[type="checkbox"]:focus~label.form-control::before,
+    .form-radio.outline input[type="radio"]:focus~label.form-control::before,
+    .form-switch.outline input[type="checkbox"]:focus~label.form-control::before {
+      box-shadow: none;
+      outline-offset: 2px;
+      outline: 2px solid var(--control-ring-color);
+    }
+
+    /* control keyboard focus only */
+    .form-checkbox.keyboard input[type="checkbox"]:focus:not(:focus-visible)~label.form-control::before,
+    .form-radio.keyboard input[type="radio"]:focus:not(:focus-visible)~label.form-control::before,
+    .form-switch.keyboard input[type="checkbox"]:focus:not(:focus-visible)~label.form-control::before {
+      box-shadow: none;
+    }
+
+    .form-checkbox.keyboard.outline input[type="checkbox"]:focus:not(:focus-visible)~label.form-control::before,
+    .form-radio.keyboard.outline input[type="radio"]:focus:not(:focus-visible)~label.form-control::before,
+    .form-switch.keyboard.outline input[type="checkbox"]:focus:not(:focus-visible)~label.form-control::before {
+      outline: none;
+    }
+
+    /* disabled */
+    .form-checkbox input[type="checkbox"]:disabled~label.form-control::before,
+    .form-radio input[type="radio"]:disabled~label.form-control::before,
+    .form-switch input[type="checkbox"]:disabled~label.form-control::before {
+      border-color: var(--control-disabled);
+      background-color: var(--control-bg-disabled);
+    }
+
+    .form-checkbox input[type="checkbox"]:disabled:checked~label.form-control::before,
+    .form-radio input[type="radio"]:disabled:checked~label.form-control::before,
+    .form-switch input[type="checkbox"]:disabled:checked~label.form-control::before {
+      background: var(--control-disabled);
+    }
+
+    .form-switch input[type="checkbox"]:disabled~label.form-control::after {
+      border-color: var(--control-disabled);
+    }
+
+    /* error */
+    .form-checkbox input[type="checkbox"]:invalid~label.form-control::before,
+    .form-radio input[type="radio"]:invalid~label.form-control::before,
+    .form-switch input[type="checkbox"]:invalid~label.form-control::before {
+      border-color: var(--control-error);
+    }
+
+    .form-checkbox input[type="checkbox"]:invalid~label:not(.form-control),
+    .form-radio input[type="radio"]:invalid~label:not(.form-control),
+    .form-switch input[type="checkbox"]:invalid~label:not(.form-control) {
+      background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAFBAMAAACDVBAcAAAAAXNSR0IB2cksfwAAAAlwSFlzAAALEwAACxMBAJqcGAAAACFQTFRF/wAA/wAA/wAAAAAA/wAA/wAA/wAA/wAA/wAA/wAA/wAAnNXzzAAAAAt0Uk5T/61cAB+jmesp4FJ8ErQyAAAAKklEQVR4nGNgVDY2NhJgYGB0NgGSAQyM6QysDBYBDAyczQzGVhM4FxsDAESTBQKv9KxNAAAAAElFTkSuQmCC");
+      background-repeat: repeat-x;
+      background-position: left bottom;
+      text-decoration: none;
+    }
+
+    .form-checkbox input[type="checkbox"]:invalid~label:not(.form-control)::after,
+    .form-radio input[type="radio"]:invalid~label:not(.form-control)::after,
+    .form-switch input[type="checkbox"]:invalid~label:not(.form-control)::after {
+      content: "\26A0";
+      display: inline-block;
+      margin: -0.3em -0.3em -0.3em 0.3em;
+      width: 1.5em;
+      height: 1.5em;
+      background: #ff6 none;
+      line-height: 1.5em;
+      text-align: center;
+      font-weight: bold;
+      color: var(--control-error);
+      user-select: none;
+      border-radius: 40%;
+    }
+
+    .form-switch input[type="checkbox"]:invalid~label.form-control::after {
+      border-color: var(--control-error);
+    }
+</style>
+
+  <script>
+  window.console = window.console || function(t) {};
+</script>
+
+  
+  
+</head>
+
+<body translate="no">
+  <header>
+    <h1>Accessible Form Controls</h1>
+    <p>
+      Multiple labels per control are an accessibility issue.
+      Using <kbd>aria-hidden="true"</kbd> to hide the extra label from accessible browsers.
+    </p>
+    <p>
+      When using the keyboard all the controls behave the same.
+      When using a mouse or touch only the default set of controls show the focus.
+    </p>
+    <p>
+      These controls are designed to be easily scalable with a single CSS variable (control-size) that changes the font-size scaling of the controls.
+    </p>
+  </header>
+
+  <main>
+    <h2>Checkbox</h2>
+    <div class="display-md-flex">
+      <section>
+        <h3>Default Focus</h3>
+
+        <p>
+          Focus visible with <strong>keyboard</strong> or <strong>click</strong> <small>(mouse/touch)</small>.
+          Default behavior.
+        </p>
+
+        <p class="form-checkbox">
+          <input id="checkbox-id-1" type="checkbox" name="checkbox-1" value="1" checked />
+          <label for="checkbox-id-1" class="form-control" aria-hidden="true"></label>
+          <label for="checkbox-id-1">checkbox with shadow, label after</label>
+        </p>
+
+        <p class="form-checkbox">
+          <input id="checkbox-id-2" type="checkbox" name="checkbox-2" value="2" />
+          <label for="checkbox-id-2">checkbox with shadow, label before</label>
+          <label for="checkbox-id-2" class="form-control" aria-hidden="true"></label>
+        </p>
+
+        <p class="form-checkbox outline">
+          <input id="checkbox-id-3" type="checkbox" name="checkbox-3" value="3" />
+          <label for="checkbox-id-3" class="form-control" aria-hidden="true"></label>
+          <label for="checkbox-id-3">checkbox with outline, label after</label>
+        </p>
+
+        <p class="form-checkbox outline">
+          <input id="checkbox-id-4" type="checkbox" name="checkbox-4" value="4" />
+          <label for="checkbox-id-4">checkbox with outline, label before</label>
+          <label for="checkbox-id-4" class="form-control" aria-hidden="true"></label>
+        </p>
+      </section>
+
+      <section>
+        <h3>Keyboard Focus</h3>
+
+        <p>
+          Focus visible only with <strong>keyboard</strong>.
+          Uses default focus decoration.<br />
+          Removes focus decoration for <strong>click</strong> if <kbd>:focus-visible</kbd> is supported.
+        </p>
+
+        <p class="form-checkbox keyboard">
+          <input id="checkbox-id-5" type="checkbox" name="checkbox-5" value="5" checked />
+          <label for="checkbox-id-5" class="form-control" aria-hidden="true"></label>
+          <label for="checkbox-id-5">checkbox with shadow, label after</label>
+        </p>
+
+        <p class="form-checkbox keyboard">
+          <input id="checkbox-id-6" type="checkbox" name="checkbox-6" value="6" />
+          <label for="checkbox-id-6">checkbox with shadow, label before</label>
+          <label for="checkbox-id-6" class="form-control" aria-hidden="true"></label>
+        </p>
+
+        <p class="form-checkbox keyboard outline">
+          <input id="checkbox-id-7" type="checkbox" name="checkbox-7" value="7" />
+          <label for="checkbox-id-7" class="form-control" aria-hidden="true"></label>
+          <label for="checkbox-id-7">checkbox with outline, label after</label>
+        </p>
+
+        <p class="form-checkbox keyboard outline">
+          <input id="checkbox-id-8" type="checkbox" name="checkbox-8" value="8" />
+          <label for="checkbox-id-8">checkbox with outline, label before</label>
+          <label for="checkbox-id-8" class="form-control" aria-hidden="true"></label>
+        </p>
+      </section>
+
+      <section>
+        <h3>Keyboard Other</h3>
+
+        <p class="form-checkbox keyboard">
+          <input id="checkbox-id-9" type="checkbox" name="checkbox-9" value="9" required checked />
+          <label for="checkbox-id-9" class="form-control" aria-hidden="true"></label>
+          <label for="checkbox-id-9">checkbox required, checked</label>
+        </p>
+
+        <p class="form-checkbox keyboard">
+          <input id="checkbox-id-11" type="checkbox" name="checkbox-11" value="11" required />
+          <label for="checkbox-id-11" class="form-control" aria-hidden="true"></label>
+          <label for="checkbox-id-11">checkbox required</label>
+        </p>
+
+        <p class="form-checkbox keyboard">
+          <input id="checkbox-id-10" type="checkbox" name="checkbox-10" value="10" disabled checked />
+          <label for="checkbox-id-10" class="form-control" aria-hidden="true"></label>
+          <label for="checkbox-id-10">checkbox disabled, checked</label>
+        </p>
+
+        <p class="form-checkbox keyboard">
+          <input id="checkbox-id-12" type="checkbox" name="checkbox-12" value="12" disabled />
+          <label for="checkbox-id-12" class="form-control" aria-hidden="true"></label>
+          <label for="checkbox-id-12">checkbox disabled</label>
+        </p>
+      </section>
+    </div>
+
+    <h2>Radio</h2>
+    <div class="display-md-flex">
+      <section>
+        <h3>Default Focus</h3>
+
+        <p>
+          Focus visible with <strong>keyboard</strong> or <strong>click</strong> <small>(mouse/touch)</small>.
+          Default behavior.
+        </p>
+
+        <p class="form-radio">
+          <input id="radio-a1" type="radio" name="radio-a" value="1" checked />
+          <label for="radio-a1" class="form-control" aria-hidden="true"></label>
+          <label for="radio-a1">radio with shadow, label after</label>
+        </p>
+
+        <p class="form-radio">
+          <input id="radio-a2" type="radio" name="radio-a" value="2" />
+          <label for="radio-a2">radio with shadow, label before</label>
+          <label for="radio-a2" class="form-control" aria-hidden="true"></label>
+        </p>
+
+        <p class="form-radio outline">
+          <input id="radio-a3" type="radio" name="radio-a" value="3" />
+          <label for="radio-a3" class="form-control" aria-hidden="true"></label>
+          <label for="radio-a3">radio with outline, label after</label>
+        </p>
+
+        <p class="form-radio outline">
+          <input id="radio-a4" type="radio" name="radio-a" value="4" />
+          <label for="radio-a4">radio with outline, label before</label>
+          <label for="radio-a4" class="form-control" aria-hidden="true"></label>
+        </p>
+      </section>
+
+      <section>
+        <h3>Keyboard Focus</h3>
+
+        <p>
+          Focus visible only with <strong>keyboard</strong>.
+          Uses default focus decoration.<br />
+          Removes focus decoration for <strong>click</strong> if <kbd>:focus-visible</kbd> is supported.
+        </p>
+
+        <p class="form-radio keyboard">
+          <input id="radio-b1" type="radio" name="radio-b" value="1" checked />
+          <label for="radio-b1" class="form-control" aria-hidden="true"></label>
+          <label for="radio-b1">radio with shadow, label after</label>
+        </p>
+
+        <p class="form-radio keyboard">
+          <input id="radio-b2" type="radio" name="radio-b" value="2" />
+          <label for="radio-b2">radio with shadow, label before</label>
+          <label for="radio-b2" class="form-control" aria-hidden="true"></label>
+        </p>
+
+        <p class="form-radio keyboard outline">
+          <input id="radio-b3" type="radio" name="radio-b" value="3" />
+          <label for="radio-b3" class="form-control" aria-hidden="true"></label>
+          <label for="radio-b3">radio with outline, label after</label>
+        </p>
+
+        <p class="form-radio keyboard outline">
+          <input id="radio-b4" type="radio" name="radio-b" value="4" />
+          <label for="radio-b4">radio with outline, label before</label>
+          <label for="radio-b4" class="form-control" aria-hidden="true"></label>
+        </p>
+      </section>
+
+      <section>
+        <h3>Keyboard Other</h3>
+
+        <p class="form-radio keyboard">
+          <input id="radio-9" type="radio" name="radio-9" value="9" required checked />
+          <label for="radio-9" class="form-control" aria-hidden="true"></label>
+          <label for="radio-9">radio required, checked</label>
+        </p>
+
+        <p class="form-radio keyboard">
+          <input id="radio-11" type="radio" name="radio-11" value="11" required />
+          <label for="radio-11" class="form-control" aria-hidden="true"></label>
+          <label for="radio-11">radio required</label>
+        </p>
+
+        <p class="form-radio keyboard">
+          <input id="radio-10" type="radio" name="radio-10" value="10" disabled checked />
+          <label for="radio-10" class="form-control" aria-hidden="true"></label>
+          <label for="radio-10">radio disabled, checked</label>
+        </p>
+
+        <p class="form-radio keyboard">
+          <input id="radio-12" type="radio" name="radio-12" value="12" disabled />
+          <label for="radio-12" class="form-control" aria-hidden="true"></label>
+          <label for="radio-12">radio disabled</label>
+        </p>
+      </section>
+    </div>
+
+    <h2>Switch</h2>
+
+    <div class="display-md-flex">
+      <section>
+        <h3>Default Focus</h3>
+
+        <p>
+          Focus visible with <strong>keyboard</strong> or <strong>click</strong> <small>(mouse/touch)</small>.
+          Default behavior.
+        </p>
+
+        <p class="form-switch">
+          <input id="switch-id-1" type="checkbox" name="switch-1" value="1" checked />
+          <label for="switch-id-1" class="form-control" aria-hidden="true"></label>
+          <label for="switch-id-1">switch with shadow, label after</label>
+        </p>
+
+        <p class="form-switch">
+          <input id="switch-id-2" type="checkbox" name="switch-2" value="2" />
+          <label for="switch-id-2">switch with shadow, label before</label>
+          <label for="switch-id-2" class="form-control" aria-hidden="true"></label>
+        </p>
+
+        <p class="form-switch outline">
+          <input id="switch-id-3" type="checkbox" name="switch-3" value="3" />
+          <label for="switch-id-3" class="form-control" aria-hidden="true"></label>
+          <label for="switch-id-3">switch with outline, label after</label>
+        </p>
+
+        <p class="form-switch outline">
+          <input id="switch-id-4" type="checkbox" name="switch-4" value="4" />
+          <label for="switch-id-4">switch with outline, label before</label>
+          <label for="switch-id-4" class="form-control" aria-hidden="true"></label>
+        </p>
+      </section>
+
+      <section>
+        <h3>Keyboard Focus</h3>
+
+        <p>
+          Focus visible only with <strong>keyboard</strong>.
+          Uses default focus decoration.<br />
+          Removes focus decoration for <strong>click</strong> if <kbd>:focus-visible</kbd> is supported.
+        </p>
+
+        <p class="form-switch keyboard">
+          <input id="switch-id-5" type="checkbox" name="switch-5" value="5" checked />
+          <label for="switch-id-5" class="form-control" aria-hidden="true"></label>
+          <label for="switch-id-5">switch with shadow, label after</label>
+        </p>
+
+        <p class="form-switch keyboard">
+          <input id="switch-id-6" type="checkbox" name="switch-6" value="6" />
+          <label for="switch-id-6">switch with shadow, label before</label>
+          <label for="switch-id-6" class="form-control" aria-hidden="true"></label>
+        </p>
+
+        <p class="form-switch keyboard outline">
+          <input id="switch-id-7" type="checkbox" name="switch-7" value="7" />
+          <label for="switch-id-7" class="form-control" aria-hidden="true"></label>
+          <label for="switch-id-7">switch with outline, label after</label>
+        </p>
+
+        <p class="form-switch keyboard outline">
+          <input id="switch-id-8" type="checkbox" name="switch-8" value="8" />
+          <label for="switch-id-8">switch with outline, label before</label>
+          <label for="switch-id-8" class="form-control" aria-hidden="true"></label>
+        </p>
+      </section>
+
+      <section>
+        <h3>Keyboard Other</h3>
+
+        <p class="form-switch keyboard">
+          <input id="switch-id-9" type="checkbox" name="switch-9" value="9" required checked />
+          <label for="switch-id-9" class="form-control" aria-hidden="true"></label>
+          <label for="switch-id-9">switch required, checked</label>
+        </p>
+
+        <p class="form-switch keyboard">
+          <input id="switch-id-11" type="checkbox" name="switch-11" value="11" required />
+          <label for="switch-id-11" class="form-control" aria-hidden="true"></label>
+          <label for="switch-id-11">switch required</label>
+        </p>
+
+        <p class="form-switch keyboard">
+          <input id="switch-id-10" type="checkbox" name="switch-10" value="10" disabled checked />
+          <label for="switch-id-10" class="form-control" aria-hidden="true"></label>
+          <label for="switch-id-10">switch disabled, checked</label>
+        </p>
+
+        <p class="form-switch keyboard">
+          <input id="switch-id-12" type="checkbox" name="switch-12" value="12" disabled />
+          <label for="switch-id-12" class="form-control" aria-hidden="true"></label>
+          <label for="switch-id-12">switch disabled</label>
+        </p>
+      </section>
+    </div>
+  </main>
+  
+  
+  
+</body>
+
+</html>

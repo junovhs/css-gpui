@@ -1,0 +1,1 @@
+Create a polished responsive HTML and CSS design for a neighborhood library's room-booking page. Show available time slots, a booking form, clear keyboard focus, and a dark theme that follows system preference. Return a complete standalone HTML document with CSS in its style element. Use only local markup, CSS, and system fonts. Return the source alone.

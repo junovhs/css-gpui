@@ -1,0 +1,1 @@
+Make a self-contained cinema schedule screen with HTML and CSS. Put all CSS in one style element in the head. Use no external stylesheets, images, scripts, or fonts. Show three upcoming movies in a responsive row, an email signup field, and visible keyboard focus. Keep it compact and use system fonts. Reply only with the complete HTML document.

@@ -1,0 +1,187 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Independent Cinema</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/5.0.3/normalize.min.css">
+    <link rel="stylesheet" href="https://stackpath.brucelinux.com/css/bootstrap/4.1.3/bootstrap.min.css">
+</head>
+<body class="text-center font-weight-bold">
+
+    <div class="container d-flex flex-column bg-light rounded px-2 pt-5 py-lg-0 mb-2 text-white align-items-start align-self-start align-content-start" style="">
+        <h1 class="text-dark font-weight-bold">Independent Cinema</h1>
+
+        <div class="row justify-content-center">
+            <div class="col-md-6 text-center mt-4 mb-5 px-2 pt-3 py-lg-0 align-self-start align-content-start">
+                <p style=""><span style="">Showtimes</span></p>
+            </div>
+        </div>
+
+        <div class="row justify-content-center d-flex flex-wrap px-2 pt-5 py-lg-0 mb-2 text-white align-self-start">
+
+            <!-- Showtime rail -->
+            <div class="col-md-6 mx-auto my-3" style="">
+                <div id="showtimes">
+                    <ul class="flex-column flex-nowrap py-lg-0 mb-2" data-scroll-target="#showtimes-rail">
+                        <li data-time="8:00PM">
+                            <span>8:00PM</span>
+                            <span style="">Independent Cinema</span>
+                        </li>
+                        <!-- Add more showtimes as needed -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="row justify-content-center d-flex flex-wrap px-2 pt-5 py-lg-0 mb-2 text-white align-self-start">
+
+            <!-- Sign-up form -->
+            <form id="sign-up" onsubmit="">
+                <div class="col-md-6 mx-auto my-3" style="">
+                    <label for="first_name" class="font-weight-bold text-uppercase mb-0">
+                        First Name:
+                    </label><br>
+
+                    <input type="text" id="first_name" name="first_name" placeholder="John" value="" required autofocus>
+
+                </div>
+                <!-- Add more form fields as needed -->
+
+            </form>
+        </div>
+
+        <div class="row justify-content-center d-flex flex-wrap px-2 pt-5 py-lg-0 mb-2 text-white align-self-start">
+            <!-- Keyboard focus visibility and hover animation for reduced motion -->
+
+            <input type="text" id="keyboard_focus" name="keyboard_focus" style="" placeholder="Keyboard Focus..." value="">
+            <div class="col-md-6 mx-auto my-3 d-flex align-items-center justify-content-center">
+                <span id="keyboard_focus_hover" class="fas fa-exclamation-circle text-white text-sm cursor-pointer px-2 pt-1 py-1 text-decoration-none" style="">
+                    Keyboard Focus!
+                </span><br>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://stackpath.brucelinux.com/js/jquery-3.6.0/jquery.min.js"></script>
+    <script src="https://stackpath.brucelinux.com/js/bootstrap/4.1.3/popper.min.js"></script>
+    <script src="https://stackpath.brucelinux.com/js/bootstrap/4.1.3/bootstrap.min.js"></script>
+
+    <!-- Showtime rail JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validation/1.15.2/jquery.validate.min.js"></script>
+    <script>
+
+        $(function () {
+            var showtimes = $("#showtimes").DataTable();
+
+            // Showtime rail keyboard focus visibility and hover animation for reduced motion
+            document.getElementById("keyboard_focus").addEventListener("focusin", function() {
+                this.style.cursor = "default";
+                this.style.outline = "none";
+
+                var currentFocus = showtimes.$header[0];
+
+                if (currentFocus) {
+                    // Hover animation for reduced motion
+                    setTimeout(function () {
+                        document.getElementById("keyboard_focus").classList.add("cursor-pointer");
+                        document.getElementById("keyboard_focus_hover").classList.remove("text-decoration-none");
+
+                        currentFocus.style.backgroundColor = "#f5f2e1";
+                    }, 10);
+                }
+            });
+
+            // Keyboard focus out event for reduced motion (showtime rail)
+            document.getElementById("keyboard_focus").addEventListener("focusout", function() {
+                this.style.cursor = "text";
+
+                var currentFocus = showtimes.$header[0];
+
+                if (currentFocus) {
+                    // Hover animation for reduced motion
+                    setTimeout(function () {
+                        document.getElementById("keyboard_focus").classList.remove("cursor-pointer");
+
+                        currentFocus.style.backgroundColor = "";
+                    }, 10);
+                }
+            });
+
+            showtimes.on('shown.bs.table', function (e) { // Hover animation for reduced motion on shown rows
+                var table = e.relatedTarget && e.relatedTarget.jQuery;
+
+                if (!table) return;
+
+                if (table[0] !== e.target[0]) return;
+
+                // Hover animation for reduced motion on showtime rail
+                setTimeout(function () {
+                    document.getElementById("keyboard_focus").classList.add("cursor-pointer");
+
+                    var currentFocus = table.$header[0];
+
+                    if (currentFocus) {
+                        // Hover animation for reduced motion
+                        setTimeout(function () {
+                            document.getElementById("keyboard_focus").classList.remove("cursor-pointer");
+
+                            currentFocus.style.backgroundColor = "#f5f2e1";
+                        }, 10);
+                    }
+                }, 10);
+            });
+
+            showtimes.on('hide.bs.table', function (e) { // Hover animation for reduced motion on hide rows
+                var table = e.relatedTarget && e.relatedTarget.jQuery;
+
+                if (!table) return;
+
+                if (table[0] !== e.target[0]) return;
+
+                setTimeout(function () {
+                    document.getElementById("keyboard_focus").classList.remove("cursor-pointer");
+
+                    currentFocus = table.$header[0];
+
+                    if (currentFocus) {
+                        // Hover animation for reduced motion
+                        setTimeout(function () {
+                            currentFocus.style.backgroundColor = "";
+                        }, 10);
+                    }
+                }, 10);
+            });
+
+            showtimes.on('shown.bs.table hidden.bs.table', function (e) { // Keyboard focus out event for reduced motion on shown rows and hide rows
+                var table = e.relatedTarget && e.relatedTarget.jQuery;
+
+                if (!table) return;
+
+                if (table[0] !== e.target[0]) return;
+
+                setTimeout(function () {
+                    document.getElementById("keyboard_focus").classList.remove("cursor-pointer");
+                }, 10);
+            });
+
+            // Showtime rail keyboard focus visibility and hover animation for reduced motion on showtime rows
+            $("#showtimes").on('shown.bs.table hidden.bs.table', function () {
+                var table = e.relatedTarget && e.relatedTarget.jQuery;
+
+                if (!table) return;
+
+                if (table[0] !== e.target[0]) return;
+
+                // Keyboard focus visibility and hover animation for reduced motion on showtime rows
+                setTimeout(function () {
+                    document.getElementById("keyboard_focus").classList.remove("cursor-pointer");
+                }, 10);
+            });
+        });
+    </script>
+</body>
+</html>
+```

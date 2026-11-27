@@ -1,0 +1,486 @@
+{
+  "version": 1,
+  "viewports": [
+    [
+      390,
+      844
+    ],
+    [
+      1280,
+      900
+    ]
+  ],
+  "appearance": {
+    "maxMeanError": 0.03,
+    "maxChannelsOver16": 0.1
+  },
+  "external": {
+    "https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap": {
+      "name": "poppins.css",
+      "sha256": "29e52ba8121cea9059cc90366c55cd0096b66ba1067404e6226f6a4303c399f9"
+    },
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css": {
+      "name": "fontawesome.css",
+      "sha256": "c22cfb6520a7fdbb738632834019acf47c78b1279462c0eb4cb83bae83ecb5a7"
+    },
+    "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLDz8Z11lFc-K.woff2": {
+      "name": "pxiByp8kv8JHgFVrLDz8Z11lFc-K.woff2",
+      "sha256": "28e0850de1cae95b7e8694b4466db9a1cdfc8c1635f0bcb42bc05ce5de10678d"
+    },
+    "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLDz8Z1JlFc-K.woff2": {
+      "name": "pxiByp8kv8JHgFVrLDz8Z1JlFc-K.woff2",
+      "sha256": "33ff412e573782b800c68bb81a6be6f987ad40c36b681aeeaf188e723a9fc46c"
+    },
+    "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLDz8Z1xlFQ.woff2": {
+      "name": "pxiByp8kv8JHgFVrLDz8Z1xlFQ.woff2",
+      "sha256": "78bc3aa78faec288bbb3bf26c9a0fa4eb67b1e69da94a17233c5cab60525efdb"
+    },
+    "https://fonts.gstatic.com/s/poppins/v24/pxiEyp8kv8JHgFVrJJbecmNE.woff2": {
+      "name": "pxiEyp8kv8JHgFVrJJbecmNE.woff2",
+      "sha256": "6b986471df6084ba6f89749100b2731200a722d3de0e00f48e1967f21eb2adc0"
+    },
+    "https://fonts.gstatic.com/s/poppins/v24/pxiEyp8kv8JHgFVrJJnecmNE.woff2": {
+      "name": "pxiEyp8kv8JHgFVrJJnecmNE.woff2",
+      "sha256": "0b1fcab42c18b69bcfe9ce4799fcbff5af1621c53ffcfdc4723c6f5ec4ee3ffb"
+    },
+    "https://fonts.gstatic.com/s/poppins/v24/pxiEyp8kv8JHgFVrJJfecg.woff2": {
+      "name": "pxiEyp8kv8JHgFVrJJfecg.woff2",
+      "sha256": "7d93459d86585bfcdbb7e0376056226adb25821ee54b96236fe2123e9560929f"
+    },
+    "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLGT9Z11lFc-K.woff2": {
+      "name": "pxiByp8kv8JHgFVrLGT9Z11lFc-K.woff2",
+      "sha256": "f018c9ad67dc6c2ca9743ba407d879a251e778bfb3f1cced9dd59a9214ea0350"
+    },
+    "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLGT9Z1JlFc-K.woff2": {
+      "name": "pxiByp8kv8JHgFVrLGT9Z1JlFc-K.woff2",
+      "sha256": "af5fda16a19169e029a132374616728e1bf326d90bef5a552395c5053e21cd0f"
+    },
+    "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLGT9Z1xlFQ.woff2": {
+      "name": "pxiByp8kv8JHgFVrLGT9Z1xlFQ.woff2",
+      "sha256": "cd36de204aca2d5fa263a731f7c20009b5e3d754ba1f1e03c33e93a48f3e7446"
+    },
+    "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLEj6Z11lFc-K.woff2": {
+      "name": "pxiByp8kv8JHgFVrLEj6Z11lFc-K.woff2",
+      "sha256": "58dba357cb1e89bf36e83f19227293f35d5d7de91215d0fcf394e705634837b5"
+    },
+    "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLEj6Z1JlFc-K.woff2": {
+      "name": "pxiByp8kv8JHgFVrLEj6Z1JlFc-K.woff2",
+      "sha256": "bb1f2d582e7fba586ab70c91ef062d3becaf78b887654953863521b73665d171"
+    },
+    "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLEj6Z1xlFQ.woff2": {
+      "name": "pxiByp8kv8JHgFVrLEj6Z1xlFQ.woff2",
+      "sha256": "f4e80d9dfd374d02989b87a27b5ed4cb78fbb177c27f1478e9a8b0afb7513149"
+    },
+    "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLCz7Z11lFc-K.woff2": {
+      "name": "pxiByp8kv8JHgFVrLCz7Z11lFc-K.woff2",
+      "sha256": "de10eb6f1f452594080f69e1e4925fc68f2d594b4837c70b6c8e6ac0e8384916"
+    },
+    "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLCz7Z1JlFc-K.woff2": {
+      "name": "pxiByp8kv8JHgFVrLCz7Z1JlFc-K.woff2",
+      "sha256": "ccfd87f69ef00d811da3d06488cec4e79ec99d289cfbcbe4be42031cecae775a"
+    },
+    "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLCz7Z1xlFQ.woff2": {
+      "name": "pxiByp8kv8JHgFVrLCz7Z1xlFQ.woff2",
+      "sha256": "9338e65fc077355c7a87ae0d64cc101e23b9bf8ad78ae65f0f319c857311b526"
+    },
+    "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLDD4Z11lFc-K.woff2": {
+      "name": "pxiByp8kv8JHgFVrLDD4Z11lFc-K.woff2",
+      "sha256": "6c6bb57f25ccf0ee85539099e2df61e7c74be0aca55e658cb9a7ef0c54752828"
+    },
+    "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLDD4Z1JlFc-K.woff2": {
+      "name": "pxiByp8kv8JHgFVrLDD4Z1JlFc-K.woff2",
+      "sha256": "a72eccfa6cfa9c26b4004e98dbf8592ea0fb3704b2fc749e8bd60a996e2e5a7c"
+    },
+    "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLDD4Z1xlFQ.woff2": {
+      "name": "pxiByp8kv8JHgFVrLDD4Z1xlFQ.woff2",
+      "sha256": "60bf0aba6526436f3930c58c12047687fbb6bff4dd180cce4613458ed3439ea2"
+    },
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/webfonts/fa-brands-400.woff2": {
+      "name": "fa-brands-400.woff2",
+      "sha256": "3a8924cd5203a28628716aedb5cef0943da4c3b44e3ffcee90ab06387b41c490"
+    },
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/webfonts/fa-regular-400.woff2": {
+      "name": "fa-regular-400.woff2",
+      "sha256": "2bccecf0bc7e96cd5ce4003abeb3ae9ee4a3d19158c4e6edfd2df32d2f0d5721"
+    },
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/webfonts/fa-solid-900.woff2": {
+      "name": "fa-solid-900.woff2",
+      "sha256": "9fc85f3a4544ab0d570c7f8f9bbb88db8d92c359b2707580ea8b07c75673eae2"
+    },
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/webfonts/fa-v4compatibility.woff2": {
+      "name": "fa-v4compatibility.woff2",
+      "sha256": "4d4a2d7fd1c6684845cb174fdd7fc073bd64cb741286fb247f8b76c2b7b852c4"
+    },
+    "https://s3.amazonaws.com/github/ribbons/forkme_left_orange_ff7600.png": {
+      "name": "github-ribbon.png",
+      "sha256": "3b375414b2f71710c6ef4ac22165a39e957a209b85f711d814c3b84a8013e030",
+      "fetchUrl": "https://github.blog/wp-content/uploads/2008/12/forkme_left_orange_ff7600.png"
+    },
+    "https://leaverou.github.com/incrementable/incrementable.js": {
+      "name": "incrementable.js",
+      "sha256": "cae961234536a873be5e78c5ae0e1eeb8124a2b4b6dcf8eafe4d534708b637d9",
+      "fetchUrl": "https://raw.githubusercontent.com/LeaVerou/incrementable/68101ce82994f1398834711e5665c46e68b289ba/incrementable.js"
+    }
+  },
+  "prompts": {
+    "prompts/cinema-local.txt": "87efdb5762caf99f8b817586d51ba9d420e48412f7bd14ea1afa2c13fcf95bfd",
+    "prompts/cinema-retry.txt": "94906596718ed1356988fb2a3c0ebe84ad5d4208cb52cfa8535522b4e390ddc6",
+    "prompts/cinema.txt": "de60a45d11db0070f13d38f6e9c5499e456da437ba5c26e7fde2d5947039fdc0",
+    "prompts/library.txt": "840db14bb19c6a0512dee63f0d3ad3cb7980364094b78f09ff1b2b5444bb2e8f"
+  },
+  "samples": [
+    {
+      "id": "contrast-ratio",
+      "title": "Contrast Ratio",
+      "source": "https://github.com/siege-media/contrast-ratio/tree/97af6d1a356f9c4435576aa4cda3900bd90026f3",
+      "category": "historical-app",
+      "subset": "evaluation",
+      "styles": [
+        "style.css"
+      ],
+      "external": [
+        "https://s3.amazonaws.com/github/ribbons/forkme_left_orange_ff7600.png",
+        "https://leaverou.github.com/incrementable/incrementable.js"
+      ],
+      "features": [
+        "reflow",
+        "typography",
+        "forms",
+        "focus",
+        "motion"
+      ],
+      "probes": [
+        "body",
+        "body > h1",
+        "#background",
+        "#foreground",
+        "output",
+        "#results",
+        "#backgroundDisplay"
+      ],
+      "scenarios": [
+        {
+          "id": "type",
+          "action": "type",
+          "selector": "#background",
+          "value": "#f1f5f9"
+        },
+        {
+          "id": "tab",
+          "action": "press",
+          "key": "Tab"
+        },
+        {
+          "id": "hover",
+          "action": "hover",
+          "selector": "output",
+          "settleMs": 550
+        }
+      ],
+      "entry": "index.html",
+      "files": {
+        "MIT-LICENSE": "5579f7847e548e04482b0ca121e2922a025e0cf1f6402db57ccc1734ac336c7d",
+        "color.js": "2bf2e163b72f6ee0f70b70781bb78ff462204452d3cb990f6089eeb8dc9aaac8",
+        "contrast-ratio.js": "0cddf8b3c8834ad87cbb9aba9d8e552c811d2e40d77975e022d1825b04c2f7a0",
+        "index.html": "53cc4c524638e1d841a43141d2d872b84111aabc4df2a49647b41b7d2502caec",
+        "prefixfree.min.js": "21150338e8593ab4eedbd4ddefcc4482acdd924929d4e159f2c2ec3266695e8c",
+        "style.css": "97da2b7abc16edd668b65ef4e08f08f8a69bf1658cfca86572a22ed3ad982d4b"
+      }
+    },
+    {
+      "id": "taskflow",
+      "title": "TaskFlow",
+      "source": "https://github.com/OM-ALONI/TaskFlow/tree/c43bcfaf0bd19c07a3c99c89afb87a1e1127d97d",
+      "category": "recent-app",
+      "subset": "evaluation",
+      "styles": [
+        "https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap",
+        "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css",
+        "styles.css"
+      ],
+      "external": [
+        "https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap",
+        "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css",
+        "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLDz8Z11lFc-K.woff2",
+        "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLDz8Z1JlFc-K.woff2",
+        "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLDz8Z1xlFQ.woff2",
+        "https://fonts.gstatic.com/s/poppins/v24/pxiEyp8kv8JHgFVrJJbecmNE.woff2",
+        "https://fonts.gstatic.com/s/poppins/v24/pxiEyp8kv8JHgFVrJJnecmNE.woff2",
+        "https://fonts.gstatic.com/s/poppins/v24/pxiEyp8kv8JHgFVrJJfecg.woff2",
+        "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLGT9Z11lFc-K.woff2",
+        "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLGT9Z1JlFc-K.woff2",
+        "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLGT9Z1xlFQ.woff2",
+        "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLEj6Z11lFc-K.woff2",
+        "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLEj6Z1JlFc-K.woff2",
+        "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLEj6Z1xlFQ.woff2",
+        "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLCz7Z11lFc-K.woff2",
+        "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLCz7Z1JlFc-K.woff2",
+        "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLCz7Z1xlFQ.woff2",
+        "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLDD4Z11lFc-K.woff2",
+        "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLDD4Z1JlFc-K.woff2",
+        "https://fonts.gstatic.com/s/poppins/v24/pxiByp8kv8JHgFVrLDD4Z1xlFQ.woff2",
+        "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/webfonts/fa-brands-400.woff2",
+        "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/webfonts/fa-regular-400.woff2",
+        "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/webfonts/fa-solid-900.woff2",
+        "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/webfonts/fa-v4compatibility.woff2"
+      ],
+      "ignoredResources": [
+        "http://css-compat.test/favicon.png"
+      ],
+      "readySelector": "#loading-screen",
+      "features": [
+        "reflow",
+        "typography",
+        "forms",
+        "focus",
+        "themes",
+        "motion"
+      ],
+      "probes": [
+        "html",
+        "body",
+        ".stats-section",
+        ".task-form .form-row",
+        "#task-input",
+        "#theme-toggle",
+        "#theme-toggle i"
+      ],
+      "scenarios": [
+        {
+          "id": "type",
+          "action": "type",
+          "selector": "#task-input",
+          "value": "Sample text"
+        },
+        {
+          "id": "tab",
+          "action": "press",
+          "key": "Tab"
+        },
+        {
+          "id": "theme",
+          "action": "click",
+          "selector": "#theme-toggle",
+          "settleMs": 450
+        },
+        {
+          "id": "hover",
+          "action": "hover",
+          "selector": "#theme-toggle",
+          "settleMs": 450
+        }
+      ],
+      "entry": "index.html",
+      "files": {
+        "LICENSE": "682d195446e1bb913f9a6a65999d3f22a66250a6a215d0b062db1075d0c42476",
+        "index.html": "fd6e49aa7d0c6150d240031ebb0ba945c7847dd99217632eb917311b3d12168f",
+        "script.js": "6f95cdfee48bb28d655bed5c950fe8f3bc952fb02e8223eaeb2b32e5acd3640c",
+        "styles.css": "76677cf1302d97150b9cd1daa316b578b9f696ad23de761fad6f6125896d6251"
+      }
+    },
+    {
+      "id": "scroll-snap",
+      "title": "CSS Scroll Snap Carousel",
+      "source": "https://cdpn.io/newinweb/fullpage/EpPgdR",
+      "category": "independent-pen",
+      "subset": "evaluation",
+      "ignoredResources": [
+        "https://cpwebassets.codepen.io/assets/favicon/"
+      ],
+      "features": [
+        "reflow",
+        "typography",
+        "scrolling"
+      ],
+      "probes": [
+        "#carousel",
+        "#carousel-1",
+        "#carousel-2"
+      ],
+      "scenarios": [
+        {
+          "id": "scroll",
+          "action": "scroll",
+          "selector": "#carousel",
+          "distance": 800,
+          "settleMs": 650
+        }
+      ],
+      "entry": "index.html",
+      "files": {
+        "LICENSE": "fb42900a0551efbb34a60df012a429123546518edcf437287cb4eb56969431a7",
+        "index.html": "d8c0ff10f558d4378c2625d5c3dee6f5fe3a6b259e318745502c5b72bd72392a"
+      }
+    },
+    {
+      "id": "accessible-controls",
+      "title": "Accessible Form Controls",
+      "source": "https://cdpn.io/joeflash/fullpage/qBYLbpw",
+      "category": "independent-pen",
+      "subset": "holdout",
+      "ignoredResources": [
+        "https://cpwebassets.codepen.io/assets/favicon/"
+      ],
+      "features": [
+        "reflow",
+        "typography",
+        "forms",
+        "focus",
+        "motion"
+      ],
+      "probes": [
+        "h1",
+        ".display-md-flex",
+        "#checkbox-id-1",
+        "label[for=checkbox-id-1]",
+        "#switch-id-1",
+        "label[for=switch-id-1]"
+      ],
+      "scenarios": [
+        {
+          "id": "tab",
+          "action": "press",
+          "key": "Tab"
+        },
+        {
+          "id": "switch",
+          "action": "click",
+          "selector": "label[for=switch-id-1]",
+          "settleMs": 450
+        }
+      ],
+      "entry": "index.html",
+      "files": {
+        "LICENSE": "fc607bf24222ad02846173589b1f6c13ed4f093a559eda2e7200b9ff7ed1feda",
+        "index.html": "a8012a50fa5bf98a68a6482f326436310b24639f77b77654ee7921cacaaa6ced"
+      }
+    },
+    {
+      "id": "qwen-library",
+      "title": "Library Room Booking",
+      "category": "fresh-ai",
+      "subset": "evaluation",
+      "source": "https://ollama.com/library/qwen2.5-coder:1.5b-instruct-q4_K_M",
+      "generation": {
+        "tool": "llama.cpp b12818 (a38695013), llama-server /v1/chat/completions",
+        "modelSha256": "29d8c98fa6b098e200069bfb88b9508dc3e85586d20cba59f8dda9a808165104",
+        "prompt": "prompts/library.txt",
+        "seed": 25,
+        "temperature": 0.5,
+        "tokenLimit": 3600,
+        "outputTokens": 1024,
+        "finishReason": "stop",
+        "sourceExtraction": "Remove the surrounding Markdown fence; preserve all HTML/CSS."
+      },
+      "features": [
+        "reflow",
+        "typography",
+        "forms",
+        "focus",
+        "themes"
+      ],
+      "probes": [
+        "body",
+        ".container",
+        "h1",
+        ".time-slots",
+        ".time-slot",
+        ".form-container input",
+        ".theme-toggle"
+      ],
+      "scenarios": [
+        {
+          "id": "type",
+          "action": "type",
+          "selector": ".form-container input",
+          "value": "Sample name"
+        },
+        {
+          "id": "tab",
+          "action": "press",
+          "key": "Tab"
+        },
+        {
+          "id": "dark",
+          "colorScheme": "dark"
+        }
+      ],
+      "entry": "index.html",
+      "files": {
+        "index.html": "7e65d42cc49296d224266924acecfca7b760cc14bba2132ea53f965f36506d98",
+        "response.txt": "94db25cec65b950d5167445c0cdaae7e3019b07760ddd538a3a5361fdb9f8cbf"
+      }
+    },
+    {
+      "id": "smollm-cinema",
+      "title": "Upcoming Movies",
+      "category": "fresh-ai",
+      "subset": "evaluation",
+      "source": "https://ollama.com/library/smollm2:1.7b-instruct-q4_K_M",
+      "generation": {
+        "tool": "Ollama 0.40.19, /api/chat",
+        "modelSha256": "decd2598bc2c8ed08c19adc3c8fdd461ee19ed5708679d1c54ef54a5a30d4f33",
+        "prompt": "prompts/cinema-local.txt",
+        "seed": 27,
+        "temperature": 0.6,
+        "repeatPenalty": 1.12,
+        "tokenLimit": 2800,
+        "outputTokens": 252,
+        "finishReason": "stop",
+        "sourceExtraction": "Use the assistant text as returned.",
+        "excludedAttempts": [
+          {
+            "prompt": "prompts/cinema.txt",
+            "output": "response-first.txt",
+            "seed": 25,
+            "temperature": 0.5,
+            "tokenLimit": 3600,
+            "reason": "Truncated without a complete HTML document; uses external dependencies."
+          },
+          {
+            "prompt": "prompts/cinema-retry.txt",
+            "output": "response-retry.txt",
+            "seed": 26,
+            "temperature": 0.7,
+            "repeatPenalty": 1.12,
+            "tokenLimit": 3600,
+            "reason": "Complete HTML but no embedded CSS and external script/stylesheet dependencies despite self-contained prompt."
+          }
+        ]
+      },
+      "features": [
+        "reflow",
+        "typography",
+        "forms",
+        "focus"
+      ],
+      "probes": [
+        "body",
+        ".movie-container",
+        ".movie-container h3",
+        ".movie-container a",
+        ".email-signup form",
+        "input[type=email]"
+      ],
+      "scenarios": [
+        {
+          "id": "type",
+          "action": "type",
+          "selector": "input[type=email]",
+          "value": "screen@example.test"
+        },
+        {
+          "id": "tab",
+          "action": "press",
+          "key": "Tab"
+        }
+      ],
+      "entry": "index.html",
+      "files": {
+        "index.html": "88a7fc70971d637c744661ea038d9822d59732b9d279bc0a577d465358ea95e3",
+        "response-first.txt": "657e5b346dbb133c60356f92654167ca7acbc48c01c8a4bcdb4781dcd9351586",
+        "response-retry.txt": "05ea0a9147b255a9ae6270e6727bbd63ea623526f9dc810944922933bb135f00"
+      }
+    }
+  ]
+}

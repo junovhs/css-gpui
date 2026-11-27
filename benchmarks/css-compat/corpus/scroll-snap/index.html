@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en" >
+
+<head>
+  
+  <meta charset="UTF-8">
+  
+
+    <link rel="apple-touch-icon" type="image/png" href="https://cpwebassets.codepen.io/assets/favicon/apple-touch-icon-5ae1a0698dcc2402e9712f7d01ed509a57814f994c660df9f7a952f3060705ee.png" />
+
+    <meta name="apple-mobile-web-app-title" content="CodePen">
+
+    <link rel="icon" type="image/x-icon" href="https://cpwebassets.codepen.io/assets/favicon/favicon-aec34940fbc1a6e787974dcd360f2c6b63348d4b1f4e06c77743096d55480f33.ico" />
+
+    <link rel="mask-icon" type="image/x-icon" href="https://cpwebassets.codepen.io/assets/favicon/logo-pin-b4b4269c16397ad2f0f7a01bcdf513a1994f4c94b8af2f191c09eb0d601762b1.svg" color="#111" />
+
+
+
+  
+    <script src="https://cpwebassets.codepen.io/assets/common/stopExecutionOnTimeout-f07739098a39bd4e74ddd974652dac904146f33fdc1ecab356e8c809a05faccb.js"></script>
+
+
+  <title>CSS Scroll Snap Carousel</title>
+
+    <link rel="canonical" href="https://codepen.io/newinweb/pen/EpPgdR">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  
+  
+<style>
+#carousel {
+  /* Ensure that the contents flow horizontally */
+  overflow-x: auto;
+  white-space: nowrap;
+  display: flex;
+}
+
+#carousel.vertical {
+  flex-direction: column;
+}
+
+/* 2018 spec - For Safari 11, Chrome 69+ */
+#carousel.snap {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch; /* Needed to work on iOS Safari */
+}
+
+#carousel.snap > div {
+  scroll-snap-align: center;
+}
+
+#carousel.snap.vertical {
+  flex-direction: column;
+  scroll-snap-type: y mandatory;
+}
+
+
+
+/* 2015 spec - For Firefox, Edge, IE */
+#carousel.snap {
+  scroll-snap-type: mandatory;
+  -ms-scroll-snap-type: mandatory;
+  scroll-snap-points-x: repeat(100%);
+  -ms-scroll-snap-points-x: repeat(100%);
+}
+
+#carousel.snap.vertical {
+  scroll-snap-points-x: initial;
+  -ms-scroll-snap-points-x: initial;
+  scroll-snap-points-y: repeat(100%);
+  -ms-scroll-snap-points-y: repeat(100%);
+}
+
+
+/* Below here is styling, not important for the actual example, just to make it look nice. No need to look down here! */
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+#carousel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+#carousel > div {
+  min-width: 100%;
+  min-height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  color: #fff;
+  font-size: 20px;
+}
+
+#carousel-1 {
+  background-color: #e34747;
+}
+
+#carousel-2 {
+  background-color: #5ab92c;
+}
+
+#carousel-3 {
+  background-color: #226de2;
+}
+
+#controls {
+  position: fixed;
+  bottom: 10px;
+  left: 10px;
+}
+
+#controls button {
+  padding: 5px 10px;
+}
+</style>
+
+  <script>
+  window.console = window.console || function(t) {};
+</script>
+
+  
+  
+</head>
+
+<body translate="no">
+  <div id="carousel" class="snap">
+  <div id="carousel-1">Item 1<br>Start scrolling ...</div>
+  <div id="carousel-2">Item 2</div>
+  <div id="carousel-3">Item 3</div>
+</div>
+
+<div id="controls">
+  <button onclick="toggleSnap()">Turn Snapping <span id="otherSnappingState">off</span></button>
+  <button onclick="toggleDirection()">Change scroll to <span id="otherScrollState">vertical</span></button>
+</div>
+  
+    <script id="rendered-js" >
+function toggleSnap() {
+  var snapEnabled = document.getElementById('carousel').classList.toggle('snap');
+  document.getElementById('otherSnappingState').innerText = snapEnabled ? 'off' : 'on';
+}
+
+function toggleDirection() {
+  var isVertical = document.getElementById('carousel').classList.toggle('vertical');
+  document.getElementById('otherScrollState').innerText = isVertical ? 'horizontal' : 'vertical';
+}
+//# sourceURL=pen.js
+  </script>
+
+  
+</body>
+
+</html>

@@ -20,3 +20,4 @@ The example writes the resolved scene as JSON to stdout and reports recognized u
 - [Founding brief](docs/founding.md) — the authoring workflow and what makes the output worth keeping.
 - [Compiler design](docs/compiler.md) — the imported code, its limits, and the boundary for GPUI generation.
 - [First milestone](docs/first-milestone.md) — a resizable toolbar, the browser reference, and the conditions for calling the port successful.
+- [Independent CSS compatibility benchmark](benchmarks/css-compat/README.md) — frozen inputs, browser and native comparisons, and measured feature coverage.

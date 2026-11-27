@@ -1,0 +1,151 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Library Room Booking</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            color: #333;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            transition: background-color 0.3s;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 80%;
+            max-width: 600px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .time-slots {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .time-slot {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+            cursor: pointer;
+        }
+
+        .time-slot:hover {
+            background-color: #e0e0e0;
+        }
+
+        .form-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .form-container input {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .form-container button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .form-container button:hover {
+            background-color: #0056b3;
+        }
+
+        .theme-toggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            background-color: #fff;
+            color: #333;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .theme-toggle:hover {
+            background-color: #e0e0e0;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #333;
+                color: #fff;
+            }
+
+            .container {
+                background-color: #222;
+            }
+
+            .time-slot {
+                background-color: #333;
+            }
+
+            .form-container {
+                background-color: #444;
+            }
+
+            .theme-toggle {
+                background-color: #444;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Library Room Booking</h1>
+        <div class="time-slots">
+            <div class="time-slot">9:00 AM</div>
+            <div class="time-slot">10:00 AM</div>
+            <div class="time-slot">11:00 AM</div>
+            <div class="time-slot">12:00 PM</div>
+            <div class="time-slot">1:00 PM</div>
+            <div class="time-slot">2:00 PM</div>
+            <div class="time-slot">3:00 PM</div>
+            <div class="time-slot">4:00 PM</div>
+            <div class="time-slot">5:00 PM</div>
+            <div class="time-slot">6:00 PM</div>
+            <div class="time-slot">7:00 PM</div>
+            <div class="time-slot">8:00 PM</div>
+            <div class="time-slot">9:00 PM</div>
+            <div class="time-slot">10:00 PM</div>
+        </div>
+        <div class="form-container">
+            <input type="text" placeholder="Name" required>
+            <input type="email" placeholder="Email" required>
+            <button type="submit">Book Room</button>
+        </div>
+        <div class="theme-toggle">
+            <span>Dark Theme</span>
+        </div>
+    </div>
+</body>
+</html>
+```

@@ -1,0 +1,422 @@
+{
+  "subset": "evaluation",
+  "corpusSha256": "bd5925dbef26613bb934c364acee7e6145ecd4a497c50e7dda17d9d8512bbf2b",
+  "compilerRevision": "7ad79513bb3720aa91e0fb4fac813ad59f37d391",
+  "chromium": "148.0.7778.96",
+  "environment": {
+    "platform": "Pop!_OS 22.04 LTS (Linux x86_64)",
+    "display": "Xvfb, Mesa lavapipe, 1x",
+    "gpui": "0.2.2",
+    "playwright": "1.60.0",
+    "rustc": "1.90.0",
+    "node": "24.22.3"
+  },
+  "results": [
+    {
+      "sample": "contrast-ratio",
+      "width": 390,
+      "height": 844,
+      "strict": {
+        "exitCode": 1,
+        "signal": null,
+        "emitted": false,
+        "clean": false,
+        "sourceLosses": 69,
+        "targetLosses": 0,
+        "error": "Error: \"GPUI conversion has source losses\""
+      },
+      "exploratory": {
+        "exitCode": 0,
+        "signal": null,
+        "emitted": true,
+        "clean": false,
+        "sourceLosses": 69,
+        "targetLosses": 2,
+        "error": null
+      },
+      "reference": {
+        "errors": [],
+        "missingResources": [],
+        "states": {
+          "type": "captured",
+          "tab": "captured",
+          "hover": "captured"
+        }
+      },
+      "native": {
+        "tier": "exploratory",
+        "status": "captured",
+        "normalizedRgbMeanAbsoluteError": 0.594736,
+        "fractionOfRgbChannelsOver16": 0.966447,
+        "appearancePass": false
+      }
+    },
+    {
+      "sample": "contrast-ratio",
+      "width": 1280,
+      "height": 900,
+      "strict": {
+        "exitCode": 1,
+        "signal": null,
+        "emitted": false,
+        "clean": false,
+        "sourceLosses": 69,
+        "targetLosses": 0,
+        "error": "Error: \"GPUI conversion has source losses\""
+      },
+      "exploratory": {
+        "exitCode": 0,
+        "signal": null,
+        "emitted": true,
+        "clean": false,
+        "sourceLosses": 69,
+        "targetLosses": 2,
+        "error": null
+      },
+      "reference": {
+        "errors": [],
+        "missingResources": [],
+        "states": {
+          "type": "captured",
+          "tab": "captured",
+          "hover": "captured"
+        }
+      },
+      "native": {
+        "tier": "exploratory",
+        "status": "captured",
+        "normalizedRgbMeanAbsoluteError": 0.604511,
+        "fractionOfRgbChannelsOver16": 0.985495,
+        "appearancePass": false
+      }
+    },
+    {
+      "sample": "taskflow",
+      "width": 390,
+      "height": 844,
+      "strict": {
+        "exitCode": 1,
+        "signal": null,
+        "emitted": false,
+        "clean": false,
+        "sourceLosses": 4892,
+        "targetLosses": 0,
+        "error": "Error: \"GPUI conversion has source losses\""
+      },
+      "exploratory": {
+        "exitCode": 0,
+        "signal": null,
+        "emitted": true,
+        "clean": false,
+        "sourceLosses": 4892,
+        "targetLosses": 6,
+        "error": null
+      },
+      "reference": {
+        "errors": [],
+        "missingResources": [],
+        "states": {
+          "type": "captured",
+          "tab": "captured",
+          "theme": "captured",
+          "hover": "captured"
+        }
+      },
+      "native": {
+        "tier": "exploratory",
+        "status": "captured",
+        "normalizedRgbMeanAbsoluteError": 0.438552,
+        "fractionOfRgbChannelsOver16": 0.486214,
+        "appearancePass": false
+      }
+    },
+    {
+      "sample": "taskflow",
+      "width": 1280,
+      "height": 900,
+      "strict": {
+        "exitCode": 1,
+        "signal": null,
+        "emitted": false,
+        "clean": false,
+        "sourceLosses": 4861,
+        "targetLosses": 0,
+        "error": "Error: \"GPUI conversion has source losses\""
+      },
+      "exploratory": {
+        "exitCode": 0,
+        "signal": null,
+        "emitted": true,
+        "clean": false,
+        "sourceLosses": 4861,
+        "targetLosses": 6,
+        "error": null
+      },
+      "reference": {
+        "errors": [],
+        "missingResources": [],
+        "states": {
+          "type": "captured",
+          "tab": "captured",
+          "theme": "captured",
+          "hover": "captured"
+        }
+      },
+      "native": {
+        "tier": "exploratory",
+        "status": "captured",
+        "normalizedRgbMeanAbsoluteError": 0.862044,
+        "fractionOfRgbChannelsOver16": 0.886263,
+        "appearancePass": false
+      }
+    },
+    {
+      "sample": "scroll-snap",
+      "width": 390,
+      "height": 844,
+      "strict": {
+        "exitCode": 1,
+        "signal": null,
+        "emitted": false,
+        "clean": false,
+        "sourceLosses": 16,
+        "targetLosses": 0,
+        "error": "Error: \"GPUI conversion has source losses\""
+      },
+      "exploratory": {
+        "exitCode": 0,
+        "signal": null,
+        "emitted": true,
+        "clean": false,
+        "sourceLosses": 16,
+        "targetLosses": 0,
+        "error": null
+      },
+      "reference": {
+        "errors": [],
+        "missingResources": [],
+        "states": {
+          "scroll": "captured"
+        }
+      },
+      "native": {
+        "tier": "exploratory",
+        "status": "captured",
+        "normalizedRgbMeanAbsoluteError": 0.486846,
+        "fractionOfRgbChannelsOver16": 0.989608,
+        "appearancePass": false
+      }
+    },
+    {
+      "sample": "scroll-snap",
+      "width": 1280,
+      "height": 900,
+      "strict": {
+        "exitCode": 1,
+        "signal": null,
+        "emitted": false,
+        "clean": false,
+        "sourceLosses": 16,
+        "targetLosses": 0,
+        "error": "Error: \"GPUI conversion has source losses\""
+      },
+      "exploratory": {
+        "exitCode": 0,
+        "signal": null,
+        "emitted": true,
+        "clean": false,
+        "sourceLosses": 16,
+        "targetLosses": 0,
+        "error": null
+      },
+      "reference": {
+        "errors": [],
+        "missingResources": [],
+        "states": {
+          "scroll": "captured"
+        }
+      },
+      "native": {
+        "tier": "exploratory",
+        "status": "captured",
+        "normalizedRgbMeanAbsoluteError": 0.483637,
+        "fractionOfRgbChannelsOver16": 0.997031,
+        "appearancePass": false
+      }
+    },
+    {
+      "sample": "qwen-library",
+      "width": 390,
+      "height": 844,
+      "strict": {
+        "exitCode": 1,
+        "signal": null,
+        "emitted": false,
+        "clean": false,
+        "sourceLosses": 10,
+        "targetLosses": 0,
+        "error": "Error: \"GPUI conversion has source losses\""
+      },
+      "exploratory": {
+        "exitCode": 0,
+        "signal": null,
+        "emitted": true,
+        "clean": false,
+        "sourceLosses": 10,
+        "targetLosses": 1,
+        "error": null
+      },
+      "reference": {
+        "errors": [],
+        "missingResources": [],
+        "states": {
+          "type": "captured",
+          "tab": "captured",
+          "dark": "captured"
+        }
+      },
+      "native": {
+        "tier": "exploratory",
+        "status": "captured",
+        "normalizedRgbMeanAbsoluteError": 0.664751,
+        "fractionOfRgbChannelsOver16": 0.715404,
+        "appearancePass": false
+      }
+    },
+    {
+      "sample": "qwen-library",
+      "width": 1280,
+      "height": 900,
+      "strict": {
+        "exitCode": 1,
+        "signal": null,
+        "emitted": false,
+        "clean": false,
+        "sourceLosses": 10,
+        "targetLosses": 0,
+        "error": "Error: \"GPUI conversion has source losses\""
+      },
+      "exploratory": {
+        "exitCode": 0,
+        "signal": null,
+        "emitted": true,
+        "clean": false,
+        "sourceLosses": 10,
+        "targetLosses": 1,
+        "error": null
+      },
+      "reference": {
+        "errors": [],
+        "missingResources": [],
+        "states": {
+          "type": "captured",
+          "tab": "captured",
+          "dark": "captured"
+        }
+      },
+      "native": {
+        "tier": "exploratory",
+        "status": "captured",
+        "normalizedRgbMeanAbsoluteError": 0.686967,
+        "fractionOfRgbChannelsOver16": 0.725518,
+        "appearancePass": false
+      }
+    },
+    {
+      "sample": "smollm-cinema",
+      "width": 390,
+      "height": 844,
+      "strict": {
+        "exitCode": 0,
+        "signal": null,
+        "emitted": true,
+        "clean": true,
+        "sourceLosses": 0,
+        "targetLosses": 0,
+        "error": null
+      },
+      "exploratory": null,
+      "reference": {
+        "errors": [],
+        "missingResources": [],
+        "states": {
+          "type": "captured",
+          "tab": "captured"
+        }
+      },
+      "native": {
+        "tier": "strict",
+        "status": "captured",
+        "normalizedRgbMeanAbsoluteError": 0.993843,
+        "fractionOfRgbChannelsOver16": 0.997509,
+        "appearancePass": false,
+        "gestures": {
+          "type": {
+            "status": "captured",
+            "normalizedRgbMeanAbsoluteError": 0.991304,
+            "fractionOfRgbChannelsOver16": 0.994982,
+            "appearancePass": false,
+            "browserChangedPixels": 2004,
+            "nativeChangedPixels": 0
+          },
+          "tab": {
+            "status": "captured",
+            "normalizedRgbMeanAbsoluteError": 0.992978,
+            "fractionOfRgbChannelsOver16": 0.996646,
+            "appearancePass": false,
+            "browserChangedPixels": 320,
+            "nativeChangedPixels": 0
+          }
+        }
+      }
+    },
+    {
+      "sample": "smollm-cinema",
+      "width": 1280,
+      "height": 900,
+      "strict": {
+        "exitCode": 0,
+        "signal": null,
+        "emitted": true,
+        "clean": true,
+        "sourceLosses": 0,
+        "targetLosses": 0,
+        "error": null
+      },
+      "exploratory": null,
+      "reference": {
+        "errors": [],
+        "missingResources": [],
+        "states": {
+          "type": "captured",
+          "tab": "captured"
+        }
+      },
+      "native": {
+        "tier": "strict",
+        "status": "captured",
+        "normalizedRgbMeanAbsoluteError": 0.998241,
+        "fractionOfRgbChannelsOver16": 0.999288,
+        "appearancePass": false,
+        "gestures": {
+          "type": {
+            "status": "captured",
+            "normalizedRgbMeanAbsoluteError": 0.997515,
+            "fractionOfRgbChannelsOver16": 0.998566,
+            "appearancePass": false,
+            "browserChangedPixels": 2004,
+            "nativeChangedPixels": 0
+          },
+          "tab": {
+            "status": "captured",
+            "normalizedRgbMeanAbsoluteError": 0.997994,
+            "fractionOfRgbChannelsOver16": 0.999042,
+            "appearancePass": false,
+            "browserChangedPixels": 320,
+            "nativeChangedPixels": 0
+          }
+        }
+      }
+    }
+  ]
+}

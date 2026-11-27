@@ -1,0 +1,12 @@
+[package]
+name = "css-gpui-compat-host"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+gpui = { version = "=0.2.2", default-features = false, features = ["windows-manifest", "x11"] }
+
+[profile.dev]
+debug = 0
+incremental = false
