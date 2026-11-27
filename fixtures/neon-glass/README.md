@@ -103,6 +103,24 @@ The native replay checks the generated Calculator bounds, viewport clamping, row
 cargo test --locked --manifest-path fixtures/neon-glass/native/Cargo.toml --features interactive --all-targets -- --include-ignored
 ```
 
+### Compare glass in the standalone Windows client
+
+After the native browser capture above, build the menu example and capture its actual client area on the original and +90 px backdrops. Use an interactive Windows desktop session.
+
+```powershell
+python -m pip install windows-capture==2.0.1 Pillow==10.4.0
+$manifest = 'fixtures/neon-glass/native/Cargo.toml'
+cargo build --locked --manifest-path $manifest --features interactive --example menu
+$target = (cargo metadata --no-deps --format-version 1 --manifest-path $manifest | ConvertFrom-Json).target_directory
+$menu = Join-Path $target 'debug/examples/menu.exe'
+foreach ($shift in @(0, 90)) {
+    python fixtures/neon-glass/capture_windows.py $menu "$frames/gpui-startup-1100-shift$shift.png" 1100 760 $shift
+}
+python fixtures/neon-glass/compare_startup.py $frames
+```
+
+The checker normalizes the client PNG to the Chromium logical viewport and reports mean RGB errors for the whole panel, the glass over the bright backdrop line, and each glow corner. To check detection, temporarily omit the glass canvas in `MenuView::render`, rebuild, and capture both GPUI PNGs again. The comparison should exit with status 1.
+
 ## Input inventory
 
 - HTML uses a stage with header and hue controls and a fixed menu aside. The menu has six decorative shine and glow spans, a search label and text input, and two sections of focusable list rows separated by a rule.

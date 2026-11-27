@@ -416,11 +416,23 @@ impl Render for MenuView {
         };
         let mut root = div()
             .size_full()
-            .child(texture(Arc::clone(&self.stage.as_ref().unwrap().texture)).size_full())
+            .child(
+                texture(Arc::clone(&self.stage.as_ref().unwrap().texture))
+                    .top_0()
+                    .left_0()
+                    .size_full(),
+            )
             .child(stage);
         if self.visible {
             let glass = Arc::clone(&self.glass.as_ref().unwrap().texture);
-            root = root.child(texture(glass).size_full().opacity(self.opacity));
+            // The compositor emits viewport coordinates, including glow outside the panel.
+            root = root.child(
+                texture(glass)
+                    .top_0()
+                    .left_0()
+                    .size_full()
+                    .opacity(self.opacity),
+            );
             if let Some((index, highlight)) = &self.hover_texture {
                 let [x, y, width, height] = self.config().rows[*index].bounds;
                 root = root.child(

@@ -136,6 +136,11 @@ try {
         geometry.push({ ...viewport, boxes, rows });
         const menu = page.locator('#menu');
         if (nativeFonts) {
+            await settle(page);
+            await page.screenshot({
+                path: resolve(output, `chromium-startup-${viewport.width}-shift0.png`),
+                animations: 'disabled',
+            });
             const setShift = (position) => page.evaluate((value) => {
                 document.body.style.backgroundPosition = value;
             }, position);
