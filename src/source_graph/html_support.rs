@@ -135,5 +135,5 @@ fn parse_attribute_value(
 }
 
 fn is_void_element(name: &str) -> bool {
-    matches!(name, "meta" | "link" | "img" | "br" | "hr" | "input")
+    matches!(name, "meta" | "link" | "img" | "br" | "hr") || name.eq_ignore_ascii_case("input")
 }

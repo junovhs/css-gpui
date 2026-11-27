@@ -50,6 +50,7 @@ impl HtmlTreeBuilder {
             attributes: Vec::new(),
             dom_path: root.path.clone(),
             document_id,
+            start_tag_range: None,
         }];
 
         Self {
@@ -120,7 +121,7 @@ impl HtmlTreeBuilder {
             return Ok(find_tag_end(source, close)? + 1);
         }
 
-        let open_node = self.push_element(raw_tag, start)?;
+        let open_node = self.push_element(raw_tag, start..end + 1)?;
         if let Some(node) = open_node {
             self.stack.push(node);
         }
@@ -142,9 +143,9 @@ impl HtmlTreeBuilder {
     fn push_element(
         &mut self,
         raw_tag: &str,
-        offset: usize,
+        range: Range<usize>,
     ) -> Result<Option<OpenNode>, SourceGraphError> {
-        let start_tag = parse_start_tag(raw_tag, offset)?;
+        let start_tag = parse_start_tag(raw_tag, range.start)?;
         let (parent_id, dom_path) = self.next_child_location()?;
         let id = self.nodes.len();
         self.nodes.push(HtmlNode {
@@ -156,6 +157,7 @@ impl HtmlTreeBuilder {
             attributes: start_tag.attributes,
             dom_path: dom_path.clone(),
             document_id: self.document_id,
+            start_tag_range: Some(range),
         });
         Ok((!start_tag.self_closing).then_some(OpenNode {
             id,
@@ -176,6 +178,7 @@ impl HtmlTreeBuilder {
             attributes: Vec::new(),
             dom_path,
             document_id: self.document_id,
+            start_tag_range: None,
         });
         Ok(())
     }

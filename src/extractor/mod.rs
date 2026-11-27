@@ -159,7 +159,12 @@ fn process_element(
         .and_then(|pid| html_to_ir_id.get(&pid))
         .cloned();
 
-    let (mut kind, control_kind) = element_kind(html_node, tag);
+    let control_kind = control_kind(html_node);
+    let mut kind = if control_kind.is_some() {
+        NodeKind::Control
+    } else {
+        NodeKind::Box
+    };
     let mut layout = map::to_layout(&lo.style, &lo.geometry);
     if tag == "svg" {
         let mut markup = String::new();
@@ -343,12 +348,21 @@ fn process_text(
     })
 }
 
-fn element_kind(node: &HtmlNode, tag: &str) -> (NodeKind, Option<ControlKind>) {
-    match tag {
-        "button" => (NodeKind::Control, Some(ControlKind::Button)),
-        "input" if attribute(node, "type").is_none_or(|tag| tag.eq_ignore_ascii_case("text")) => {
-            (NodeKind::Control, Some(ControlKind::TextInput))
+pub(crate) fn control_kind(node: &HtmlNode) -> Option<ControlKind> {
+    match node.name.as_deref()? {
+        tag if tag.eq_ignore_ascii_case("button") => Some(ControlKind::Button),
+        tag if tag.eq_ignore_ascii_case("input")
+            && input_type(node).is_none_or(|kind| kind.eq_ignore_ascii_case("text")) =>
+        {
+            Some(ControlKind::TextInput)
         }
-        _ => (NodeKind::Box, None),
+        _ => None,
     }
+}
+
+pub(crate) fn input_type(node: &HtmlNode) -> Option<&str> {
+    node.attributes
+        .iter()
+        .find(|(key, _)| key.eq_ignore_ascii_case("type"))
+        .map(|(_, value)| value.as_str())
 }

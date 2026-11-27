@@ -7,9 +7,10 @@
 #[cfg(test)]
 mod tests;
 
-use crate::CssRule;
+use crate::extractor::{control_kind, input_type};
 use crate::resolver::selector::Selector;
 use crate::source_graph::SceneSourceGraph;
+use crate::{CssRule, TraceSpan};
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -45,15 +46,48 @@ pub struct Diagnostic {
     pub value: Option<String>,
 }
 
-/// Analyze `graph` for unsupported constructs and return the full list of
-/// diagnostics. An empty vec means the scene is within the v0.1 support
-/// envelope.
+/// Analyze `graph` for unsupported CSS constructs.
 pub fn analyze(graph: &SceneSourceGraph) -> Vec<Diagnostic> {
     let mut out: Vec<Diagnostic> = Vec::new();
     for rule in &graph.css_rules {
         analyze_rule(rule, &mut out);
     }
     out
+}
+
+/// An HTML form control whose behavior cannot be represented by the extractor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FormControlLoss {
+    pub element: String,
+    pub span: TraceSpan,
+}
+
+/// Report interactive controls that would otherwise become generic IR boxes.
+pub fn form_control_losses(graph: &SceneSourceGraph) -> impl Iterator<Item = FormControlLoss> {
+    graph.html_nodes.iter().filter_map(|node| {
+        let tag = node.name.as_deref()?;
+        let range = node.start_tag_range.as_ref()?;
+        if control_kind(node).is_some() {
+            return None;
+        }
+        let element = match tag {
+            tag if tag.eq_ignore_ascii_case("input") => {
+                let kind = input_type(node)?;
+                if kind.eq_ignore_ascii_case("hidden") {
+                    return None;
+                }
+                format!("<input type={kind:?}>")
+            }
+            tag if tag.eq_ignore_ascii_case("select") || tag.eq_ignore_ascii_case("textarea") => {
+                format!("<{tag}>")
+            }
+            _ => return None,
+        };
+        Some(FormControlLoss {
+            element,
+            span: TraceSpan::from_offsets(&graph.html.contents, range.start, range.end),
+        })
+    })
 }
 
 // ---------------------------------------------------------------------------

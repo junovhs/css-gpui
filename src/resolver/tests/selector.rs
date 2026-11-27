@@ -16,6 +16,7 @@ fn el(name: &str, class: &str) -> HtmlNode {
         attributes,
         dom_path: "0/0".to_owned(),
         document_id: 0,
+        start_tag_range: None,
     }
 }
 

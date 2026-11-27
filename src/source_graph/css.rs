@@ -140,7 +140,7 @@ impl Parser<'_> {
             id: self.rules.len(),
             selectors,
             declarations,
-            span: span_for(
+            span: TraceSpan::from_offsets(
                 self.source,
                 self.offset + range.start,
                 self.offset + range.end,
@@ -332,7 +332,7 @@ fn parse_css_declarations(
         declarations.push(CssDeclaration {
             property: property.to_owned(),
             value: value.to_owned(),
-            span: span_for(
+            span: TraceSpan::from_offsets(
                 full_source,
                 declaration_start,
                 declaration_start + trimmed.len(),
@@ -350,25 +350,4 @@ fn skip_css_ws(source: &str, mut index: usize) -> usize {
         index += 1;
     }
     index
-}
-
-fn span_for(source: &str, start: usize, end: usize) -> TraceSpan {
-    let mut line = 1;
-    let mut line_start = 0;
-    for (offset, ch) in source.char_indices() {
-        if offset >= start {
-            break;
-        }
-        if ch == '\n' {
-            line += 1;
-            line_start = offset + ch.len_utf8();
-        }
-    }
-
-    TraceSpan {
-        start,
-        end,
-        line,
-        column: start.saturating_sub(line_start) + 1,
-    }
 }

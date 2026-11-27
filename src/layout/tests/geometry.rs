@@ -13,6 +13,7 @@ fn elem(id: usize, name: &str) -> HtmlNode {
         attributes: Vec::new(),
         dom_path: format!("0/{id}"),
         document_id: 0,
+        start_tag_range: None,
     }
 }
 

@@ -56,36 +56,45 @@ fn main() -> Result<(), Box<dyn Error>> {
         ))
     })?;
     let losses = diagnostics::analyze(&graph);
-    if !losses.is_empty() {
-        for loss in &losses {
-            let rule = &graph.css_rules[loss.rule_id];
-            let span = loss
-                .property
-                .as_deref()
-                .and_then(|property| {
-                    rule.declarations.iter().find(|declaration| {
-                        declaration.property == property
-                            && Some(declaration.value.as_str()) == loss.value.as_deref()
-                    })
+    for loss in &losses {
+        let rule = &graph.css_rules[loss.rule_id];
+        let span = loss
+            .property
+            .as_deref()
+            .and_then(|property| {
+                rule.declarations.iter().find(|declaration| {
+                    declaration.property == property
+                        && Some(declaration.value.as_str()) == loss.value.as_deref()
                 })
-                .map_or(&rule.span, |declaration| &declaration.span);
-            eprintln!(
-                "{}:{}:{}: source loss in {}: {}",
-                if rule.document_id == graph.html.id {
-                    html_path
-                } else {
-                    css_path
-                }
-                .display(),
-                span.line,
-                span.column,
-                loss.selector.as_deref().unwrap_or("CSS rule"),
-                loss.message
-            );
-        }
-        if !allow_loss {
-            return Err("GPUI conversion has source losses".into());
-        }
+            })
+            .map_or(&rule.span, |declaration| &declaration.span);
+        eprintln!(
+            "{}:{}:{}: source loss in {}: {}",
+            if rule.document_id == graph.html.id {
+                html_path
+            } else {
+                css_path
+            }
+            .display(),
+            span.line,
+            span.column,
+            loss.selector.as_deref().unwrap_or("CSS rule"),
+            loss.message
+        );
+    }
+    let mut has_source_losses = !losses.is_empty();
+    for loss in diagnostics::form_control_losses(&graph) {
+        eprintln!(
+            "{}:{}:{}: source loss in {}: unsupported form control",
+            html_path.display(),
+            loss.span.line,
+            loss.span.column,
+            loss.element
+        );
+        has_source_losses = true;
+    }
+    if has_source_losses && !allow_loss {
+        return Err("GPUI conversion has source losses".into());
     }
     let resolved = match viewport {
         Some((width, height)) => resolver::resolve_scene_at_viewport(&graph, width, height),

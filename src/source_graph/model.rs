@@ -1,4 +1,5 @@
 use crate::fixture_manifest::FixtureManifestError;
+use std::ops::Range;
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -89,6 +90,8 @@ pub struct HtmlNode {
     pub attributes: Vec<(String, String)>,
     pub dom_path: String,
     pub document_id: usize,
+    /// Byte range of the opening tag, including its delimiters.
+    pub start_tag_range: Option<Range<usize>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -97,6 +100,29 @@ pub struct TraceSpan {
     pub end: usize,
     pub line: usize,
     pub column: usize,
+}
+
+impl TraceSpan {
+    pub(crate) fn from_offsets(source: &str, start: usize, end: usize) -> Self {
+        let mut line = 1;
+        let mut line_start = 0;
+        for (offset, ch) in source.char_indices() {
+            if offset >= start {
+                break;
+            }
+            if ch == '\n' {
+                line += 1;
+                line_start = offset + ch.len_utf8();
+            }
+        }
+
+        Self {
+            start,
+            end,
+            line,
+            column: start.saturating_sub(line_start) + 1,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
