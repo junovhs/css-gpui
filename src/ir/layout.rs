@@ -37,6 +37,31 @@ pub enum FlexDirection {
     Column,
 }
 
+/// CSS `flex-wrap` line wrapping.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FlexWrap {
+    Nowrap,
+    Wrap,
+    WrapReverse,
+}
+
+impl FlexWrap {
+    pub(crate) fn from_css_keyword(value: &str) -> Option<Self> {
+        [Self::Nowrap, Self::Wrap, Self::WrapReverse]
+            .into_iter()
+            .find(|variant| value.eq_ignore_ascii_case(variant.css_keyword()))
+    }
+
+    pub(crate) fn css_keyword(self) -> &'static str {
+        match self {
+            Self::Nowrap => "nowrap",
+            Self::Wrap => "wrap",
+            Self::WrapReverse => "wrap-reverse",
+        }
+    }
+}
+
 /// CSS `align-items` value supported in v0.1.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -148,6 +173,9 @@ pub struct Layout {
     /// Present only when `display` is [`Display::Flex`] or [`Display::InlineFlex`].
     #[serde(skip_serializing_if = "Option::is_none")]
     pub flex_direction: Option<FlexDirection>,
+    /// Authored line wrapping. An omitted value uses the CSS initial value `nowrap`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flex_wrap: Option<FlexWrap>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub align_items: Option<AlignItems>,
     #[serde(skip_serializing_if = "Option::is_none")]

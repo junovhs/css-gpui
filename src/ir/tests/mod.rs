@@ -18,6 +18,7 @@ pub(super) fn minimal_layout() -> Layout {
         margin: EdgeInset::zero(),
         padding: EdgeInset::zero(),
         flex_direction: None,
+        flex_wrap: None,
         align_items: None,
         justify_content: None,
         align_self: None,

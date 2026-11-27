@@ -1,3 +1,5 @@
+use crate::ir::FlexWrap;
+
 use super::model::ComputedStyle;
 use super::values::{LengthContext, value_parts};
 
@@ -102,6 +104,11 @@ pub(super) fn apply_with_lengths(
 
         // --- Flex ---
         "flex-direction" => style.flex_direction = Some(value.to_owned()),
+        "flex-wrap" => {
+            if let Some(wrap) = FlexWrap::from_css_keyword(value) {
+                style.flex_wrap = Some(wrap);
+            }
+        }
         "align-items" => style.align_items = Some(value.to_owned()),
         "justify-content" => style.justify_content = Some(value.to_owned()),
         "align-self" => style.align_self = Some(value.to_owned()),

@@ -8,6 +8,7 @@
 mod tests;
 
 use crate::extractor::{control_kind, input_type, unsupported_text_input_attribute};
+use crate::ir::FlexWrap;
 use crate::resolver::selector::Selector;
 use crate::source_graph::SceneSourceGraph;
 use crate::{CssRule, TraceSpan};
@@ -185,6 +186,7 @@ const KNOWN_PROPERTIES: &[&str] = &[
     "border-radius",
     "background-color",
     "flex-direction",
+    "flex-wrap",
     "align-items",
     "justify-content",
     "align-self",
@@ -220,6 +222,9 @@ fn unsupported_value_message(property: &str, value: &str) -> Option<String> {
                 "position: '{value}' is not supported in v0.1; treated as static"
             )),
         },
+        "flex-wrap" if FlexWrap::from_css_keyword(value).is_none() => Some(format!(
+            "flex-wrap: '{value}' is not supported; expected 'nowrap', 'wrap', or 'wrap-reverse'"
+        )),
         "justify-content" => match value {
             "center" | "space-between" | "normal" | "flex-start" => None,
             _ => Some(format!(

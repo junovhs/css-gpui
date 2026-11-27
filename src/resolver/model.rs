@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::ir::paint::Decoration;
+use crate::ir::{FlexWrap, paint::Decoration};
 
 /// Fully resolved CSS properties for a single HTML element node in the v0.1 subset.
 ///
@@ -37,6 +37,7 @@ pub struct ComputedStyle {
 
     // --- Flex ---
     pub flex_direction: Option<String>,
+    pub flex_wrap: Option<FlexWrap>,
     pub align_items: Option<String>,
     pub justify_content: Option<String>,
     pub align_self: Option<String>,
@@ -85,6 +86,7 @@ impl Default for ComputedStyle {
             padding_bottom: 0.0,
             padding_left: 0.0,
             flex_direction: None,
+            flex_wrap: None,
             align_items: None,
             justify_content: None,
             align_self: None,

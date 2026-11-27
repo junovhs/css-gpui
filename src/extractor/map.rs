@@ -24,6 +24,7 @@ pub fn to_layout(style: &ComputedStyle, geo: &Geometry) -> Layout {
         margin: edge(&geo.margin),
         padding: edge(&geo.padding),
         flex_direction: style.flex_direction.as_deref().and_then(to_flex_direction),
+        flex_wrap: style.flex_wrap,
         align_items: style.align_items.as_deref().and_then(to_align_items),
         justify_content: style
             .justify_content
@@ -225,6 +226,7 @@ pub fn to_layout_default() -> Layout {
         margin: EdgeInset::zero(),
         padding: EdgeInset::zero(),
         flex_direction: None,
+        flex_wrap: None,
         align_items: None,
         justify_content: None,
         align_self: None,

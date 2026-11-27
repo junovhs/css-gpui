@@ -62,6 +62,19 @@ VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a \
   node benchmarks/css-compat/text-input-probe.mjs /path/to/playwright-install "$scratch/text-input"
 ```
 
+## Flex wrapping probe
+
+The standalone probe compiles the same authored flex row for 390×844 and 1280×900. It compares Chromium DOM bounds with pixel-measured bounds from the generated GPUI window. The third child starts a new line at 390 px, and all three fit on the first line at 1280 px. The probe saves both frames and the measured bounds for each viewport.
+
+Use the same Playwright, Xvfb and Vulkan setup as the benchmark.
+
+```sh
+scratch=$(mktemp -d)
+VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a \
+  --server-args='-screen 0 1600x1200x24' \
+  node benchmarks/css-compat/flex-wrap-probe.mjs /path/to/playwright-install "$scratch/flex-wrap"
+```
+
 ## Holdout and refresh
 
 The holdout is frozen with the evaluation sources. Keep it out of routine runs and out of compiler tuning. Run the same browser and native commands on that split with `--holdout` passed to `run.mjs` when evaluating a later candidate. Record holdout results separately and retire each disclosed holdout from future gate decisions.

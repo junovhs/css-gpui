@@ -4,7 +4,8 @@ use std::fmt::Write;
 
 use crate::ir::{
     AlignItems, AlignSelf, BoxSizing, Color, ControlKind, Cursor, Display, EdgeInset,
-    FlexDirection, IrNode, JustifyContent, LineHeight, NodeKind, Position, SceneIr, Typography,
+    FlexDirection, FlexWrap, IrNode, JustifyContent, LineHeight, NodeKind, Position, SceneIr,
+    Typography,
 };
 
 use super::{Capability, CapabilityGap, TargetCapabilities, TargetEmission, TargetEmitter};
@@ -349,6 +350,12 @@ fn emit_layout(
     }
     if layout.flex_direction == Some(FlexDirection::Column) {
         method("flex_col()");
+    }
+    match layout.flex_wrap {
+        Some(FlexWrap::Nowrap) => method("flex_nowrap()"),
+        Some(FlexWrap::Wrap) => method("flex_wrap()"),
+        Some(FlexWrap::WrapReverse) => method("flex_wrap_reverse()"),
+        None => {}
     }
     if layout.align_items == Some(AlignItems::Center) {
         method("items_center()");

@@ -106,6 +106,73 @@ fn authored_text_input_value_survives_scene_json_and_html_roundtrip()
     Ok(())
 }
 
+#[test]
+fn flex_wrap_survives_scene_json_and_both_targets() -> Result<(), Box<dyn std::error::Error>> {
+    use crate::target::{TargetEmitter, gpui::GpuiTarget};
+
+    let compile = |html, css| -> Result<SceneIr, Box<dyn std::error::Error>> {
+        let graph = crate::SceneSourceGraph::from_strings("flex-wrap", html, css)?;
+        assert!(crate::diagnostics::analyze(&graph).is_empty());
+        let resolved = resolve_scene(&graph)?;
+        Ok(extract_ir(&compute_layout(&resolved), &graph)?)
+    };
+
+    let scene = compile(
+        r#"<section class="wrapped"></section><section class="reversed"></section><section class="nowrap"></section><section class="default"></section>"#,
+        r#"
+            section { display: flex; }
+            .wrapped { flex-wrap: WRAP; }
+            .reversed { flex-wrap: wrap-reverse; }
+            .nowrap { flex-wrap: wrap; flex-wrap: nowrap; }
+        "#,
+    )?;
+    assert_eq!(scene.schema_version, 3);
+    let json = scene.to_json()?;
+    let serialized: serde_json::Value = serde_json::from_str(&json)?;
+    let values: Vec<_> = serialized["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|node| node["layout"]["flex_wrap"].as_str())
+        .collect();
+    assert_eq!(
+        values,
+        [Some("wrap"), Some("wrap_reverse"), Some("nowrap"), None]
+    );
+    let restored = SceneIr::from_json(&json)?;
+    let html = crate::emitter::emit(&restored);
+    let reparsed = compile(&html.html, &html.css)?;
+    assert_eq!(
+        reparsed
+            .nodes
+            .iter()
+            .map(|node| &node.layout)
+            .collect::<Vec<_>>(),
+        restored
+            .nodes
+            .iter()
+            .map(|node| &node.layout)
+            .collect::<Vec<_>>(),
+    );
+
+    let native = GpuiTarget.emit(&restored);
+    assert!(native.declared_loss.is_empty());
+    for builder in [".flex_wrap()", ".flex_wrap_reverse()", ".flex_nowrap()"] {
+        assert_eq!(native.artifact.matches(builder).count(), 1, "{builder}");
+    }
+
+    let invalid = crate::SceneSourceGraph::from_strings(
+        "invalid-flex-wrap",
+        "<div></div>",
+        "div { display: flex; flex-wrap: sideway; }",
+    )?;
+    let losses = crate::diagnostics::analyze(&invalid);
+    assert!(matches!(losses.as_slice(), [loss]
+        if loss.kind == crate::diagnostics::DiagnosticKind::UnsupportedValue
+            && loss.property.as_deref() == Some("flex-wrap")));
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Text nodes
 // ---------------------------------------------------------------------------

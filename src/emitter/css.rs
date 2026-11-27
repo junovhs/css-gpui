@@ -115,6 +115,9 @@ fn layout_decls(l: &Layout) -> Vec<String> {
     if let Some(ref fd) = l.flex_direction {
         d.push(format!("flex-direction: {}", flex_dir(fd)));
     }
+    if let Some(wrap) = l.flex_wrap {
+        d.push(format!("flex-wrap: {}", wrap.css_keyword()));
+    }
     if let Some(ref ai) = l.align_items {
         d.push(format!("align-items: {}", align_items_val(ai)));
     }
