@@ -16,6 +16,7 @@ const readFixture = (name) => readFile(new URL(name, import.meta.url));
 const reference = JSON.parse(await readFixture('reference.json'));
 const source = Buffer.from((await readFixture('source.html')).toString('utf8').replaceAll('\r\n', '\n'));
 const pageUrl = 'http://neon-glass.test/';
+const normalizeUrl = 'https://public.codepenassets.com/css/normalize-5.0.0.min.css';
 const sharedCssUrl = 'https://codepen.io/simeydotme/pen/jEOaeNd/63809857734821de257097bf620e7121.css';
 const sharedFrameUrl = sharedCssUrl.replace('codepen.io/simeydotme/pen/', 'cdpn.io/simeydotme/fullpage/');
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -81,6 +82,7 @@ async function sampleRgb(page, png) {
 const browser = await chromium.launch({ args: ['--force-color-profile=srgb', '--disable-gpu', '--run-all-compositor-stages-before-draw'] });
 const errors = [];
 const frames = [];
+const geometry = [];
 try {
     for (const viewport of [{ width: 1100, height: 760 }, { width: 390, height: 844 }]) {
         const context = await browser.newContext({ viewport, deviceScaleFactor: 1, locale: 'en-US', colorScheme: 'dark' });
@@ -107,6 +109,22 @@ try {
         await page.goto(pageUrl);
         await page.evaluate(() => document.fonts.ready);
         assert.deepEqual(errors, []);
+        const boxes = await page.evaluate(() => {
+            const selectors = {
+                menu: '#menu',
+                content: '#menu .inner',
+                search: '#menu .search',
+                searchInput: '#menu .search input',
+                firstRow: '#menu li',
+                lastRow: '#menu section:last-of-type li:last-child',
+                separator: '#menu hr',
+            };
+            return Object.fromEntries(Object.entries(selectors).map(([name, selector]) => {
+                const { x, y, width, height } = document.querySelector(selector).getBoundingClientRect();
+                return [name, [x, y, width, height]];
+            }));
+        });
+        geometry.push({ ...viewport, boxes });
         const menu = page.locator('#menu');
         const row = menu.getByText('Calculator', { exact: true });
         const positions = [
@@ -159,7 +177,11 @@ try {
     assert.deepEqual(errors, []);
     const chromiumVersion = browser.version();
     assert.equal(chromiumVersion, reference.chromium, 'Chromium version');
-    await writeFile(resolve(output, 'shared.css'), (await resources.get(sharedCssUrl)).body);
+    const shared = (await resources.get(sharedCssUrl)).body;
+    const normalize = (await resources.get(normalizeUrl)).body;
+    await writeFile(resolve(output, 'shared.css'), shared);
+    await writeFile(resolve(output, 'linked.css'), Buffer.concat([normalize, Buffer.from('\n'), Buffer.from(shared)]));
+    await writeFile(resolve(output, 'geometry.json'), JSON.stringify(geometry, null, 2) + '\n');
     await writeFile(resolve(output, 'frames.json'), JSON.stringify({
         platform: process.platform, chromium: chromiumVersion, sourceSha256: sha256(source), frames,
     }, null, 2) + '\n');

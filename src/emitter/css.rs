@@ -54,12 +54,16 @@ fn emit_rule(node: &IrNode) -> Option<String> {
 
 fn layout_decls(l: &Layout) -> Vec<String> {
     let mut d: Vec<String> = Vec::new();
-    if l.position == Position::Absolute {
-        d.push("position: absolute".to_owned());
+    match l.position {
+        Position::Absolute => d.push("position: absolute".to_owned()),
+        Position::Relative => d.push("position: relative".to_owned()),
+        Position::Fixed => d.push("position: fixed".to_owned()),
+        Position::Static => {}
     }
     match l.display {
         Display::Flex => d.push("display: flex".to_owned()),
         Display::InlineFlex => d.push("display: inline-flex".to_owned()),
+        Display::Grid => d.push("display: grid".to_owned()),
         Display::Block => {}
     }
     if l.box_sizing == BoxSizing::BorderBox {
@@ -79,6 +83,28 @@ fn layout_decls(l: &Layout) -> Vec<String> {
     }
     if let Some(v) = l.min_width {
         d.push(format!("min-width: {}", px(v)));
+    }
+    if let Some(v) = l.min_height {
+        d.push(format!("min-height: {}", px(v)));
+    }
+    if let Some(grid) = &l.grid {
+        let tracks = |count| vec!["1fr"; usize::from(count)].join(" ");
+        match (grid.rows, grid.columns) {
+            (Some(rows), Some(columns)) => d.push(format!(
+                "grid-template: {} / {}",
+                tracks(rows),
+                tracks(columns)
+            )),
+            (Some(rows), None) => d.push(format!("grid-template-rows: {}", tracks(rows))),
+            (None, Some(columns)) => d.push(format!("grid-template-columns: {}", tracks(columns))),
+            _ => {}
+        }
+        match (grid.row_start, grid.column_start) {
+            (Some(row), Some(column)) => d.push(format!("grid-area: {row} / {column}")),
+            (Some(row), None) => d.push(format!("grid-row-start: {row}")),
+            (None, Some(column)) => d.push(format!("grid-column-start: {column}")),
+            _ => {}
+        }
     }
     if let Some(s) = edge_shorthand("margin", &l.margin) {
         d.push(s);
@@ -187,6 +213,7 @@ fn align_self_val(ase: &AlignSelf) -> &'static str {
     match ase {
         AlignSelf::Auto => "auto",
         AlignSelf::FlexStart => "flex-start",
+        AlignSelf::Center => "center",
     }
 }
 

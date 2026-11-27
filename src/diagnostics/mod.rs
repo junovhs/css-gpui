@@ -8,6 +8,7 @@
 mod tests;
 
 use crate::CssRule;
+use crate::resolver::selector::Selector;
 use crate::source_graph::SceneSourceGraph;
 
 // ---------------------------------------------------------------------------
@@ -23,10 +24,10 @@ pub enum DiagnosticKind {
     /// A CSS property is recognized but the specific value is not mapped. The
     /// property falls back to its CSS initial value.
     UnsupportedValue,
-    /// A CSS selector uses syntax that v0.1 cannot match (ID, pseudo-class,
-    /// pseudo-element, attribute selector, or a combinator). The entire rule is
-    /// unmatched against all elements.
+    /// A selector that the static resolver cannot match.
     UnsupportedSelector,
+    /// An at-rule that the source graph could not evaluate.
+    UnsupportedAtRule,
 }
 
 /// A single item produced by [`analyze`].
@@ -61,13 +62,23 @@ pub fn analyze(graph: &SceneSourceGraph) -> Vec<Diagnostic> {
 
 fn analyze_rule(rule: &CssRule, out: &mut Vec<Diagnostic>) {
     for selector in &rule.selectors {
-        if is_unsupported_selector(selector) {
+        let unsupported = if selector.starts_with('@') {
+            Some((
+                DiagnosticKind::UnsupportedAtRule,
+                format!("at-rule '{selector}' was not evaluated"),
+            ))
+        } else if Selector::parse(selector).is_none() {
+            Some((
+                DiagnosticKind::UnsupportedSelector,
+                format!("selector '{selector}' is outside the static selector subset"),
+            ))
+        } else {
+            None
+        };
+        if let Some((kind, message)) = unsupported {
             out.push(Diagnostic {
-                kind: DiagnosticKind::UnsupportedSelector,
-                message: format!(
-                    "selector '{selector}' uses syntax not supported in v0.1 \
-                     (id/pseudo/attribute/combinator); rule is unmatched"
-                ),
+                kind,
+                message,
                 rule_id: rule.id,
                 selector: Some(selector.clone()),
                 property: None,
@@ -103,21 +114,6 @@ fn analyze_rule(rule: &CssRule, out: &mut Vec<Diagnostic>) {
 }
 
 // ---------------------------------------------------------------------------
-// Selector analysis
-// ---------------------------------------------------------------------------
-
-/// Returns `true` when the selector uses patterns v0.1 cannot match.
-fn is_unsupported_selector(selector: &str) -> bool {
-    let s = selector.trim();
-    // Internal whitespace = descendant/child combinator
-    if s.chars().any(char::is_whitespace) {
-        return true;
-    }
-    // Explicit combinators or advanced syntax
-    s.contains(['#', ':', '[', ']', '>', '+', '~'])
-}
-
-// ---------------------------------------------------------------------------
 // Property / value analysis
 // ---------------------------------------------------------------------------
 
@@ -135,6 +131,9 @@ const KNOWN_PROPERTIES: &[&str] = &[
     "width",
     "height",
     "min-width",
+    "min-height",
+    "grid-template",
+    "grid-area",
     "margin-top",
     "margin-right",
     "margin-bottom",
@@ -161,12 +160,15 @@ const KNOWN_PROPERTIES: &[&str] = &[
 ];
 
 fn is_known_property(property: &str) -> bool {
-    KNOWN_PROPERTIES.contains(&property)
+    property.starts_with("--") || KNOWN_PROPERTIES.contains(&property)
 }
 
 /// Returns a diagnostic message when a known property has a value we cannot
 /// map. These are the policy edges most likely to silently mis-render.
 fn unsupported_value_message(property: &str, value: &str) -> Option<String> {
+    let value = value
+        .strip_suffix("!important")
+        .map_or(value, str::trim_end);
     match property {
         "appearance" => match value {
             "none" | "inherit" => None,
@@ -175,7 +177,7 @@ fn unsupported_value_message(property: &str, value: &str) -> Option<String> {
             )),
         },
         "position" => match value {
-            "static" | "absolute" | "inherit" => None,
+            "static" | "relative" | "absolute" | "fixed" | "inherit" => None,
             _ => Some(format!(
                 "position: '{value}' is not supported in v0.1; treated as static"
             )),
@@ -187,7 +189,7 @@ fn unsupported_value_message(property: &str, value: &str) -> Option<String> {
             )),
         },
         "display" => match value {
-            "block" | "flex" | "inline-flex" | "inherit" => None,
+            "block" | "flex" | "inline-flex" | "grid" | "inherit" => None,
             _ => Some(format!(
                 "display: '{value}' is not supported in v0.1; treated as block"
             )),

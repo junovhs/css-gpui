@@ -9,8 +9,11 @@ mod map;
 mod tests;
 
 use std::collections::{HashMap, HashSet};
+use std::fmt::Write;
 
-use crate::ir::{ControlKind, ExecutionMode, IrNode, NodeKind, SceneIr, SourceRef};
+use crate::ir::{
+    BoxSizing, ControlKind, ExecutionMode, IrNode, LineHeight, NodeKind, SceneIr, SourceRef,
+};
 use crate::layout::{LaidOutNode, LaidOutScene};
 use crate::source_graph::SceneSourceGraph;
 use crate::{HtmlNode, HtmlNodeKind};
@@ -81,6 +84,7 @@ pub fn extract_ir(
             HtmlNodeKind::Element => {
                 process_element(
                     html_node,
+                    &graph.html_nodes,
                     &node_map,
                     &mut html_to_ir_id,
                     &mut ir_nodes,
@@ -112,6 +116,7 @@ pub fn extract_ir(
 
 fn process_element(
     html_node: &HtmlNode,
+    html_nodes: &[HtmlNode],
     node_map: &HashMap<usize, &LaidOutNode>,
     html_to_ir_id: &mut HashMap<usize, String>,
     ir_nodes: &mut Vec<IrNode>,
@@ -146,23 +151,148 @@ fn process_element(
         .and_then(|pid| html_to_ir_id.get(&pid))
         .cloned();
 
-    let (kind, control_kind) = element_kind(tag);
+    let (mut kind, control_kind) = element_kind(html_node, tag);
+    let mut layout = map::to_layout(&lo.style, &lo.geometry);
+    if tag == "svg" {
+        let mut markup = String::new();
+        emit_svg_markup(
+            &mut markup,
+            html_node,
+            html_nodes,
+            lo.style.color.as_deref(),
+        );
+        kind = NodeKind::Svg(markup);
+        skipped_ids.insert(html_node.id);
+
+        let size = |name| {
+            attribute(html_node, name)
+                .and_then(|value| {
+                    value
+                        .strip_suffix("px")
+                        .unwrap_or(value)
+                        .parse::<f32>()
+                        .ok()
+                })
+                .filter(|size| size.is_finite() && *size >= 0.0)
+        };
+        layout.width = layout.width.or_else(|| size("width"));
+        layout.height = layout.height.or_else(|| size("height"));
+        if let Some(ratio) = svg_aspect_ratio(html_node) {
+            if layout.width.is_none() {
+                layout.width = layout.height.map(|height| height * ratio);
+            }
+            if layout.height.is_none() {
+                layout.height = layout.width.map(|width| width / ratio);
+            }
+        }
+    }
+
+    let typography = map::to_typography(&lo.style);
+    let text_content = if control_kind == Some(ControlKind::TextInput) {
+        if layout.height.is_none() {
+            let height = typography
+                .as_ref()
+                .and_then(|type_style| match type_style.line_height {
+                    LineHeight::Length { value } => Some(value),
+                    LineHeight::Normal => None,
+                })
+                .unwrap_or_else(|| lo.style.font_size.unwrap_or(16.0) * 1.2);
+            layout.height = Some(if layout.box_sizing == BoxSizing::BorderBox {
+                height + layout.padding.top + layout.padding.bottom + 2.0 * lo.style.border_width
+            } else {
+                height
+            });
+        }
+        attribute(html_node, "placeholder").map(str::to_owned)
+    } else {
+        None
+    };
 
     ir_nodes.push(IrNode {
         id: ir_id,
         kind,
         parent_id: parent_ir_id,
         control_kind,
-        text_content: None,
-        layout: map::to_layout(&lo.style, &lo.geometry),
+        text_content,
+        layout,
         paint: map::to_paint(&lo.style),
-        typography: map::to_typography(&lo.style),
+        typography,
         source: SourceRef {
             doc_id: html_node.document_id,
             dom_path: html_node.dom_path.clone(),
             span: None,
         },
     });
+}
+
+fn attribute<'a>(node: &'a HtmlNode, name: &str) -> Option<&'a str> {
+    node.attributes
+        .iter()
+        .find(|(key, _)| key == name)
+        .map(|(_, value)| value.as_str())
+}
+
+fn svg_aspect_ratio(node: &HtmlNode) -> Option<f32> {
+    let view_box = attribute(node, "viewBox")?;
+    let coordinates = view_box
+        .split(|ch: char| ch.is_ascii_whitespace() || ch == ',')
+        .filter(|part| !part.is_empty())
+        .map(str::parse::<f32>)
+        .collect::<Result<Vec<_>, _>>()
+        .ok()?;
+    match coordinates.as_slice() {
+        [_, _, width, height]
+            if width.is_finite() && height.is_finite() && *width > 0.0 && *height > 0.0 =>
+        {
+            let ratio = width / height;
+            (ratio.is_finite() && ratio > 0.0).then_some(ratio)
+        }
+        _ => None,
+    }
+}
+
+fn emit_svg_markup(
+    out: &mut String,
+    node: &HtmlNode,
+    nodes: &[HtmlNode],
+    inherited_color: Option<&str>,
+) {
+    if node.kind == HtmlNodeKind::Text {
+        out.push_str(
+            &node
+                .text
+                .as_deref()
+                .unwrap_or_default()
+                .replace('<', "&lt;"),
+        );
+        return;
+    }
+    let Some(tag) = node.name.as_deref() else {
+        return;
+    };
+    write!(out, "<{tag}").unwrap();
+    for (name, value) in &node.attributes {
+        write!(
+            out,
+            " {name}=\"{}\"",
+            value.replace('"', "&quot;").replace('<', "&lt;")
+        )
+        .unwrap();
+    }
+    if tag == "svg" && attribute(node, "xmlns").is_none() {
+        out.push_str(" xmlns=\"http://www.w3.org/2000/svg\"");
+    }
+    if let Some(color) = inherited_color.filter(|_| attribute(node, "color").is_none()) {
+        write!(out, " color=\"{color}\"").unwrap();
+    }
+    out.push('>');
+    for child in nodes
+        .iter()
+        .filter(|child| child.parent_id == Some(node.id))
+    {
+        emit_svg_markup(out, child, nodes, None);
+    }
+    write!(out, "</{tag}>").unwrap();
 }
 
 fn process_text(
@@ -205,9 +335,12 @@ fn process_text(
     })
 }
 
-fn element_kind(tag: &str) -> (NodeKind, Option<ControlKind>) {
+fn element_kind(node: &HtmlNode, tag: &str) -> (NodeKind, Option<ControlKind>) {
     match tag {
         "button" => (NodeKind::Control, Some(ControlKind::Button)),
+        "input" if attribute(node, "type").is_none_or(|tag| tag.eq_ignore_ascii_case("text")) => {
+            (NodeKind::Control, Some(ControlKind::TextInput))
+        }
         _ => (NodeKind::Box, None),
     }
 }

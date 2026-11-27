@@ -8,20 +8,14 @@ fn today_panel_preserves_task_order_and_reports_grid_losses() {
     let graph = SceneSourceGraph::from_strings("noceremony-today", HTML, CSS).unwrap();
     let losses = diagnostics::analyze(&graph);
 
-    for (kind, declaration) in [
-        (diagnostics::DiagnosticKind::UnsupportedValue, "display"),
-        (
-            diagnostics::DiagnosticKind::UnsupportedProperty,
-            "grid-template-columns",
-        ),
-    ] {
-        assert!(
-            losses.iter().any(|loss| loss.kind == kind
+    assert!(
+        losses.iter().any(
+            |loss| loss.kind == diagnostics::DiagnosticKind::UnsupportedProperty
                 && loss.selector.as_deref() == Some(".task-row")
-                && loss.message.contains(declaration)),
-            "expected a source-linked loss for .task-row {declaration}: {losses:?}"
-        );
-    }
+                && loss.property.as_deref() == Some("grid-template-columns")
+        ),
+        "expected a source-linked loss for .task-row grid tracks: {losses:?}"
+    );
 
     let resolved = resolver::resolve_scene(&graph).unwrap();
     let scene = extractor::extract_ir(&layout::compute_layout(&resolved), &graph).unwrap();

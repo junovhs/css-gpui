@@ -19,6 +19,7 @@ pub struct ComputedStyle {
     pub width: Option<f32>,
     pub height: Option<f32>,
     pub min_width: Option<f32>,
+    pub min_height: Option<f32>,
 
     // --- Box model edges ---
     pub margin_top: f32,
@@ -36,6 +37,9 @@ pub struct ComputedStyle {
     pub justify_content: Option<String>,
     pub align_self: Option<String>,
     pub gap: Option<f32>,
+    /// Single-cell grid items can share a cell and align independently.
+    pub grid_template: Option<String>,
+    pub grid_area: Option<String>,
 
     // --- Paint ---
     pub background_color: Option<String>,
@@ -64,6 +68,7 @@ impl Default for ComputedStyle {
             width: None,
             height: None,
             min_width: None,
+            min_height: None,
             margin_top: 0.0,
             margin_right: 0.0,
             margin_bottom: 0.0,
@@ -77,6 +82,8 @@ impl Default for ComputedStyle {
             justify_content: None,
             align_self: None,
             gap: None,
+            grid_template: None,
+            grid_area: None,
             background_color: None,
             border_width: 0.0,
             border_color: None,

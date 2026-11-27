@@ -2,6 +2,6 @@ body { margin: 0; }
 .bad {
   mystery-property: 1px;
   appearance: auto;
-  position: relative;
-  display: grid;
+  position: sticky;
+  display: inline-grid;
 }

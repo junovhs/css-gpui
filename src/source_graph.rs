@@ -7,14 +7,14 @@ mod model;
 mod tests;
 
 use crate::fixture_manifest::{FixtureSceneEntry, load_fixture_manifest};
-use css::parse_css_document;
+use css::parse_css_region;
 use html::parse_html_document;
 pub use model::{
     CssDeclaration, CssRule, HtmlNode, HtmlNodeKind, SceneSourceGraph, SourceDocument,
     SourceDocumentKind, SourceGraphError, TraceSpan,
 };
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub fn load_scene_source_graph(
     repo_root: impl AsRef<Path>,
@@ -38,20 +38,30 @@ impl SceneSourceGraph {
         html_str: &str,
         css_str: &str,
     ) -> Result<Self, SourceGraphError> {
-        use std::path::PathBuf;
-        let html =
-            SourceDocument::new_html(0, PathBuf::from("<emitted-html>"), html_str.to_owned());
-        let css = SourceDocument::new_css(1, PathBuf::from("<emitted-css>"), css_str.to_owned());
-        let html_nodes = parse_html_document(html.id, &html.contents)?;
-        let css_rules = parse_css_document(css.id, &css.contents)?;
-        Ok(Self {
-            scene_id: scene_id.to_owned(),
-            scene_root: PathBuf::from("."),
-            html,
-            css,
-            html_nodes,
-            css_rules,
-        })
+        Self::from_documents(
+            scene_id.to_owned(),
+            PathBuf::from("."),
+            SourceDocument::new_html(0, PathBuf::from("<html>"), html_str.to_owned()),
+            SourceDocument::new_css(1, PathBuf::from("<css>"), css_str.to_owned()),
+            None,
+        )
+    }
+
+    /// Build a graph for a fixed CSS viewport width. Linked stylesheet contents
+    /// are supplied as CSS in cascade order before the document's inline styles.
+    pub fn from_strings_at_viewport(
+        scene_id: &str,
+        html_str: &str,
+        css_str: &str,
+        viewport_width: f32,
+    ) -> Result<Self, SourceGraphError> {
+        Self::from_documents(
+            scene_id.to_owned(),
+            PathBuf::from("."),
+            SourceDocument::new_html(0, PathBuf::from("<html>"), html_str.to_owned()),
+            SourceDocument::new_css(1, PathBuf::from("<css>"), css_str.to_owned()),
+            Some(viewport_width),
+        )
     }
 
     pub fn load(scene: FixtureSceneEntry) -> Result<Self, SourceGraphError> {
@@ -61,15 +71,36 @@ impl SceneSourceGraph {
         let css_contents = fs::read_to_string(&css_path)?;
         let html = SourceDocument::new_html(0, html_path, html_contents);
         let css = SourceDocument::new_css(1, css_path, css_contents);
-        let html_nodes = parse_html_document(html.id, &html.contents)?;
-        let css_rules = parse_css_document(css.id, &css.contents)?;
+        Self::from_documents(scene.scene.id, scene.scene_root, html, css, None)
+    }
 
+    fn from_documents(
+        scene_id: String,
+        scene_root: PathBuf,
+        html: SourceDocument,
+        css: SourceDocument,
+        viewport_width: Option<f32>,
+    ) -> Result<Self, SourceGraphError> {
+        let parsed_html = parse_html_document(html.id, &html.contents)?;
+        let mut css_rules =
+            parse_css_region(css.id, &css.contents, 0..css.contents.len(), viewport_width)?;
+        for region in parsed_html.styles {
+            css_rules.extend(parse_css_region(
+                html.id,
+                &html.contents,
+                region,
+                viewport_width,
+            )?);
+        }
+        for (id, rule) in css_rules.iter_mut().enumerate() {
+            rule.id = id;
+        }
         Ok(Self {
-            scene_id: scene.scene.id,
-            scene_root: scene.scene_root,
+            scene_id,
+            scene_root,
             html,
             css,
-            html_nodes,
+            html_nodes: parsed_html.nodes,
             css_rules,
         })
     }

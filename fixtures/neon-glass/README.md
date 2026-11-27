@@ -24,7 +24,7 @@ node "$browser/node_modules/playwright/cli.js" install chromium
 node fixtures/neon-glass/capture.mjs $browser $frames
 ```
 
-The capture verifies the Pen, the shared stylesheet render, and each requested asset before use. It saves 12 full-viewport PNGs, a frame manifest and the extracted shared stylesheet to the output directory. On the recorded Windows configuration, ten frames use exact PNG hashes. The two narrow hover frames also allow a three-level RGB channel tolerance on a 20 x 20 pixel sample grid. Repeated captures showed differences of up to two levels per channel in those two frames. Other platforms can replay the interactions and check input hashes, Chromium version and placement.
+The capture verifies the Pen, the shared stylesheet render, and each requested asset before use. It saves 12 full-viewport PNGs, a frame manifest, the measured menu geometry, and the linked CSS to the output directory. On the recorded Windows configuration, open and closed frames use exact PNG hashes. Hover frames also allow a three-level RGB channel tolerance on a 20 × 20 pixel sample grid. Repeated captures showed differences of up to two levels per channel in hover frames. Other platforms can replay the interactions and check input hashes, Chromium version and placement.
 
 The harness sets device scale to 1 and seeds both saved hues to the CSS defaults of 255 and 222. The original JavaScript otherwise chooses random hues on a fresh load. Each case waits for fonts and animations to settle. Filenames are `<width>-<position>-<state>.png`.
 
@@ -34,6 +34,23 @@ The harness sets device scale to 1 and seeds both saved hues to the CSS defaults
 | 390 × 844 | (16, 120) | (382, 836) |
 
 At each width the two clicks place the menu over different areas of the same centered backdrop. The lower-right case exercises the Pen's edge clamp. The replay opens via right-click, hovers Calculator, and closes with an outside click. It verifies the expected menu position, hover state, and visibility changes before recording the respective frames.
+
+## Compare GPUI geometry
+
+With the browser replay output still available, run from the repository root:
+
+```powershell
+$env:NEON_GLASS_REFERENCE = $frames
+cargo test --locked --manifest-path fixtures/neon-glass/native/Cargo.toml
+```
+
+The test compiles the pinned Pen and its linked CSS through Scene IR, checks deterministic Rust emission, and measures the generated GPUI elements in offscreen windows. It compares the panel, inner column, search container and input, first and last rows, and divider against Chromium within one logical pixel at each viewport.
+
+To emit the Rust with diagnostics for features beyond the current renderer:
+
+```powershell
+cargo run --example generate_gpui -- --allow-loss --viewport 390x844 fixtures/neon-glass/source.html (Join-Path $frames 'linked.css')
+```
 
 ## Input inventory
 

@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 pub enum Position {
     Static,
     Absolute,
+    Relative,
+    Fixed,
 }
 
 /// CSS `display` value supported in v0.1.
@@ -16,6 +18,7 @@ pub enum Display {
     Flex,
     /// CSS `inline-flex`.
     InlineFlex,
+    Grid,
 }
 
 /// CSS `box-sizing` value.
@@ -55,6 +58,7 @@ pub enum JustifyContent {
 pub enum AlignSelf {
     Auto,
     FlexStart,
+    Center,
 }
 
 /// CSS `cursor` value supported in v0.1.
@@ -98,6 +102,19 @@ impl EdgeInset {
     }
 }
 
+/// Equal-sized grid tracks and explicit start lines for items.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GridLayout {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rows: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub columns: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub row_start: Option<i16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub column_start: Option<i16>,
+}
+
 /// Resolved layout properties for an [`super::IrNode`].
 ///
 /// All lengths are in CSS pixels. `None` means the property was not explicitly
@@ -109,10 +126,10 @@ pub struct Layout {
     pub position: Position,
     pub display: Display,
     pub box_sizing: BoxSizing,
-    /// CSS `top`, present only when `position` is [`Position::Absolute`].
+    /// CSS `top`, for an absolute or fixed box.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub top: Option<f32>,
-    /// CSS `left`, present only when `position` is [`Position::Absolute`].
+    /// CSS `left`, for an absolute or fixed box.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub left: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -121,6 +138,10 @@ pub struct Layout {
     pub height: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_width: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_height: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grid: Option<GridLayout>,
     pub margin: EdgeInset,
     pub padding: EdgeInset,
     /// Present only when `display` is [`Display::Flex`] or [`Display::InlineFlex`].

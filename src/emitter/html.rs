@@ -49,6 +49,13 @@ fn render_node(node: &IrNode, all_nodes: &[IrNode], depth: usize) -> String {
         NodeKind::Box | NodeKind::Control => {
             let tag = element_tag(node);
             let class = &node.id;
+            if node.control_kind == Some(ControlKind::TextInput) {
+                let placeholder = node.text_content.as_deref().unwrap_or_default();
+                let placeholder = escape_html(placeholder).replace('"', "&quot;");
+                return format!(
+                    "{indent}<input type=\"text\" class=\"{class}\" placeholder=\"{placeholder}\">"
+                );
+            }
             let inner = render_children(Some(&node.id), all_nodes, depth + 1);
             if inner.is_empty() {
                 format!("{indent}<{tag} class=\"{class}\"></{tag}>")

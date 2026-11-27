@@ -90,10 +90,67 @@ fn returns_error_for_unknown_scene() {
 }
 
 #[test]
-fn rejects_css_at_rules_in_v0_subset() {
-    let css = "@media (min-width: 800px) { .card { width: 100px; } }";
-    let error =
-        css::parse_css_document(1, css).expect_err("at-rules should be rejected in the v0 subset");
+fn matches_media_width_and_keeps_unsupported_at_rule_location() {
+    let css = "@media (max-width: 480px) { .card { width: 100px; } }\n@keyframes fade { to { opacity: 0; } }";
+    let small =
+        SceneSourceGraph::from_strings_at_viewport("media", "<div></div>", css, 390.0).unwrap();
+    let large =
+        SceneSourceGraph::from_strings_at_viewport("media", "<div></div>", css, 1100.0).unwrap();
 
-    assert!(matches!(error, SourceGraphError::UnsupportedCss { .. }));
+    assert_eq!(small.css_rules[0].selectors, [".card"]);
+    assert_eq!(large.css_rules.len(), 1);
+    let unsupported = &large.css_rules[0];
+    assert_eq!(unsupported.selectors, ["@keyframes fade"]);
+    assert_eq!((unsupported.span.line, unsupported.span.column), (2, 1));
+}
+
+#[test]
+fn parses_original_neon_glass_html_and_nested_css() {
+    let html = include_str!("../../fixtures/neon-glass/source.html");
+    let graph = SceneSourceGraph::from_strings_at_viewport("neon-glass", html, "", 390.0).unwrap();
+
+    let search_icon = graph
+        .html_nodes
+        .iter()
+        .find(|node| node.name.as_deref() == Some("svg"))
+        .unwrap();
+    assert!(
+        search_icon
+            .attributes
+            .iter()
+            .any(|(name, value)| name == "viewBox" && value == "0 0 24 24")
+    );
+    let nested = graph
+        .css_rules
+        .iter()
+        .find(|rule| rule.selectors == ["#menu label > *"])
+        .unwrap();
+    assert_eq!(nested.declarations[0].property, "grid-area");
+    assert_eq!(nested.document_id, graph.html.id);
+    assert!(html[nested.span.start..nested.span.end].starts_with("& > *"));
+    assert!(graph.css_rules.iter().any(|rule| {
+        rule.selectors == ["#app > footer"]
+            && rule
+                .declarations
+                .iter()
+                .any(|d| d.property == "gap" && d.value == "1em")
+    }));
+}
+
+#[test]
+fn css_comments_do_not_corrupt_selectors_or_source_offsets() {
+    let source = "/* thème { } */\n.menu/**/.open, /* } */ #menu {\n  /* ;{} */ width: 275px;\n  font-family: '/* literal */';\n}";
+    let rules = css::parse_css_region(1, source, 0..source.len(), None)
+        .expect("commented rule should parse");
+    let rule = &rules[0];
+
+    assert_eq!(rule.selectors, [".menu.open", "#menu"]);
+    assert_eq!((rule.span.line, rule.span.column), (2, 1));
+    assert_eq!(rule.declarations[0].property, "width");
+    assert_eq!(rule.declarations[0].value, "275px");
+    assert_eq!(
+        &source[rule.declarations[0].span.start..rule.declarations[0].span.end],
+        "width: 275px"
+    );
+    assert_eq!(rule.declarations[1].value, "'/* literal */'");
 }

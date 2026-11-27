@@ -9,10 +9,10 @@ use crate::resolver::ComputedStyle;
 /// Margin and padding are stored as `[top, right, bottom, left]`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Geometry {
-    /// Resolved x-position for `position: absolute` elements (CSS `left`).
+    /// Resolved x-position for absolute or fixed elements (CSS `left`).
     /// Always `None` for in-flow and flex-item elements in v0.1.
     pub explicit_x: Option<f32>,
-    /// Resolved y-position for `position: absolute` elements (CSS `top`).
+    /// Resolved y-position for absolute or fixed elements (CSS `top`).
     /// Always `None` for in-flow and flex-item elements in v0.1.
     pub explicit_y: Option<f32>,
     /// Declared CSS `width` in pixels.
@@ -21,6 +21,8 @@ pub struct Geometry {
     pub height: Option<f32>,
     /// Declared CSS `min-width` in pixels.
     pub min_width: Option<f32>,
+    /// Declared CSS `min-height` in pixels.
+    pub min_height: Option<f32>,
     /// Inner content-box width after subtracting padding and border (border-box).
     /// Equal to `width` for content-box elements.
     pub content_width: Option<f32>,

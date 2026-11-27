@@ -32,10 +32,10 @@ pub fn find_tag_end(source: &str, start: usize) -> Result<usize, SourceGraphErro
 }
 
 pub fn parse_start_tag(tag_body: &str, offset: usize) -> Result<StartTag, SourceGraphError> {
-    let self_closing = tag_body.ends_with('/') || is_void_element(tag_body);
-    let trimmed = tag_body.trim_end_matches('/').trim();
-    let name_end = trimmed.find(char::is_whitespace).unwrap_or(trimmed.len());
-    let name = &trimmed[..name_end];
+    let name_end = tag_body
+        .find(|ch: char| ch.is_whitespace() || ch == '/')
+        .unwrap_or(tag_body.len());
+    let name = &tag_body[..name_end];
     if name.is_empty() {
         return Err(SourceGraphError::UnsupportedHtml {
             reason: "HTML element tag names must not be empty".to_owned(),
@@ -43,39 +43,42 @@ pub fn parse_start_tag(tag_body: &str, offset: usize) -> Result<StartTag, Source
         });
     }
 
+    let (attributes, self_closing) = parse_attributes(tag_body[name_end..].trim(), offset)?;
     Ok(StartTag {
         name: name.to_owned(),
-        attributes: parse_attributes(trimmed[name_end..].trim(), offset)?,
-        self_closing,
+        attributes,
+        self_closing: self_closing || is_void_element(name),
     })
 }
 
-fn parse_attributes(input: &str, offset: usize) -> Result<Vec<(String, String)>, SourceGraphError> {
+type Attributes = Vec<(String, String)>;
+
+fn parse_attributes(input: &str, offset: usize) -> Result<(Attributes, bool), SourceGraphError> {
     let mut attributes = Vec::new();
     let mut index = 0;
+    loop {
+        let rest = input[index..].trim_start();
+        index = input.len() - rest.len();
+        match rest {
+            "" => return Ok((attributes, false)),
+            "/" => return Ok((attributes, true)),
+            _ => {}
+        }
 
-    while let Some(name) = next_attribute_name(input, &mut index) {
-        let value = parse_attribute_value(input, &mut index, &name, offset)?;
-        attributes.push((name, value));
+        let length = rest
+            .find(|ch: char| ch.is_whitespace() || ch == '=' || ch == '/')
+            .unwrap_or(rest.len());
+        if length == 0 {
+            return Err(SourceGraphError::UnsupportedHtml {
+                reason: "expected an HTML attribute name".to_owned(),
+                offset,
+            });
+        }
+        let name = &rest[..length];
+        index += length;
+        let value = parse_attribute_value(input, &mut index, name, offset)?;
+        attributes.push((name.to_owned(), value));
     }
-
-    Ok(attributes)
-}
-
-fn next_attribute_name(input: &str, index: &mut usize) -> Option<String> {
-    let bytes = input.as_bytes();
-    while *index < bytes.len() && bytes[*index].is_ascii_whitespace() {
-        *index += 1;
-    }
-    if *index >= bytes.len() {
-        return None;
-    }
-
-    let start = *index;
-    while *index < bytes.len() && !bytes[*index].is_ascii_whitespace() && bytes[*index] != b'=' {
-        *index += 1;
-    }
-    Some(input[start..*index].trim().to_owned())
 }
 
 fn parse_attribute_value(
@@ -95,7 +98,26 @@ fn parse_attribute_value(
     while *index < bytes.len() && bytes[*index].is_ascii_whitespace() {
         *index += 1;
     }
-    let quote = read_quote(bytes, *index, name, offset)?;
+    let Some(&first) = bytes.get(*index) else {
+        return Err(SourceGraphError::UnsupportedHtml {
+            reason: format!("missing value for attribute `{name}`"),
+            offset,
+        });
+    };
+    if first != b'"' && first != b'\'' {
+        let start = *index;
+        while *index < bytes.len() && !bytes[*index].is_ascii_whitespace() {
+            if matches!(bytes[*index], b'"' | b'\'' | b'<' | b'=' | b'`') {
+                return Err(SourceGraphError::UnsupportedHtml {
+                    reason: format!("invalid unquoted value for attribute `{name}`"),
+                    offset,
+                });
+            }
+            *index += 1;
+        }
+        return Ok(input[start..*index].to_owned());
+    }
+    let quote = first;
     *index += 1;
     let value_start = *index;
     while *index < bytes.len() && bytes[*index] != quote {
@@ -112,26 +134,6 @@ fn parse_attribute_value(
     Ok(value)
 }
 
-fn read_quote(
-    bytes: &[u8],
-    index: usize,
-    name: &str,
-    offset: usize,
-) -> Result<u8, SourceGraphError> {
-    if index >= bytes.len() || (bytes[index] != b'"' && bytes[index] != b'\'') {
-        return Err(SourceGraphError::UnsupportedHtml {
-            reason: format!("attribute `{name}` must use quoted values"),
-            offset,
-        });
-    }
-    Ok(bytes[index])
-}
-
-fn is_void_element(tag_body: &str) -> bool {
-    let name = tag_body
-        .split_whitespace()
-        .next()
-        .unwrap_or_default()
-        .trim_end_matches('/');
+fn is_void_element(name: &str) -> bool {
     matches!(name, "meta" | "link" | "img" | "br" | "hr" | "input")
 }

@@ -31,9 +31,8 @@ fn parse_color_normalizes_hex_to_lowercase() {
 }
 
 #[test]
-fn parse_color_returns_none_for_non_hex() {
+fn parse_color_rejects_unsupported_keywords() {
     assert_eq!(parse_color("red"), None);
-    assert_eq!(parse_color("transparent"), None);
     assert_eq!(parse_color("none"), None);
 }
 
@@ -208,4 +207,41 @@ fn inheritance_does_not_propagate_non_inherited_properties() {
     );
     assert_eq!(child.border_width, 0.0, "border-width must not inherit");
     assert_eq!(child.position, "static", "position must not inherit");
+}
+
+#[test]
+fn resolves_custom_properties_before_inheritance_and_relative_sizes_after_font_cascade() {
+    let html = r#"<html><body><aside id="menu"><div class="row"></div></aside></body></html>"#;
+    let css = r#"
+        :root { --space: 2px; font-size: 20px; }
+        #menu { --inherited: var(--space); padding: calc(1em + var(--space)); font-size: 0.8rem; left: 2svw; }
+        .row { --space: 10px; --loop: var(--loop); gap: var(--inherited); height: var(--loop, 1.5em); }
+    "#;
+    let graph =
+        crate::SceneSourceGraph::from_strings_at_viewport("units", html, css, 390.0).unwrap();
+    let scene = crate::resolver::resolve_scene_at_viewport(&graph, 390.0, 844.0).unwrap();
+    let menu = &scene
+        .nodes
+        .iter()
+        .find(|node| node.node.name.as_deref() == Some("aside"))
+        .unwrap()
+        .style;
+    assert_eq!(menu.padding_top, 18.0);
+    assert_eq!(menu.left, Some(7.8));
+    let row = &scene.nodes.last().unwrap().style;
+    assert_eq!(row.gap, Some(2.0));
+    assert_eq!(row.height, Some(24.0));
+}
+
+#[test]
+fn parse_solid_hsl_preserves_opacity() {
+    assert_eq!(
+        parse_color("hsl(222, 12%, 20%)").as_deref(),
+        Some("#2d3139")
+    );
+    assert_eq!(
+        parse_color("hsl(0deg 100% 50% / 50%)").as_deref(),
+        Some("#ff000080")
+    );
+    assert_eq!(parse_color("transparent").as_deref(), Some("#00000000"));
 }

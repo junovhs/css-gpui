@@ -88,7 +88,9 @@ pub enum Capability {
     BlockLayout,
     /// Flex / inline-flex layout with the v0.1 flex subset.
     FlexLayout,
-    /// `position: absolute` with `top`/`left` offsets.
+    /// Grid layout with equal-sized tracks and explicit item placement.
+    GridLayout,
+    /// Absolute and fixed positioning with `top`/`left` offsets.
     AbsolutePositioning,
     /// A solid border on a box.
     Border,
@@ -100,6 +102,8 @@ pub enum Capability {
     Typography,
     /// A native button control.
     ButtonControl,
+    /// An editable single-line text input.
+    TextInputControl,
     /// Standalone SVG artwork with its original colors and shapes.
     SvgArtwork,
 }
@@ -111,12 +115,14 @@ impl Capability {
         &[
             BlockLayout,
             FlexLayout,
+            GridLayout,
             AbsolutePositioning,
             Border,
             BorderRadius,
             Background,
             Typography,
             ButtonControl,
+            TextInputControl,
             SvgArtwork,
         ]
     }
@@ -181,11 +187,14 @@ fn node_capabilities(node: &IrNode) -> BTreeSet<Capability> {
                 Display::Block => {
                     caps.insert(Capability::BlockLayout);
                 }
+                Display::Grid => {
+                    caps.insert(Capability::GridLayout);
+                }
                 Display::Flex | Display::InlineFlex => {
                     caps.insert(Capability::FlexLayout);
                 }
             }
-            if node.layout.position == Position::Absolute {
+            if matches!(node.layout.position, Position::Absolute | Position::Fixed) {
                 caps.insert(Capability::AbsolutePositioning);
             }
             if node.paint.background_color.is_some() {
@@ -200,8 +209,14 @@ fn node_capabilities(node: &IrNode) -> BTreeSet<Capability> {
             if node.typography.is_some() {
                 caps.insert(Capability::Typography);
             }
-            if matches!(node.control_kind, Some(ControlKind::Button)) {
-                caps.insert(Capability::ButtonControl);
+            match node.control_kind {
+                Some(ControlKind::Button) => {
+                    caps.insert(Capability::ButtonControl);
+                }
+                Some(ControlKind::TextInput) => {
+                    caps.insert(Capability::TextInputControl);
+                }
+                None => {}
             }
         }
     }

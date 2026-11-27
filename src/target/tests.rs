@@ -29,6 +29,8 @@ fn base_layout() -> Layout {
         width: None,
         height: None,
         min_width: None,
+        min_height: None,
+        grid: None,
         margin: EdgeInset::zero(),
         padding: EdgeInset::zero(),
         flex_direction: None,
@@ -216,7 +218,10 @@ fn scene_capabilities_reports_every_required_family() {
         Capability::all()
             .iter()
             .copied()
-            .filter(|capability| *capability != Capability::SvgArtwork)
+            .filter(|capability| !matches!(
+                capability,
+                Capability::SvgArtwork | Capability::GridLayout | Capability::TextInputControl
+            ))
             .collect::<Vec<_>>()
     );
 }
@@ -311,7 +316,10 @@ fn expected_conformance_strips_provenance_and_round_trips_through_json() {
         Capability::all()
             .iter()
             .copied()
-            .filter(|capability| *capability != Capability::SvgArtwork)
+            .filter(|capability| !matches!(
+                capability,
+                Capability::SvgArtwork | Capability::GridLayout | Capability::TextInputControl
+            ))
             .collect::<Vec<_>>()
     );
     // Pre-order, provenance dropped.

@@ -18,6 +18,8 @@ fn default_layout() -> Layout {
         width: None,
         height: None,
         min_width: None,
+        min_height: None,
+        grid: None,
         margin: EdgeInset::zero(),
         padding: EdgeInset::zero(),
         flex_direction: None,

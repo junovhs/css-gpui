@@ -1,0 +1,16 @@
+[package]
+name = "css-gpui-neon-reference"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dev-dependencies]
+gpui = { version = "=0.2.2", default-features = false, features = ["test-support", "windows-manifest"] }
+
+[build-dependencies]
+css-gpui = { path = "../../.." }
+serde_json = "1.0"
+
+[profile.dev]
+debug = 0
+incremental = false

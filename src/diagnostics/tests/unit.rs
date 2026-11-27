@@ -93,12 +93,12 @@ fn multiple_unknown_properties_each_produce_a_diagnostic() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn display_grid_produces_unsupported_value_diagnostic() {
-    let graph = fake_graph(vec![rule(0, &[".foo"], &[("display", "grid")])]);
+fn display_inline_grid_produces_unsupported_value_diagnostic() {
+    let graph = fake_graph(vec![rule(0, &[".foo"], &[("display", "inline-grid")])]);
     let diags = analyze(&graph);
     assert_eq!(diags.len(), 1);
     assert_eq!(diags[0].kind, DiagnosticKind::UnsupportedValue);
-    assert_eq!(diags[0].value.as_deref(), Some("grid"));
+    assert_eq!(diags[0].value.as_deref(), Some("inline-grid"));
 }
 
 #[test]
@@ -125,8 +125,8 @@ fn unsupported_appearance_value_produces_diagnostic() {
 }
 
 #[test]
-fn position_relative_produces_unsupported_value_diagnostic() {
-    let graph = fake_graph(vec![rule(0, &[".foo"], &[("position", "relative")])]);
+fn position_sticky_produces_unsupported_value_diagnostic() {
+    let graph = fake_graph(vec![rule(0, &[".foo"], &[("position", "sticky")])]);
     let diags = analyze(&graph);
     assert_eq!(diags.len(), 1);
     assert_eq!(diags[0].kind, DiagnosticKind::UnsupportedValue);
@@ -151,15 +151,10 @@ fn position_absolute_is_supported_no_diagnostic() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn id_selector_produces_unsupported_selector_diagnostic() {
+fn id_selector_has_no_diagnostic() {
     let graph = fake_graph(vec![rule(0, &["#main"], &[("display", "flex")])]);
     let diags = analyze(&graph);
-    assert!(
-        diags
-            .iter()
-            .any(|d| d.kind == DiagnosticKind::UnsupportedSelector),
-        "diags={diags:?}"
-    );
+    assert!(diags.is_empty(), "diags={diags:?}");
 }
 
 #[test]
@@ -175,31 +170,21 @@ fn pseudo_class_produces_unsupported_selector_diagnostic() {
 }
 
 #[test]
-fn descendant_combinator_produces_unsupported_selector_diagnostic() {
+fn descendant_combinator_has_no_diagnostic() {
     let graph = fake_graph(vec![rule(0, &["div span"], &[("color", "#000")])]);
     let diags = analyze(&graph);
-    assert!(
-        diags
-            .iter()
-            .any(|d| d.kind == DiagnosticKind::UnsupportedSelector),
-        "diags={diags:?}"
-    );
+    assert!(diags.is_empty(), "diags={diags:?}");
 }
 
 #[test]
-fn attribute_selector_produces_unsupported_selector_diagnostic() {
+fn attribute_selector_has_no_diagnostic() {
     let graph = fake_graph(vec![rule(
         0,
         &["input[type=\"text\"]"],
         &[("color", "#000")],
     )]);
     let diags = analyze(&graph);
-    assert!(
-        diags
-            .iter()
-            .any(|d| d.kind == DiagnosticKind::UnsupportedSelector),
-        "diags={diags:?}"
-    );
+    assert!(diags.is_empty(), "diags={diags:?}");
 }
 
 #[test]

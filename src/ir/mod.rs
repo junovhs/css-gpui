@@ -86,6 +86,7 @@ pub enum NodeKind {
 #[serde(rename_all = "snake_case")]
 pub enum ControlKind {
     Button,
+    TextInput,
 }
 
 // ---------------------------------------------------------------------------
@@ -105,7 +106,7 @@ pub struct IrNode {
     /// Present only when `kind` is [`NodeKind::Control`].
     #[serde(skip_serializing_if = "Option::is_none")]
     pub control_kind: Option<ControlKind>,
-    /// Verbatim text content. Present only when `kind` is [`NodeKind::Text`].
+    /// Verbatim text or the placeholder of a text input.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text_content: Option<String>,
     pub layout: Layout,

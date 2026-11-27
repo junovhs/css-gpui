@@ -35,6 +35,8 @@ fn full_scene_round_trip_with_text_and_control() -> Result<(), serde_json::Error
                     width: Some(320.0),
                     height: Some(48.0),
                     min_width: None,
+                    min_height: None,
+                    grid: None,
                     margin: EdgeInset::zero(),
                     padding: EdgeInset::uniform(8.0),
                     flex_direction: Some(FlexDirection::Row),
@@ -76,6 +78,8 @@ fn full_scene_round_trip_with_text_and_control() -> Result<(), serde_json::Error
                     width: Some(80.0),
                     height: Some(32.0),
                     min_width: None,
+                    min_height: None,
+                    grid: None,
                     margin: EdgeInset::zero(),
                     padding: EdgeInset {
                         top: 0.0,

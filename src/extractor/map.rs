@@ -1,8 +1,8 @@
 //! Mapping functions from resolver/layout types to SEMUI IR types.
 
 use crate::ir::layout::{
-    AlignItems, AlignSelf, BoxSizing, Cursor, Display, EdgeInset, FlexDirection, JustifyContent,
-    Layout, Position,
+    AlignItems, AlignSelf, BoxSizing, Cursor, Display, EdgeInset, FlexDirection, GridLayout,
+    JustifyContent, Layout, Position,
 };
 use crate::ir::paint::{Border, Color, Paint};
 use crate::ir::typography::{LineHeight, Typography};
@@ -19,6 +19,8 @@ pub fn to_layout(style: &ComputedStyle, geo: &Geometry) -> Layout {
         width: geo.width,
         height: geo.height,
         min_width: geo.min_width,
+        min_height: geo.min_height,
+        grid: grid_layout(style),
         margin: edge(&geo.margin),
         padding: edge(&geo.padding),
         flex_direction: style.flex_direction.as_deref().and_then(to_flex_direction),
@@ -57,7 +59,7 @@ pub fn to_typography(style: &ComputedStyle) -> Option<Typography> {
         font_family: parse_font_family(style.font_family.as_deref()?),
         font_size: style.font_size?,
         font_weight: style.font_weight?,
-        line_height: to_line_height(style.line_height.as_deref()),
+        line_height: to_line_height(style.line_height.as_deref(), style.font_size?),
         color: Color(style.color.clone()?),
     })
 }
@@ -69,6 +71,8 @@ pub fn to_typography(style: &ComputedStyle) -> Option<Typography> {
 fn to_position(s: &str) -> Position {
     match s {
         "absolute" => Position::Absolute,
+        "fixed" => Position::Fixed,
+        "relative" => Position::Relative,
         _ => Position::Static,
     }
 }
@@ -78,10 +82,48 @@ fn to_display(s: &str) -> Display {
         "block" => Display::Block,
         "flex" => Display::Flex,
         "inline-flex" => Display::InlineFlex,
+        "grid" => Display::Grid,
         // Unsupported values (including `none`) are diagnosed at the source
         // boundary and normalize to the CSS initial value.
         _ => Display::Block,
     }
+}
+
+fn grid_layout(style: &ComputedStyle) -> Option<GridLayout> {
+    let tracks = |value: &str| {
+        let mut tracks = value.split_ascii_whitespace();
+        let first = tracks.next()?.strip_suffix("fr")?.parse::<f32>().ok()?;
+        if first <= 0.0 {
+            return None;
+        }
+        let mut count = 1u16;
+        for track in tracks {
+            if track.strip_suffix("fr")?.parse::<f32>().ok()? != first {
+                return None;
+            }
+            count = count.checked_add(1)?;
+        }
+        Some(count)
+    };
+    let (rows, columns) = style
+        .grid_template
+        .as_deref()
+        .and_then(|value| value.split_once('/'))
+        .map_or((None, None), |(rows, cols)| (tracks(rows), tracks(cols)));
+    let (row_start, column_start) = style
+        .grid_area
+        .as_deref()
+        .and_then(|value| value.split_once('/'))
+        .map_or((None, None), |(row, col)| {
+            (row.trim().parse().ok(), col.trim().parse().ok())
+        });
+    let grid = GridLayout {
+        rows,
+        columns,
+        row_start,
+        column_start,
+    };
+    (grid != GridLayout::default()).then_some(grid)
 }
 
 fn to_box_sizing(s: &str) -> BoxSizing {
@@ -120,6 +162,7 @@ fn to_align_self(s: &str) -> Option<AlignSelf> {
     match s {
         "auto" => Some(AlignSelf::Auto),
         "flex-start" => Some(AlignSelf::FlexStart),
+        "center" => Some(AlignSelf::Center),
         _ => None,
     }
 }
@@ -132,20 +175,28 @@ fn to_cursor(s: &str) -> Option<Cursor> {
     }
 }
 
-fn to_line_height(s: Option<&str>) -> LineHeight {
+fn to_line_height(s: Option<&str>, font_size: f32) -> LineHeight {
     match s {
         None | Some("normal") => LineHeight::Normal,
         Some(v) => v
             .trim()
             .strip_suffix("px")
             .and_then(|n| n.trim().parse::<f32>().ok())
+            .or_else(|| {
+                v.trim()
+                    .parse::<f32>()
+                    .ok()
+                    .map(|factor| factor * font_size)
+            })
             .map(|value| LineHeight::Length { value })
             .unwrap_or(LineHeight::Normal),
     }
 }
 
 fn parse_font_family(s: &str) -> Vec<String> {
-    s.split(',').map(|f| f.trim().to_owned()).collect()
+    s.split(',')
+        .map(|f| f.trim().trim_matches(['\'', '"']).to_owned())
+        .collect()
 }
 
 /// Zero-value [`Layout`] for text nodes, which carry no box geometry.
@@ -159,6 +210,8 @@ pub fn to_layout_default() -> Layout {
         width: None,
         height: None,
         min_width: None,
+        min_height: None,
+        grid: None,
         margin: EdgeInset::zero(),
         padding: EdgeInset::zero(),
         flex_direction: None,

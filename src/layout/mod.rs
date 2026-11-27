@@ -60,6 +60,7 @@ fn node_geometry(style: &ComputedStyle) -> Geometry {
         width: style.width,
         height: style.height,
         min_width: style.min_width,
+        min_height: style.min_height,
         content_width,
         content_height,
         margin: [
@@ -79,10 +80,14 @@ fn node_geometry(style: &ComputedStyle) -> Geometry {
     }
 }
 
-/// Return the explicit coordinate only for absolutely positioned elements.
+/// Return the explicit coordinate only for absolutely or fixed-positioned elements.
 /// Flow and flex elements have no resolved origin in v0.1.
 fn absolute_coord(position: &str, coord: Option<f32>) -> Option<f32> {
-    if position == "absolute" { coord } else { None }
+    if matches!(position, "absolute" | "fixed") {
+        coord
+    } else {
+        None
+    }
 }
 
 /// Compute content-box width and height after subtracting padding and border
