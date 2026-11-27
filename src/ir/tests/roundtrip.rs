@@ -52,6 +52,7 @@ fn full_scene_round_trip_with_text_and_control() -> Result<(), serde_json::Error
                     effects: Default::default(),
                     placement: Default::default(),
                     decorations: Vec::new(),
+                    interaction: None,
                     background_color: Some(Color("#f5f5f5".to_string())),
                     border: None,
                     border_radius: None,
@@ -106,6 +107,7 @@ fn full_scene_round_trip_with_text_and_control() -> Result<(), serde_json::Error
                     effects: Default::default(),
                     placement: Default::default(),
                     decorations: Vec::new(),
+                    interaction: None,
                     background_color: Some(Color("#0066cc".to_string())),
                     border: Some(Border {
                         width: 1.0,

@@ -158,6 +158,7 @@ fn paint_group(
             effects: decoration.effects.clone(),
             placement: decoration.placement.clone(),
             decorations: Vec::new(),
+            interaction: None,
         };
         paint_layer(
             &mut texture,

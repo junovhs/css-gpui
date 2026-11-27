@@ -159,7 +159,7 @@ fn id_selector_has_no_diagnostic() {
 
 #[test]
 fn pseudo_class_produces_unsupported_selector_diagnostic() {
-    let graph = fake_graph(vec![rule(0, &["a:hover"], &[("color", "#000")])]);
+    let graph = fake_graph(vec![rule(0, &["a:focus-visible"], &[("color", "#000")])]);
     let diags = analyze(&graph);
     assert!(
         diags

@@ -4,19 +4,27 @@ use crate::ir::layout::{
     AlignItems, AlignSelf, BoxSizing, Cursor, Display, EdgeInset, FlexDirection, JustifyContent,
     Layout, Position,
 };
-use crate::ir::paint::Paint;
+use crate::ir::paint::{Paint, StatePaint};
 use crate::ir::typography::{LineHeight, Typography};
 use crate::ir::{IrNode, LetterSpacing, NodeKind};
 
 /// Emit a complete `<style>` block for all non-Text nodes in `nodes`.
 pub fn build_css(nodes: &[IrNode]) -> String {
     let mut rules = vec!["body {\n  margin: 0;\n}".to_owned()];
-    rules.extend(
-        nodes
-            .iter()
-            .filter(|n| n.kind != NodeKind::Text)
-            .filter_map(emit_rule),
-    );
+    for node in nodes.iter().filter(|node| node.kind != NodeKind::Text) {
+        rules.extend(emit_rule(node));
+        if let Some(interaction) = node.paint.interaction.as_ref() {
+            rules.extend(emit_state_rule(node, ":hover", &interaction.hover));
+            rules.extend(emit_state_rule(node, ":focus", &interaction.focus));
+            if interaction.uses_focus() {
+                let combined = interaction.combined(
+                    &node.paint,
+                    node.typography.as_ref().map(|typography| &typography.color),
+                );
+                rules.extend(emit_state_rule(node, ":hover:focus", &combined));
+            }
+        }
+    }
     rules.join("\n\n")
 }
 
@@ -40,6 +48,13 @@ fn emit_rule(node: &IrNode) -> Option<String> {
     decls.extend(paint_decls(&node.paint));
     if let Some(ref typo) = node.typography {
         decls.extend(typography_decls(typo));
+    } else if let Some(color) = node
+        .paint
+        .interaction
+        .as_ref()
+        .and_then(|interaction| interaction.resting_text_color.as_ref())
+    {
+        decls.push(format!("color: {}", color.0));
     }
     match node.letter_spacing {
         Some(LetterSpacing::Normal) => decls.push("letter-spacing: normal".to_owned()),
@@ -57,6 +72,19 @@ fn emit_rule(node: &IrNode) -> Option<String> {
         .collect::<Vec<_>>()
         .join("\n");
     Some(format!(".{} {{\n{body}\n}}", node.id))
+}
+
+fn emit_state_rule(node: &IrNode, selector: &str, paint: &StatePaint) -> Option<String> {
+    let declarations = [
+        ("background-color", &paint.background_color),
+        ("border-color", &paint.border_color),
+        ("color", &paint.text_color),
+    ]
+    .into_iter()
+    .filter_map(|(property, color)| Some(format!("  {property}: {};", color.as_ref()?.0)))
+    .collect::<Vec<_>>();
+    (!declarations.is_empty())
+        .then(|| format!(".{}{selector} {{\n{}\n}}", node.id, declarations.join("\n")))
 }
 
 fn layout_decls(l: &Layout) -> Vec<String> {

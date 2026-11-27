@@ -11,6 +11,7 @@
 //! Version 1 scenes keep their original format. Version 2 adds a control
 //! variant that can carry an authored text input value (ISS-29). Version 3
 //! adds optional flex wrapping (ISS-30). Version 4 adds text alignment (ISS-31).
+//! Version 5 adds letter spacing (ISS-32). Version 6 adds interaction paint (ISS-33).
 
 pub mod layout;
 pub mod paint;
@@ -149,7 +150,8 @@ pub struct IrNode {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SceneIr {
     /// Version `1` for the original schema, `2` for authored text input values,
-    /// `3` for explicit flex wrapping, `4` for text alignment, and `5` for letter spacing.
+    /// `3` for explicit flex wrapping, `4` for text alignment, `5` for letter spacing,
+    /// and `6` for hover and focus paint.
     pub schema_version: u32,
     /// Matches the `id` field in `manifest.toml`, e.g. `"profile_card_absolute"`.
     pub scene_id: String,

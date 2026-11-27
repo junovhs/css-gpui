@@ -3,6 +3,15 @@ use crate::ir::{FlexWrap, LetterSpacing, TextAlign};
 use super::model::ComputedStyle;
 use super::values::{LengthContext, value_parts};
 
+pub(crate) fn split_important(value: &str) -> (&str, bool) {
+    match value.rsplit_once('!') {
+        Some((value, annotation)) if annotation.trim_ascii().eq_ignore_ascii_case("important") => {
+            (value.trim_ascii_end(), true)
+        }
+        _ => (value, false),
+    }
+}
+
 /// Apply a single CSS declaration to `style`, expanding shorthands in place.
 ///
 /// Unknown or unsupported properties are silently ignored; diagnostics are

@@ -8,16 +8,22 @@
 //! This is the output contract consumed by `EXT-01`.
 
 pub(crate) mod cascade;
+pub(crate) mod interaction;
 mod model;
 pub(crate) mod selector;
 mod values;
 
 pub use model::ComputedStyle;
 
-use crate::{HtmlNode, HtmlNodeKind, SceneSourceGraph};
-use cascade::{apply_inheritance, apply_with_lengths};
-use selector::Selector;
-use std::collections::BTreeMap;
+use crate::ir::paint::InteractionPaint;
+use crate::{CssRule, HtmlNode, HtmlNodeKind, SceneSourceGraph};
+use cascade::{apply_inheritance, apply_with_lengths, split_important};
+use interaction::{
+    Interaction, StateSelector, StateValueLoss, has_element_children, paint_difference,
+    state_value_loss, supports_state_property,
+};
+use selector::{Selector, Specificity};
+use std::collections::{BTreeMap, BTreeSet};
 use values::{LengthContext, Variables, cascade_variables, substitute_variables};
 
 /// A single HTML element node paired with its fully resolved style.
@@ -62,7 +68,7 @@ impl std::error::Error for ResolverError {}
 /// 3. Apply declarations in order; shorthands are expanded in place.
 /// 4. Propagate inheritable properties from parent elements.
 pub fn resolve_scene(graph: &SceneSourceGraph) -> Result<ResolvedScene, ResolverError> {
-    resolve(graph, None)
+    resolve(graph, None, &mut BTreeSet::new())
 }
 
 /// Resolve small viewport and viewport units using logical CSS pixels.
@@ -71,12 +77,28 @@ pub fn resolve_scene_at_viewport(
     width: f32,
     height: f32,
 ) -> Result<ResolvedScene, ResolverError> {
-    resolve(graph, Some((width, height)))
+    resolve(graph, Some((width, height)), &mut BTreeSet::new())
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct StateDeclaration {
+    pub rule: usize,
+    pub selector: usize,
+    pub declaration: usize,
+}
+
+pub(crate) fn state_value_losses(
+    graph: &SceneSourceGraph,
+) -> BTreeSet<(StateDeclaration, StateValueLoss)> {
+    let mut losses = BTreeSet::new();
+    let _ = resolve(graph, None, &mut losses);
+    losses
 }
 
 fn resolve(
     graph: &SceneSourceGraph,
     viewport: Option<(f32, f32)>,
+    losses: &mut BTreeSet<(StateDeclaration, StateValueLoss)>,
 ) -> Result<ResolvedScene, ResolverError> {
     if graph.html_nodes.is_empty() {
         return Err(ResolverError::EmptyGraph);
@@ -90,6 +112,19 @@ fn resolve(
     let mut root_font_size = 16.0;
 
     let rules = parse_rules(graph, None);
+    let state_rules: Vec<_> = graph
+        .css_rules
+        .iter()
+        .filter_map(|rule| {
+            let selectors: Vec<_> = rule
+                .selectors
+                .iter()
+                .enumerate()
+                .filter_map(|(index, text)| Some((index, StateSelector::parse(text)?)))
+                .collect();
+            (!selectors.is_empty()).then_some((rule, selectors))
+        })
+        .collect();
     let decoration_rules = [
         ("before", parse_rules(graph, Some("::before"))),
         ("after", parse_rules(graph, Some("::after"))),
@@ -109,17 +144,66 @@ fn resolve(
             viewport,
             percent: None,
         };
-        let (mut style, variables) = cascade_for_node(
-            node,
-            &graph.html_nodes,
-            &rules,
-            parent.map_or(&initial_variables, |(_, variables)| variables),
-            lengths,
-        );
+        let inherited = parent.map_or(&initial_variables, |(_, variables)| variables);
+        let matches = matching_rules(node, &graph.html_nodes, &rules);
+        let (mut style, variables) = cascade(matches.clone(), inherited, lengths, |_, _, _| true);
         if let Some((parent_style, _)) = parent {
             apply_inheritance(&mut style, parent_style);
         } else if node.name.as_deref() == Some("html") {
             root_font_size = style.font_size.unwrap_or(16.0);
+        }
+        if !state_rules.is_empty() {
+            let active: Vec<_> = state_rules
+                .iter()
+                .filter_map(|(rule, selectors)| {
+                    let selectors: Vec<_> = selectors
+                        .iter()
+                        .filter(|(_, selector)| {
+                            selector.matches(node, &graph.html_nodes)
+                                && selector.supports_element(node, &graph.html_nodes)
+                        })
+                        .collect();
+                    (!selectors.is_empty()).then_some((*rule, selectors))
+                })
+                .collect();
+            if !active.is_empty() {
+                let has_children = has_element_children(node, &graph.html_nodes);
+                let mut paint_at = |state: Interaction| {
+                    let mut matches = matches.clone();
+                    matches.extend(active.iter().filter_map(|(rule, selectors)| {
+                        let (index, specificity) = selectors
+                            .iter()
+                            .filter(|(_, selector)| state.allows(selector.state))
+                            .map(|(index, selector)| (*index, selector.specificity()))
+                            .max_by_key(|(_, specificity)| *specificity)?;
+                        Some((specificity, *rule, Some(index)))
+                    }));
+                    let (mut current, _) =
+                        cascade(matches, inherited, lengths, |source, property, value| {
+                            if property == "color" && has_children {
+                                return false;
+                            }
+                            if let Some(reason) = state_value_loss(&style, property, value) {
+                                losses.insert((source, reason));
+                                return false;
+                            }
+                            true
+                        });
+                    if let Some((parent_style, _)) = parent {
+                        apply_inheritance(&mut current, parent_style);
+                    }
+                    paint_difference(&style, &current)
+                };
+                let interaction = InteractionPaint {
+                    resting_text_color: None,
+                    hover: paint_at(Interaction::Hover),
+                    focus: paint_at(Interaction::Focus),
+                    hover_focus: paint_at(Interaction::HoverFocus),
+                };
+                if interaction != InteractionPaint::default() {
+                    style.interaction = Some(interaction);
+                }
+            }
         }
         for (name, rules) in &decoration_rules {
             if !rules.iter().any(|(_, selectors)| {
@@ -129,15 +213,14 @@ fn resolve(
             }) {
                 continue;
             }
-            let (decoration, _) = cascade_for_node(
-                node,
-                &graph.html_nodes,
-                rules,
+            let (decoration, _) = cascade(
+                matching_rules(node, &graph.html_nodes, rules),
                 &variables,
                 LengthContext {
                     em: style.font_size.unwrap_or(lengths.em),
                     ..lengths
                 },
+                |_, _, _| true,
             );
             let content = decoration.paint_effects.get("content").map(String::as_str);
             if matches!(content, None | Some("none" | "normal")) {
@@ -212,16 +295,14 @@ fn parse_rules<'a>(
         .collect()
 }
 
-/// Apply cascade for a single element node and return its raw computed style
-/// (before inheritance).
-fn cascade_for_node(
+type MatchedRule<'a> = (Specificity, &'a CssRule, Option<usize>);
+
+fn matching_rules<'a>(
     node: &HtmlNode,
     nodes: &[HtmlNode],
-    rules: &[(&crate::CssRule, Vec<Selector<'_>>)],
-    inherited: &Variables,
-    mut lengths: LengthContext,
-) -> (ComputedStyle, Variables) {
-    let mut matches: Vec<_> = rules
+    rules: &[(&'a CssRule, Vec<Selector<'_>>)],
+) -> Vec<MatchedRule<'a>> {
+    rules
         .iter()
         .filter_map(|(rule, selectors)| {
             let specificity = selectors
@@ -229,40 +310,59 @@ fn cascade_for_node(
                 .filter(|selector| selector.matches(node, nodes))
                 .map(Selector::specificity)
                 .max()?;
-            Some((specificity, rule.id, rule))
+            Some((specificity, *rule, None))
         })
-        .collect();
+        .collect()
+}
 
-    // Sort ascending — declarations are applied in this order so the last one wins.
-    matches.sort_by_key(|&(spec, id, _)| (spec, id));
-
+/// Apply matched rules in cascade order and return the style before inheritance.
+fn cascade(
+    mut matches: Vec<MatchedRule<'_>>,
+    inherited: &Variables,
+    mut lengths: LengthContext,
+    mut validate_state_value: impl FnMut(StateDeclaration, &str, Option<&str>) -> bool,
+) -> (ComputedStyle, Variables) {
+    matches.sort_by_key(|&(specificity, rule, _)| (specificity, rule.id));
     let mut declarations: Vec<_> = matches
         .iter()
-        .flat_map(|(_, _, rule)| &rule.declarations)
-        .map(|declaration| {
-            let (value, important) = declaration
-                .value
-                .strip_suffix("!important")
-                .map_or((declaration.value.as_str(), false), |value| {
-                    (value.trim_end(), true)
-                });
-            (declaration.property.as_str(), value, important)
+        .flat_map(|&(_, rule, selector)| {
+            rule.declarations
+                .iter()
+                .enumerate()
+                .filter_map(move |(index, declaration)| {
+                    let source = selector.map(|selector| StateDeclaration {
+                        rule: rule.id,
+                        selector,
+                        declaration: index,
+                    });
+                    let property = declaration.property.as_str();
+                    if source.is_some() && !supports_state_property(property) {
+                        return None;
+                    }
+                    let (value, important) = split_important(&declaration.value);
+                    Some((property, value, important, source))
+                })
         })
         .collect();
-    declarations.sort_by_key(|(_, _, important)| *important);
+    declarations.sort_by_key(|(_, _, important, _)| *important);
 
     let custom: BTreeMap<_, _> = declarations
         .iter()
-        .filter(|(name, _, _)| name.starts_with("--"))
-        .map(|(name, value, _)| (*name, *value))
+        .filter(|(name, _, _, _)| name.starts_with("--"))
+        .map(|(name, value, _, _)| (*name, *value))
         .collect();
     let variables = cascade_variables(inherited, &custom);
     let declarations: Vec<_> = declarations
         .into_iter()
-        .filter(|(name, _, _)| !name.starts_with("--"))
-        .map(|(name, value, _)| {
+        .filter(|(name, _, _, _)| !name.starts_with("--"))
+        .filter_map(|(name, value, _, source)| {
             let value = substitute_variables(value, &mut |name| variables.get(name).cloned());
-            (name, value)
+            if let Some(source) = source
+                && !validate_state_value(source, name, value.as_deref())
+            {
+                return None;
+            }
+            Some((name, value))
         })
         .collect();
 

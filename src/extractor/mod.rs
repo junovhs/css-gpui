@@ -20,14 +20,14 @@ use crate::{HtmlNode, HtmlNodeKind};
 
 /// Tags that are invisible structural boilerplate — skipped entirely along
 /// with all of their descendants.
-const INVISIBLE_TAGS: &[&str] = &["head", "meta", "link", "title", "style", "script"];
+pub(crate) const INVISIBLE_TAGS: &[&str] = &["head", "meta", "link", "title", "style", "script"];
 
 /// Tags that are transparent wrappers: we traverse their children but do not
 /// emit an [`IrNode`] for the element itself. A transparent element's children
 /// inherit their parent IR id from the transparent element's own parent.
 /// This ensures `<html>` and `<body>` vanish from the IR so that re-parsing
 /// the emitted HTML (which always has those wrappers) produces the same IR.
-const TRANSPARENT_TAGS: &[&str] = &["html", "body"];
+pub(crate) const TRANSPARENT_TAGS: &[&str] = &["html", "body"];
 
 #[derive(Debug)]
 pub enum ExtractorError {
@@ -106,7 +106,9 @@ pub fn extract_ir(
     }
 
     Ok(SceneIr {
-        schema_version: if ir_nodes.iter().any(|node| node.letter_spacing.is_some()) {
+        schema_version: if ir_nodes.iter().any(|node| node.paint.interaction.is_some()) {
+            6
+        } else if ir_nodes.iter().any(|node| node.letter_spacing.is_some()) {
             5
         } else if ir_nodes.iter().any(|node| node.layout.text_align.is_some()) {
             4

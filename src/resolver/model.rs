@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
 
-use crate::ir::{FlexWrap, LetterSpacing, TextAlign, paint::Decoration};
+use crate::ir::{
+    FlexWrap, LetterSpacing, TextAlign,
+    paint::{Decoration, InteractionPaint},
+};
 
 /// Fully resolved CSS properties for a single HTML element node in the v0.1 subset.
 ///
@@ -55,6 +58,7 @@ pub struct ComputedStyle {
     pub paint_effects: BTreeMap<String, String>,
     pub paint_placement: BTreeMap<String, String>,
     pub decorations: Vec<Decoration>,
+    pub interaction: Option<InteractionPaint>,
 
     // --- Typography — inheritable ---
     pub color: Option<String>,
@@ -103,6 +107,7 @@ impl Default for ComputedStyle {
             paint_effects: BTreeMap::new(),
             paint_placement: BTreeMap::new(),
             decorations: Vec::new(),
+            interaction: None,
             color: None,
             font_family: None,
             font_size: None,

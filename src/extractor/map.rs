@@ -46,6 +46,21 @@ pub fn to_paint(style: &ComputedStyle) -> Paint {
         None
     };
 
+    let interaction = style.interaction.clone().map(|mut interaction| {
+        if [
+            &interaction.hover,
+            &interaction.focus,
+            &interaction.hover_focus,
+        ]
+        .iter()
+        .any(|paint| paint.text_color.is_some())
+            && to_typography(style).is_none()
+        {
+            interaction.resting_text_color = style.color.clone().map(Color);
+        }
+        interaction
+    });
+
     Paint {
         background_color: style.background_color.as_ref().map(|c| Color(c.clone())),
         border,
@@ -60,6 +75,7 @@ pub fn to_paint(style: &ComputedStyle) -> Paint {
             Default::default()
         },
         decorations: style.decorations.clone(),
+        interaction,
     }
 }
 
@@ -246,6 +262,7 @@ pub fn to_paint_default() -> Paint {
         effects: Default::default(),
         placement: Default::default(),
         decorations: Vec::new(),
+        interaction: None,
     }
 }
 

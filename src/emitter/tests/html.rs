@@ -34,6 +34,7 @@ fn default_paint() -> Paint {
         effects: Default::default(),
         placement: Default::default(),
         decorations: Vec::new(),
+        interaction: None,
         background_color: None,
         border: None,
         border_radius: None,

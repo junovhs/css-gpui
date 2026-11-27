@@ -1,3 +1,4 @@
+
 use gpui::{
     App, Bounds, ClipboardItem, Context, CursorStyle, Div, ElementInputHandler, Entity,
     EntityInputHandler, FocusHandle, Keystroke, MouseButton, Pixels, Point, ShapedLine,
@@ -6,56 +7,13 @@ use gpui::{
 use std::ops::Range;
 
 #[derive(gpui::IntoElement)]
-struct SceneTabNavigation(Div);
-
-impl RenderOnce for SceneTabNavigation {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        // With no focused element, GPUI dispatches keys to the host view. Observe unhandled
-        // Tab for this window so an unmodified host can enter the scene's tab order.
-        let window_id = window.window_handle().window_id();
-        window.use_state(cx, |_, cx| {
-            App::observe_keystrokes(cx, move |event, window, cx| {
-                if window.window_handle().window_id() == window_id
-                    && window.focused(cx).is_none()
-                    && event.action.is_none()
-                {
-                    move_scene_focus(&event.keystroke, window);
-                }
-            })
-        });
-        self.0.on_key_down(|event, window, cx| {
-            if move_scene_focus(&event.keystroke, window) {
-                cx.stop_propagation();
-            }
-        })
-    }
-}
-
-fn move_scene_focus(key: &Keystroke, window: &mut Window) -> bool {
-    let modifiers = key.modifiers;
-    if key.key != "tab"
-        || modifiers.alt
-        || modifiers.control
-        || modifiers.platform
-        || modifiers.function
-    {
-        return false;
-    }
-    if modifiers.shift {
-        window.focus_prev();
-    } else {
-        window.focus_next();
-    }
-    true
-}
-
-#[derive(gpui::IntoElement)]
 struct SceneTextInput {
     element: Div,
     id: &'static str,
     value: &'static str,
     placeholder: &'static str,
     padding: [f32; 4],
+    state_paint: Option<SceneStatePaint>,
 }
 
 impl RenderOnce for SceneTextInput {
@@ -72,9 +30,12 @@ impl RenderOnce for SceneTextInput {
         let [left, right, top, bottom] = self.padding;
         let key_input = input.clone();
         let mouse_input = input.clone();
-        self.element
-            .id(self.id)
-            .track_focus(&focus)
+        let element = self.element.id(self.id).track_focus(&focus);
+        let focused = focus.is_focused(window);
+        let element = element.when_some(self.state_paint, |element, paint| {
+            paint.apply(element, self.id, focused, window, cx)
+        });
+        element
             .cursor(CursorStyle::IBeam)
             .on_key_down(move |event, window, cx| {
                 key_input.update(cx, |input, cx| input.key_down(&event.keystroke, window, cx));

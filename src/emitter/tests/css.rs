@@ -37,6 +37,7 @@ fn default_paint() -> Paint {
         effects: Default::default(),
         placement: Default::default(),
         decorations: Vec::new(),
+        interaction: None,
         background_color: None,
         border: None,
         border_radius: None,
@@ -223,6 +224,7 @@ fn border_emits_shorthand() {
         effects: Default::default(),
         placement: Default::default(),
         decorations: Vec::new(),
+        interaction: None,
         border: Some(Border {
             width: 1.0,
             color: Color("#ff0000".to_owned()),
@@ -239,6 +241,7 @@ fn background_color_emitted() {
         effects: Default::default(),
         placement: Default::default(),
         decorations: Vec::new(),
+        interaction: None,
         background_color: Some(Color("#fff".to_owned())),
         ..default_paint()
     };

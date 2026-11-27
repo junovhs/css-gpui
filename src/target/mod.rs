@@ -103,6 +103,8 @@ pub enum Capability {
     Typography,
     /// Spacing between typographic character units.
     LetterSpacing,
+    /// Paint that depends on the pointer and focus state of a generated node.
+    InteractionPaint,
     /// A native button control.
     ButtonControl,
     /// An editable single-line text input.
@@ -125,6 +127,7 @@ impl Capability {
             Background,
             Typography,
             LetterSpacing,
+            InteractionPaint,
             ButtonControl,
             TextInputControl,
             SvgArtwork,
@@ -179,6 +182,9 @@ pub struct CapabilityGap {
 /// The capabilities `node` requires, in canonical (sorted) order.
 fn node_capabilities(node: &IrNode) -> BTreeSet<Capability> {
     let mut caps = BTreeSet::new();
+    if node.paint.interaction.is_some() {
+        caps.insert(Capability::InteractionPaint);
+    }
     if let Some(LetterSpacing::Length { value }) = node.letter_spacing
         && value != 0.0
         && (node.text_content.is_some()
@@ -295,6 +301,27 @@ pub fn collect_resources(scene: &SceneIr) -> SceneResources {
         }
         if let Some(border) = &node.paint.border {
             colors.insert(border.color.0.clone());
+        }
+        if let Some(interaction) = &node.paint.interaction {
+            if let Some(color) = &interaction.resting_text_color {
+                colors.insert(color.0.clone());
+            }
+            for state in [
+                &interaction.hover,
+                &interaction.focus,
+                &interaction.hover_focus,
+            ] {
+                for color in [
+                    &state.background_color,
+                    &state.border_color,
+                    &state.text_color,
+                ]
+                .into_iter()
+                .flatten()
+                {
+                    colors.insert(color.0.clone());
+                }
+            }
         }
         if let Some(typography) = &node.typography {
             colors.insert(typography.color.0.clone());

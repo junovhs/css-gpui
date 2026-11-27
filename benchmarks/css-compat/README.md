@@ -103,6 +103,21 @@ VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a \
   node benchmarks/css-compat/letter-spacing-probe.mjs /path/to/playwright-install "$scratch/letter-spacing"
 ```
 
+## Hover and focus paint probe
+
+The probe drives pointer entry and exit and Tab and Shift+Tab in Chromium and the ordinary generated GPUI window. It compares the first control's fill, border, and label colors in all ten captures, including states where both selectors match and one property returns to its resting value. The second control's fill confirms Tab transfers focus between the button and an editable input.
+
+The compiler supports `:hover`, `:focus`, and their conjunction as suffixes on the selector for the element being painted. Hover uses generated boxes and controls. Focus uses enabled buttons and editable single-line inputs in default tab order. Supported changes are solid background and existing border colors, and text color on elements without nested elements. The CSS color parser and static custom properties apply. Other interactive selectors, layout changes, outlines, shadows, layered backgrounds, and custom tab order produce source losses.
+
+Use the same Playwright, Xvfb and Vulkan setup as the benchmark.
+
+```sh
+scratch=$(mktemp -d)
+VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a \
+  --server-args='-screen 0 1600x1200x24' \
+  node benchmarks/css-compat/state-paint-probe.mjs /path/to/playwright-install "$scratch/state-paint"
+```
+
 ## Holdout and refresh
 
 The holdout is frozen with the evaluation sources. Keep it out of routine runs and out of compiler tuning. Run the same browser and native commands on that split with `--holdout` passed to `run.mjs` when evaluating a later candidate. Record holdout results separately and retire each disclosed holdout from future gate decisions.

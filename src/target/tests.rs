@@ -69,6 +69,7 @@ fn sample_scene() -> SceneIr {
             effects: Default::default(),
             placement: Default::default(),
             decorations: Vec::new(),
+            interaction: None,
             background_color: Some(Color("#ffffff".to_string())),
             border: Some(Border {
                 width: 1.0,
@@ -92,6 +93,7 @@ fn sample_scene() -> SceneIr {
             effects: Default::default(),
             placement: Default::default(),
             decorations: Vec::new(),
+            interaction: None,
             background_color: None,
             border: None,
             border_radius: None,
@@ -123,6 +125,7 @@ fn sample_scene() -> SceneIr {
             effects: Default::default(),
             placement: Default::default(),
             decorations: Vec::new(),
+            interaction: None,
             background_color: Some(Color("#2563eb".to_string())),
             border: None,
             border_radius: None,
@@ -239,6 +242,7 @@ fn scene_capabilities_reports_every_required_family() {
                     | Capability::GridLayout
                     | Capability::TextInputControl
                     | Capability::LetterSpacing
+                    | Capability::InteractionPaint
             ))
             .collect::<Vec<_>>()
     );
@@ -340,6 +344,7 @@ fn expected_conformance_strips_provenance_and_round_trips_through_json() {
                     | Capability::GridLayout
                     | Capability::TextInputControl
                     | Capability::LetterSpacing
+                    | Capability::InteractionPaint
             ))
             .collect::<Vec<_>>()
     );
