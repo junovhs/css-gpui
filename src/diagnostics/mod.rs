@@ -9,7 +9,7 @@ mod tests;
 
 use crate::extractor::{control_kind, input_type, unsupported_text_input_attribute};
 use crate::ir::{FlexWrap, TextAlign};
-use crate::resolver::selector::Selector;
+use crate::resolver::{cascade::supports_letter_spacing, selector::Selector};
 use crate::source_graph::SceneSourceGraph;
 use crate::{CssRule, TraceSpan};
 
@@ -198,6 +198,7 @@ const KNOWN_PROPERTIES: &[&str] = &[
     "font-weight",
     "line-height",
     "text-align",
+    "letter-spacing",
 ];
 
 fn is_known_property(property: &str) -> bool {
@@ -235,6 +236,9 @@ fn unsupported_value_message(property: &str, value: &str) -> Option<String> {
                 "text-align: '{value}' is not supported; expected 'start', 'center', 'end', 'left', or 'right'"
             ))
         }
+        "letter-spacing" if !supports_letter_spacing(value) => Some(format!(
+            "letter-spacing: '{value}' is not supported; expected normal or a length in px, em, or rem"
+        )),
         "justify-content" => match value {
             "center" | "space-between" | "normal" | "flex-start" => None,
             _ => Some(format!(

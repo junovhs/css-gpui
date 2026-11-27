@@ -26,7 +26,8 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 
 use crate::ir::{
-    ControlKind, Display, IrNode, Layout, NodeKind, Paint, Position, SceneIr, Typography,
+    ControlKind, Display, IrNode, Layout, LetterSpacing, NodeKind, Paint, Position, SceneIr,
+    Typography,
 };
 
 #[cfg(test)]
@@ -100,6 +101,8 @@ pub enum Capability {
     Background,
     /// Text rendering with the typography contract.
     Typography,
+    /// Spacing between typographic character units.
+    LetterSpacing,
     /// A native button control.
     ButtonControl,
     /// An editable single-line text input.
@@ -121,6 +124,7 @@ impl Capability {
             BorderRadius,
             Background,
             Typography,
+            LetterSpacing,
             ButtonControl,
             TextInputControl,
             SvgArtwork,
@@ -175,6 +179,17 @@ pub struct CapabilityGap {
 /// The capabilities `node` requires, in canonical (sorted) order.
 fn node_capabilities(node: &IrNode) -> BTreeSet<Capability> {
     let mut caps = BTreeSet::new();
+    if let Some(LetterSpacing::Length { value }) = node.letter_spacing
+        && value != 0.0
+        && (node.text_content.is_some()
+            || node
+                .control_kind
+                .as_ref()
+                .and_then(ControlKind::text_input_value)
+                .is_some())
+    {
+        caps.insert(Capability::LetterSpacing);
+    }
     match node.kind {
         NodeKind::Text => {
             caps.insert(Capability::Typography);
@@ -394,6 +409,8 @@ pub struct ConformanceNode {
     pub paint: Paint,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub typography: Option<Typography>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub letter_spacing: Option<LetterSpacing>,
 }
 
 /// The runtime-neutral conformance fixture for a scene: the conventions, the
@@ -430,6 +447,7 @@ pub fn expected_conformance(scene: &SceneIr) -> ConformanceScene {
                 layout: node.layout.clone(),
                 paint: node.paint.clone(),
                 typography: node.typography.clone(),
+                letter_spacing: node.letter_spacing,
             })
             .collect(),
     }

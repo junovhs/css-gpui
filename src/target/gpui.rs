@@ -4,8 +4,8 @@ use std::fmt::Write;
 
 use crate::ir::{
     AlignItems, AlignSelf, BoxSizing, Color, ControlKind, Cursor, Display, EdgeInset,
-    FlexDirection, FlexWrap, IrNode, JustifyContent, LineHeight, NodeKind, Position, SceneIr,
-    TextAlign, Typography,
+    FlexDirection, FlexWrap, IrNode, JustifyContent, LetterSpacing, LineHeight, NodeKind, Position,
+    SceneIr, TextAlign, Typography,
 };
 
 use super::{Capability, CapabilityGap, TargetCapabilities, TargetEmission, TargetEmitter};
@@ -51,6 +51,7 @@ struct EmissionContext<'a> {
     debug_bounds: bool,
     hover_colors: &'a [(String, Color)],
     editable_inputs: bool,
+    uses_letter_spacing: bool,
 }
 
 fn emit_scene(
@@ -74,23 +75,22 @@ fn emit_scene(
              \x20   div().flex().flex_col().w_full()\n",
     );
     let mut declared_loss = Vec::new();
-    emit_children(
-        &mut rust,
-        &EmissionContext {
-            scene,
-            debug_bounds,
-            hover_colors,
-            editable_inputs,
-        },
-        None,
-        8,
-        &mut declared_loss,
-    );
+    let mut context = EmissionContext {
+        scene,
+        debug_bounds,
+        hover_colors,
+        editable_inputs,
+        uses_letter_spacing: false,
+    };
+    emit_children(&mut rust, &mut context, None, 8, &mut declared_loss);
     if has_editable_inputs {
         rust.push_str("        .map(SceneTabNavigation)\n");
     }
     rust.push_str("}\n");
     emit_assets(&mut rust, scene);
+    if context.uses_letter_spacing {
+        rust.push_str(include_str!("gpui_spaced_text.rs"));
+    }
     if has_editable_inputs {
         rust.push_str(include_str!("gpui_text_input.rs"));
     }
@@ -104,7 +104,7 @@ fn emit_scene(
 // stack. Wide sibling lists build and erase each element in its own closure.
 fn emit_children(
     rust: &mut String,
-    context: &EmissionContext<'_>,
+    context: &mut EmissionContext<'_>,
     parent: Option<&IrNode>,
     indent: usize,
     losses: &mut Vec<CapabilityGap>,
@@ -137,7 +137,7 @@ fn emit_children(
 
 fn emit_child(
     rust: &mut String,
-    context: &EmissionContext<'_>,
+    context: &mut EmissionContext<'_>,
     node: &IrNode,
     parent: Option<&IrNode>,
     indent: usize,
@@ -152,10 +152,11 @@ fn emit_child(
             || parent.and_then(|p| p.typography.as_ref()) == node.typography.as_ref())
     {
         let text = node.text_content.as_deref().unwrap_or_default();
+        let text_child = native_text(node, text, context, losses);
         if array_item {
-            writeln!(rust, "{:indent$}{text:?}.into_any_element(),", "").unwrap();
+            writeln!(rust, "{:indent$}{text_child}.into_any_element(),", "").unwrap();
         } else {
-            writeln!(rust, "{:indent$}.child({text:?})", "").unwrap();
+            writeln!(rust, "{:indent$}.child({text_child})", "").unwrap();
         }
         return;
     }
@@ -251,6 +252,9 @@ fn emit_child(
         .and_then(ControlKind::text_input_value)
     {
         method("overflow_hidden()");
+        if has_letter_spacing(node) {
+            declare_loss(node, Capability::LetterSpacing, losses);
+        }
         if context.editable_inputs {
             let value = value.replace(['\r', '\n'], "");
             let placeholder = node
@@ -287,11 +291,36 @@ fn emit_child(
         writeln!(rust, "{:indent$}{closing}", "").unwrap();
         return;
     }
-    if let Some(text) = &node.text_content {
-        method(&format!("child({text:?})"));
+    if let Some(text) = node.text_content.as_deref() {
+        let text_child = native_text(node, text, context, losses);
+        method(&format!("child({text_child})"));
     }
     emit_children(rust, context, Some(node), style_indent, losses);
     writeln!(rust, "{:indent$}{closing}", "").unwrap();
+}
+
+fn has_letter_spacing(node: &IrNode) -> bool {
+    matches!(node.letter_spacing, Some(LetterSpacing::Length { value }) if value != 0.0)
+}
+
+fn native_text(
+    node: &IrNode,
+    text: &str,
+    context: &mut EmissionContext<'_>,
+    losses: &mut Vec<CapabilityGap>,
+) -> String {
+    if let Some(LetterSpacing::Length { value }) = node.letter_spacing
+        && value != 0.0
+        && !text.is_empty()
+    {
+        // A single ASCII word has no wrapping, bidi, or grapheme boundary rules.
+        if text.bytes().all(|byte| byte.is_ascii_alphanumeric()) {
+            context.uses_letter_spacing = true;
+            return format!("SceneSpacedText {{ text: {text:?}, spacing: {value:?} }}");
+        }
+        declare_loss(node, Capability::LetterSpacing, losses);
+    }
+    format!("{text:?}")
 }
 
 fn svg_asset_path(node: &IrNode) -> String {

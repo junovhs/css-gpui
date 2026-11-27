@@ -78,6 +78,7 @@ fn sample_scene() -> SceneIr {
             cursor: None,
         },
         typography: None,
+        letter_spacing: None,
         source: source("body > div"),
     };
     let text = IrNode {
@@ -103,6 +104,7 @@ fn sample_scene() -> SceneIr {
             line_height: LineHeight::Length { value: 20.0 },
             color: Color("#111111".to_string()),
         }),
+        letter_spacing: None,
         source: source("body > div > #text"),
     };
     let button = IrNode {
@@ -133,6 +135,7 @@ fn sample_scene() -> SceneIr {
             line_height: LineHeight::Length { value: 18.0 },
             color: Color("#ffffff".to_string()),
         }),
+        letter_spacing: None,
         source: source("body > div > button"),
     };
     SceneIr {
@@ -232,7 +235,10 @@ fn scene_capabilities_reports_every_required_family() {
             .copied()
             .filter(|capability| !matches!(
                 capability,
-                Capability::SvgArtwork | Capability::GridLayout | Capability::TextInputControl
+                Capability::SvgArtwork
+                    | Capability::GridLayout
+                    | Capability::TextInputControl
+                    | Capability::LetterSpacing
             ))
             .collect::<Vec<_>>()
     );
@@ -330,7 +336,10 @@ fn expected_conformance_strips_provenance_and_round_trips_through_json() {
             .copied()
             .filter(|capability| !matches!(
                 capability,
-                Capability::SvgArtwork | Capability::GridLayout | Capability::TextInputControl
+                Capability::SvgArtwork
+                    | Capability::GridLayout
+                    | Capability::TextInputControl
+                    | Capability::LetterSpacing
             ))
             .collect::<Vec<_>>()
     );

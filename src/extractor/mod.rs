@@ -106,7 +106,9 @@ pub fn extract_ir(
     }
 
     Ok(SceneIr {
-        schema_version: if ir_nodes.iter().any(|node| node.layout.text_align.is_some()) {
+        schema_version: if ir_nodes.iter().any(|node| node.letter_spacing.is_some()) {
+            5
+        } else if ir_nodes.iter().any(|node| node.layout.text_align.is_some()) {
             4
         } else if ir_nodes.iter().any(|node| node.layout.flex_wrap.is_some()) {
             3
@@ -245,6 +247,7 @@ fn process_element(
         layout,
         paint: map::to_paint(&lo.style),
         typography,
+        letter_spacing: lo.style.letter_spacing,
         source: SourceRef {
             doc_id: html_node.document_id,
             dom_path: html_node.dom_path.clone(),
@@ -342,9 +345,8 @@ fn process_text(
 
     let parent_ir_id = html_to_ir_id.get(&parent_id)?.clone();
 
-    let typography = node_map
-        .get(&parent_id)
-        .and_then(|lo| map::to_typography(&lo.style));
+    let style = node_map.get(&parent_id).map(|lo| &lo.style);
+    let typography = style.and_then(map::to_typography);
 
     Some(IrNode {
         id: format!("n{next_id}"),
@@ -355,6 +357,7 @@ fn process_text(
         layout: map::to_layout_default(),
         paint: map::to_paint_default(),
         typography,
+        letter_spacing: style.and_then(|style| style.letter_spacing),
         source: SourceRef {
             doc_id: html_node.document_id,
             dom_path: html_node.dom_path.clone(),

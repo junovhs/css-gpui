@@ -58,6 +58,7 @@ fn full_scene_round_trip_with_text_and_control() -> Result<(), serde_json::Error
                     cursor: None,
                 },
                 typography: None,
+                letter_spacing: None,
                 source: SourceRef {
                     doc_id: 0,
                     dom_path: "body > div.row".to_string(),
@@ -120,6 +121,7 @@ fn full_scene_round_trip_with_text_and_control() -> Result<(), serde_json::Error
                     line_height: LineHeight::Length { value: 20.0 },
                     color: Color("#ffffff".to_string()),
                 }),
+                letter_spacing: None,
                 source: SourceRef {
                     doc_id: 0,
                     dom_path: "body > div.row > button.primary".to_string(),
@@ -141,6 +143,7 @@ fn full_scene_round_trip_with_text_and_control() -> Result<(), serde_json::Error
                     line_height: LineHeight::Normal,
                     color: Color("#ffffff".to_string()),
                 }),
+                letter_spacing: None,
                 source: SourceRef {
                     doc_id: 0,
                     dom_path: "body > div.row > button.primary > #text".to_string(),

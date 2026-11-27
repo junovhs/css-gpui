@@ -21,7 +21,7 @@ pub use layout::{
     JustifyContent, Layout, Position, TextAlign,
 };
 pub use paint::{Border, Color, Paint};
-pub use typography::{LineHeight, Typography};
+pub use typography::{LetterSpacing, LineHeight, Typography};
 
 use serde::{Deserialize, Serialize};
 
@@ -127,6 +127,9 @@ pub struct IrNode {
     /// `None` on container boxes that carry no direct text content.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub typography: Option<Typography>,
+    /// Computed tracking, independent of whether the scene specifies a full font.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub letter_spacing: Option<LetterSpacing>,
     /// Provenance pointer back to the source graph.
     pub source: SourceRef,
 }
@@ -146,7 +149,7 @@ pub struct IrNode {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SceneIr {
     /// Version `1` for the original schema, `2` for authored text input values,
-    /// `3` for explicit flex wrapping, and `4` for text alignment.
+    /// `3` for explicit flex wrapping, `4` for text alignment, and `5` for letter spacing.
     pub schema_version: u32,
     /// Matches the `id` field in `manifest.toml`, e.g. `"profile_card_absolute"`.
     pub scene_id: String,

@@ -1,4 +1,4 @@
-use crate::ir::{FlexWrap, TextAlign};
+use crate::ir::{FlexWrap, LetterSpacing, TextAlign};
 
 use super::model::ComputedStyle;
 use super::values::{LengthContext, value_parts};
@@ -6,8 +6,8 @@ use super::values::{LengthContext, value_parts};
 /// Apply a single CSS declaration to `style`, expanding shorthands in place.
 ///
 /// Unknown or unsupported properties are silently ignored; diagnostics are
-/// the responsibility of `DIA-01`. Text alignment defers `inherit` and
-/// `unset` to the inheritance pass in `resolve_scene`.
+/// the responsibility of `DIA-01`. Text alignment and letter spacing defer
+/// `inherit` and `unset` to the inheritance pass in `resolve_scene`.
 #[cfg(test)]
 pub fn apply_declaration(style: &mut ComputedStyle, property: &str, value: &str) {
     apply_with_lengths(style, property, value, LengthContext::default());
@@ -20,7 +20,7 @@ pub(super) fn apply_with_lengths(
     lengths: LengthContext,
 ) {
     let value = value.trim();
-    if value == "inherit" && property != "text-align" {
+    if value == "inherit" && !matches!(property, "text-align" | "letter-spacing") {
         return;
     }
 
@@ -162,6 +162,11 @@ pub(super) fn apply_with_lengths(
                 style.text_align = Some(alignment);
             }
         }
+        "letter-spacing" => {
+            if let Some(spacing) = parse_letter_spacing(value, lengths) {
+                style.letter_spacing = spacing;
+            }
+        }
         "line-height" => {
             style.line_height = Some(
                 lengths
@@ -196,11 +201,41 @@ pub fn apply_inheritance(child: &mut ComputedStyle, parent: &ComputedStyle) {
     if child.text_align.is_none() {
         child.text_align = parent.text_align;
     }
+    if child.letter_spacing.is_none() {
+        child.letter_spacing = parent.letter_spacing;
+    }
 }
 
 // ---------------------------------------------------------------------------
 // Value parsers
 // ---------------------------------------------------------------------------
+
+pub(crate) fn supports_letter_spacing(value: &str) -> bool {
+    parse_letter_spacing(value, LengthContext::default()).is_some()
+}
+
+fn parse_letter_spacing(value: &str, lengths: LengthContext) -> Option<Option<LetterSpacing>> {
+    let lowercase = value.trim().to_ascii_lowercase();
+    let (number, unit) = match lowercase.as_str() {
+        "inherit" | "unset" => return Some(None),
+        "normal" | "initial" => return Some(Some(LetterSpacing::Normal)),
+        value => ["rem", "em", "px"]
+            .into_iter()
+            .find_map(|unit| value.strip_suffix(unit).map(|number| (number, unit)))
+            .unwrap_or((value, "")),
+    };
+    let number: f32 = number.parse().ok()?;
+    let value = match unit {
+        "rem" => number * lengths.rem,
+        "em" => number * lengths.em,
+        "px" => number,
+        _ if number == 0.0 => 0.0,
+        _ => return None,
+    };
+    value
+        .is_finite()
+        .then_some(Some(LetterSpacing::Length { value }))
+}
 
 /// Parse a CSS pixel length into an `f32`. Accepts `"0"`, `"8px"`, `"320px"`.
 /// Returns `None` for non-pixel values or parse failures.

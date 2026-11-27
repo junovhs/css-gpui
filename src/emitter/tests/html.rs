@@ -93,6 +93,7 @@ fn box_node_emits_div() {
         layout: default_layout(),
         paint: default_paint(),
         typography: None,
+        letter_spacing: None,
         source: source_ref(),
     };
     let html = build_html(&minimal_scene(vec![node]));
@@ -110,6 +111,7 @@ fn button_control_emits_button_tag() {
         layout: default_layout(),
         paint: default_paint(),
         typography: None,
+        letter_spacing: None,
         source: source_ref(),
     };
     let html = build_html(&minimal_scene(vec![node]));
@@ -132,6 +134,7 @@ fn text_node_content_appears_inside_parent() {
         layout: default_layout(),
         paint: default_paint(),
         typography: None,
+        letter_spacing: None,
         source: source_ref(),
     };
     let text = IrNode {
@@ -143,6 +146,7 @@ fn text_node_content_appears_inside_parent() {
         layout: default_layout(),
         paint: default_paint(),
         typography: None,
+        letter_spacing: None,
         source: source_ref(),
     };
     let html = build_html(&minimal_scene(vec![parent, text]));
@@ -166,6 +170,7 @@ fn special_chars_in_text_are_escaped() {
         layout: default_layout(),
         paint: default_paint(),
         typography: None,
+        letter_spacing: None,
         source: source_ref(),
     };
     let text = IrNode {
@@ -177,6 +182,7 @@ fn special_chars_in_text_are_escaped() {
         layout: default_layout(),
         paint: default_paint(),
         typography: None,
+        letter_spacing: None,
         source: source_ref(),
     };
     let html = build_html(&minimal_scene(vec![parent, text]));
@@ -198,6 +204,7 @@ fn child_element_nested_inside_parent() {
         layout: default_layout(),
         paint: default_paint(),
         typography: None,
+        letter_spacing: None,
         source: source_ref(),
     };
     let child = IrNode {
@@ -209,6 +216,7 @@ fn child_element_nested_inside_parent() {
         layout: default_layout(),
         paint: default_paint(),
         typography: None,
+        letter_spacing: None,
         source: source_ref(),
     };
     let html = build_html(&minimal_scene(vec![parent, child]));

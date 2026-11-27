@@ -255,6 +255,100 @@ fn text_alignment_survives_scene_json_and_both_targets() -> Result<(), Box<dyn s
     Ok(())
 }
 
+#[test]
+fn letter_spacing_round_trips_and_reports_native_limits() -> Result<(), Box<dyn std::error::Error>>
+{
+    use crate::diagnostics::{DiagnosticKind, analyze};
+    use crate::ir::LetterSpacing;
+    use crate::target::{Capability, TargetEmitter, gpui::GpuiTarget};
+
+    let html = r#"<html><body><main><div class="inherit">Inherited</div><div class="own">Own</div><div class="reset">Reset</div><div>Two words</div><input type="text" value="Edit"></main></body></html>"#;
+    let css = r#"
+        html { font-size: 20px; }
+        body { letter-spacing: .1em; }
+        main { font-size: 30px; }
+        div { font-size: 10px; }
+        .inherit { letter-spacing: 12px; letter-spacing: inherit; }
+        .own { letter-spacing: -0.1em; font-size: 40px; }
+        .reset { letter-spacing: 12px; letter-spacing: NORMAL; }
+    "#;
+    let compile = |html, css| -> Result<SceneIr, Box<dyn std::error::Error>> {
+        let graph = crate::SceneSourceGraph::from_strings("letter-spacing", html, css)?;
+        assert!(analyze(&graph).is_empty(), "{:?}", analyze(&graph));
+        let resolved = resolve_scene(&graph)?;
+        Ok(extract_ir(&compute_layout(&resolved), &graph)?)
+    };
+    let scene = compile(html, css)?;
+    assert_eq!(scene.schema_version, 5);
+    let restored = SceneIr::from_json(&scene.to_json()?)?;
+    let emitted = crate::emitter::emit(&restored);
+    for declaration in [
+        "letter-spacing: 2px",
+        "letter-spacing: -4px",
+        "letter-spacing: normal",
+    ] {
+        assert!(emitted.css.contains(declaration), "{declaration}");
+    }
+    let text_spacing = |scene: &SceneIr| {
+        scene
+            .nodes
+            .iter()
+            .filter(|node| node.kind == NodeKind::Text)
+            .map(|node| node.letter_spacing)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        text_spacing(&restored),
+        [
+            Some(LetterSpacing::Length { value: 2.0 }),
+            Some(LetterSpacing::Length { value: -4.0 }),
+            Some(LetterSpacing::Normal),
+            Some(LetterSpacing::Length { value: 2.0 }),
+        ],
+    );
+    assert_eq!(
+        text_spacing(&compile(&emitted.html, &emitted.css)?),
+        text_spacing(&restored)
+    );
+    let native = GpuiTarget.emit(&restored);
+    assert!(native.artifact.contains("SceneSpacedText"));
+    let required_loss_nodes: Vec<_> = restored
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.text_content.as_deref() == Some("Two words")
+                || node
+                    .control_kind
+                    .as_ref()
+                    .and_then(crate::ir::ControlKind::text_input_value)
+                    .is_some()
+        })
+        .map(|node| node.id.as_str())
+        .collect();
+    let actual_loss_nodes: Vec<_> = native
+        .declared_loss
+        .iter()
+        .filter(|loss| loss.capability == Capability::LetterSpacing)
+        .map(|loss| loss.node_id.as_str())
+        .collect();
+    assert_eq!(actual_loss_nodes, required_loss_nodes);
+
+    let legacy = compile(html, "")?;
+    assert_eq!(legacy.schema_version, 2);
+    assert!(!legacy.to_json()?.contains("letter_spacing"));
+    assert_eq!(SceneIr::from_json(&legacy.to_json()?)?, legacy);
+
+    let graph = crate::SceneSourceGraph::from_strings(
+        "unsupported-letter-spacing",
+        "<div>Text</div>",
+        "div { letter-spacing: 10%; }",
+    )?;
+    assert!(matches!(analyze(&graph).as_slice(), [loss]
+        if loss.kind == DiagnosticKind::UnsupportedValue
+            && loss.property.as_deref() == Some("letter-spacing")));
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Text nodes
 // ---------------------------------------------------------------------------

@@ -12,6 +12,17 @@ pub enum LineHeight {
     Length { value: f32 },
 }
 
+/// Computed CSS `letter-spacing`.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum LetterSpacing {
+    Normal,
+    /// Signed advance in CSS pixels.
+    Length {
+        value: f32,
+    },
+}
+
 /// Resolved typography properties for a node that carries visible text.
 ///
 /// Present on [`super::NodeKind::Text`] nodes and [`super::NodeKind::Control`]

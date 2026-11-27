@@ -61,6 +61,7 @@ pub(super) fn minimal_scene() -> SceneIr {
                 ..minimal_paint()
             },
             typography: None,
+            letter_spacing: None,
             source: SourceRef {
                 doc_id: 0,
                 dom_path: "body".to_string(),

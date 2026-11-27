@@ -88,6 +88,21 @@ VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a \
   node benchmarks/css-compat/text-align-probe.mjs /path/to/playwright-install "$scratch/text-align"
 ```
 
+## Letter spacing probe
+
+The probe compares the advance of a DejaVu Sans Mono label with positive and negative letter spacing against an unspaced control. Chromium reports the label width through DOM geometry. In the GPUI window, the next flex sibling marks the end of that advance. The probe also compares the change in the right edge of the glyph ink to verify painting. Both changes must agree within 1 logical px at 1× scale to account for rasterization and layout rounding. The output contains both screenshots and the measured advances.
+
+The compiler resolves signed `px`, `em` and `rem` lengths, unitless zero, `normal`, `initial`, `inherit` and `unset`. HTML replay writes the computed spacing. GPUI applies nonzero spacing to single-word labels composed of ASCII letters or digits. Other text and editable inputs report a letter-spacing target loss.
+
+Use the same Playwright, Xvfb and Vulkan setup as the benchmark, with DejaVu Sans Mono installed.
+
+```sh
+scratch=$(mktemp -d)
+VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a \
+  --server-args='-screen 0 1600x1200x24' \
+  node benchmarks/css-compat/letter-spacing-probe.mjs /path/to/playwright-install "$scratch/letter-spacing"
+```
+
 ## Holdout and refresh
 
 The holdout is frozen with the evaluation sources. Keep it out of routine runs and out of compiler tuning. Run the same browser and native commands on that split with `--holdout` passed to `run.mjs` when evaluating a later candidate. Record holdout results separately and retire each disclosed holdout from future gate decisions.

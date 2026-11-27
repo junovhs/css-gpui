@@ -6,7 +6,7 @@ use crate::ir::layout::{
 };
 use crate::ir::paint::Paint;
 use crate::ir::typography::{LineHeight, Typography};
-use crate::ir::{IrNode, NodeKind};
+use crate::ir::{IrNode, LetterSpacing, NodeKind};
 
 /// Emit a complete `<style>` block for all non-Text nodes in `nodes`.
 pub fn build_css(nodes: &[IrNode]) -> String {
@@ -40,6 +40,13 @@ fn emit_rule(node: &IrNode) -> Option<String> {
     decls.extend(paint_decls(&node.paint));
     if let Some(ref typo) = node.typography {
         decls.extend(typography_decls(typo));
+    }
+    match node.letter_spacing {
+        Some(LetterSpacing::Normal) => decls.push("letter-spacing: normal".to_owned()),
+        Some(LetterSpacing::Length { value }) => {
+            decls.push(format!("letter-spacing: {}", px(value)));
+        }
+        None => {}
     }
     if decls.is_empty() {
         return None;

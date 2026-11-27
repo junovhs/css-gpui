@@ -62,6 +62,7 @@ fn control_node(id: &str) -> IrNode {
         layout: default_layout(),
         paint: default_paint(),
         typography: None,
+        letter_spacing: None,
         source: source_ref(),
     }
 }
@@ -76,6 +77,7 @@ fn box_node(id: &str, layout: Layout, paint: Paint) -> IrNode {
         layout,
         paint,
         typography: None,
+        letter_spacing: None,
         source: source_ref(),
     }
 }
@@ -286,6 +288,7 @@ fn text_node_produces_no_css_rule() {
         layout: default_layout(),
         paint: default_paint(),
         typography: None,
+        letter_spacing: None,
         source: source_ref(),
     };
     let css = build_css(&[text_node]);
