@@ -46,22 +46,8 @@ impl<'a> RadioMarkup<'a> {
                 Some(reason)
             } else if name.is_none_or(|name| name.is_empty() || !literal_attribute(name)) {
                 Some("requires a nonempty literal name")
-            } else if [
-                "form",
-                "required",
-                "readonly",
-                "hidden",
-                "tabindex",
-                "autofocus",
-                "role",
-                "contenteditable",
-                "aria-checked",
-            ]
-            .iter()
-            .any(|attr| input_attribute(radio, attr).is_some())
-                || has_event_handler(radio)
-            {
-                Some("unsupported radio attributes")
+            } else if let Some(reason) = unsupported_radio_attribute(radio) {
+                Some(reason)
             } else if input_attribute(radio, "id").is_some_and(|id| {
                 id.is_empty()
                     || id.chars().any(char::is_whitespace)
@@ -163,6 +149,25 @@ fn interactive_label_child(node: &HtmlNode, target: usize) -> bool {
             || (is_tag(node, "a") && input_attribute(node, "href").is_some())
             || input_attribute(node, "contenteditable").is_some()
             || input_attribute(node, "tabindex").is_some())
+}
+
+fn unsupported_radio_attribute(radio: &HtmlNode) -> Option<&'static str> {
+    if input_attribute(radio, "form").is_some() {
+        return Some("form ownership is unsupported");
+    }
+    [
+        "required",
+        "readonly",
+        "hidden",
+        "tabindex",
+        "autofocus",
+        "role",
+        "contenteditable",
+        "aria-checked",
+    ]
+    .into_iter()
+    .find(|attr| input_attribute(radio, attr).is_some())
+    .or_else(|| has_event_handler(radio).then_some("inline event handler"))
 }
 
 fn has_event_handler(node: &HtmlNode) -> bool {
