@@ -213,7 +213,7 @@ fn node_capabilities(node: &IrNode) -> BTreeSet<Capability> {
                 Some(ControlKind::Button) => {
                     caps.insert(Capability::ButtonControl);
                 }
-                Some(ControlKind::TextInput) => {
+                Some(ControlKind::TextInput | ControlKind::TextInputWithValue(_)) => {
                     caps.insert(Capability::TextInputControl);
                 }
                 None => {}

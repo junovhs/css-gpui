@@ -8,8 +8,8 @@
 //!
 //! # Schema stability
 //!
-//! `schema_version = 1` covers this exact field set. Any additive or breaking
-//! change must bump the version and be tracked as a new issue.
+//! Version 1 scenes keep their original format. Version 2 adds a control
+//! variant that can carry an authored text input value (ISS-29).
 
 pub mod layout;
 pub mod paint;
@@ -87,6 +87,18 @@ pub enum NodeKind {
 pub enum ControlKind {
     Button,
     TextInput,
+    TextInputWithValue(String),
+}
+
+impl ControlKind {
+    /// Returns the initial value of a text input, with an empty string for v1 inputs.
+    pub fn text_input_value(&self) -> Option<&str> {
+        match self {
+            Self::TextInput => Some(""),
+            Self::TextInputWithValue(value) => Some(value),
+            Self::Button => None,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -132,7 +144,7 @@ pub struct IrNode {
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SceneIr {
-    /// Always `1` for the v0.1 schema. Bump on breaking changes.
+    /// Version `1` for the original schema or `2` for scenes with authored text input values.
     pub schema_version: u32,
     /// Matches the `id` field in `manifest.toml`, e.g. `"profile_card_absolute"`.
     pub scene_id: String,

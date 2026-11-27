@@ -106,7 +106,14 @@ pub fn extract_ir(
     }
 
     Ok(SceneIr {
-        schema_version: 1,
+        schema_version: if ir_nodes
+            .iter()
+            .any(|node| matches!(node.control_kind, Some(ControlKind::TextInputWithValue(_))))
+        {
+            2
+        } else {
+            1
+        },
         scene_id: laid_out.scene_id.clone(),
         corpus: "v0.1".to_owned(),
         execution_mode: ExecutionMode::Static,
@@ -201,7 +208,11 @@ fn process_element(
     }
 
     let typography = map::to_typography(&lo.style);
-    let text_content = if control_kind == Some(ControlKind::TextInput) {
+    let text_content = if control_kind
+        .as_ref()
+        .and_then(ControlKind::text_input_value)
+        .is_some()
+    {
         if layout.height.is_none() {
             let height = typography
                 .as_ref()
@@ -216,7 +227,7 @@ fn process_element(
                 height
             });
         }
-        attribute(html_node, "placeholder").map(str::to_owned)
+        input_attribute(html_node, "placeholder").map(str::to_owned)
     } else {
         None
     };
@@ -349,20 +360,46 @@ fn process_text(
 }
 
 pub(crate) fn control_kind(node: &HtmlNode) -> Option<ControlKind> {
-    match node.name.as_deref()? {
-        tag if tag.eq_ignore_ascii_case("button") => Some(ControlKind::Button),
-        tag if tag.eq_ignore_ascii_case("input")
-            && input_type(node).is_none_or(|kind| kind.eq_ignore_ascii_case("text")) =>
-        {
-            Some(ControlKind::TextInput)
-        }
-        _ => None,
+    if node.name.as_deref()?.eq_ignore_ascii_case("button") {
+        return Some(ControlKind::Button);
     }
+    if !is_text_input(node) || unsupported_text_input_attribute(node).is_some() {
+        return None;
+    }
+
+    let value = input_attribute(node, "value")
+        .unwrap_or_default()
+        .replace(['\r', '\n'], "");
+    Some(if value.is_empty() {
+        ControlKind::TextInput
+    } else {
+        ControlKind::TextInputWithValue(value)
+    })
+}
+
+fn is_text_input(node: &HtmlNode) -> bool {
+    node.name
+        .as_deref()
+        .is_some_and(|tag| tag.eq_ignore_ascii_case("input"))
+        && input_type(node).is_none_or(|kind| kind.eq_ignore_ascii_case("text"))
+}
+
+pub(crate) fn unsupported_text_input_attribute(node: &HtmlNode) -> Option<&'static str> {
+    if !is_text_input(node) {
+        return None;
+    }
+    ["disabled", "readonly"]
+        .into_iter()
+        .find(|name| input_attribute(node, name).is_some())
 }
 
 pub(crate) fn input_type(node: &HtmlNode) -> Option<&str> {
+    input_attribute(node, "type")
+}
+
+fn input_attribute<'a>(node: &'a HtmlNode, name: &str) -> Option<&'a str> {
     node.attributes
         .iter()
-        .find(|(key, _)| key.eq_ignore_ascii_case("type"))
+        .find(|(key, _)| key.eq_ignore_ascii_case(name))
         .map(|(_, value)| value.as_str())
 }

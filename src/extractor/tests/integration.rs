@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use crate::extractor::extract_ir;
-use crate::ir::{ControlKind, NodeKind};
+use crate::ir::{ControlKind, NodeKind, SceneIr};
 use crate::layout::compute_layout;
 use crate::load_scene_source_graph;
 use crate::resolver::resolve_scene;
@@ -77,6 +77,32 @@ fn button_element_maps_to_control_kind() -> Result<(), Box<dyn std::error::Error
         return Ok(());
     };
     assert_eq!(btn.control_kind, Some(ControlKind::Button));
+    Ok(())
+}
+
+#[test]
+fn authored_text_input_value_survives_scene_json_and_html_roundtrip()
+-> Result<(), Box<dyn std::error::Error>> {
+    let compile = |html, css| -> Result<SceneIr, Box<dyn std::error::Error>> {
+        let graph = crate::SceneSourceGraph::from_strings("text-field", html, css)?;
+        let resolved = resolve_scene(&graph)?;
+        Ok(extract_ir(&compute_layout(&resolved), &graph)?)
+    };
+
+    let legacy = compile(r#"<input placeholder="Your name">"#, "")?;
+    assert_eq!(legacy.schema_version, 1);
+    assert_eq!(SceneIr::from_json(&legacy.to_json()?)?, legacy);
+
+    let original = compile(r#"<input placeholder="Your name" value="Dana">"#, "")?;
+    assert_eq!(original.schema_version, 2);
+    let restored = SceneIr::from_json(&original.to_json()?)?;
+    let emitted = crate::emitter::emit(&restored);
+    let reparsed = compile(&emitted.html, &emitted.css)?;
+    assert_eq!(
+        reparsed.nodes[0].control_kind,
+        original.nodes[0].control_kind
+    );
+    assert_eq!(reparsed.nodes[0].text_content.as_deref(), Some("Your name"));
     Ok(())
 }
 

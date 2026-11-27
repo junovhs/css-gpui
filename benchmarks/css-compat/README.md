@@ -49,6 +49,19 @@ VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a \
   python3 benchmarks/css-compat/capture-native.py "$scratch/evaluation"
 ```
 
+## Editable text input probe
+
+The standalone probe uses the pinned Chromium and the ordinary GPUI CLI and host. At both benchmark widths it verifies that Tab focuses the first field, typed text changes the visible field, and Tab and Shift+Tab move between fields without discarding their values. The native check reads each focused field's value through the X11 clipboard. The probe also saves browser and native frames.
+
+Use the same Xvfb and Vulkan setup as the native pass, with `xclip` and ImageMagick's `identify` and `convert` commands available.
+
+```sh
+scratch=$(mktemp -d)
+VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a \
+  --server-args='-screen 0 1600x1200x24' \
+  node benchmarks/css-compat/text-input-probe.mjs /path/to/playwright-install "$scratch/text-input"
+```
+
 ## Holdout and refresh
 
 The holdout is frozen with the evaluation sources. Keep it out of routine runs and out of compiler tuning. Run the same browser and native commands on that split with `--holdout` passed to `run.mjs` when evaluating a later candidate. Record holdout results separately and retire each disclosed holdout from future gate decisions.

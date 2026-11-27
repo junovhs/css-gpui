@@ -13,13 +13,17 @@ fn run_example(example: &str, options: &[&str], html: &Path, css: &Path) -> Outp
 }
 
 #[test]
-fn unsupported_email_input_is_a_source_loss() {
+fn unsupported_input_behavior_is_a_source_loss() {
     let directory =
-        std::env::temp_dir().join(format!("css-gpui-unsupported-email-{}", std::process::id()));
+        std::env::temp_dir().join(format!("css-gpui-unsupported-input-{}", std::process::id()));
     fs::create_dir_all(&directory).unwrap();
-    let html = directory.join("email.html");
+    let html = directory.join("inputs.html");
     let css = directory.join("email.css");
-    fs::write(&html, "<body>\n  <input type=\"email\">\n</body>\n").unwrap();
+    fs::write(
+        &html,
+        "<body>\n  <input type=\"email\">\n  <input DISABLED>\n  <input type=\"text\" readonly>\n</body>\n",
+    )
+    .unwrap();
     fs::write(&css, "").unwrap();
 
     let strict = run_example("generate_gpui", &[], &html, &css);
@@ -29,25 +33,31 @@ fn unsupported_email_input_is_a_source_loss() {
 
     assert!(
         !strict.status.success(),
-        "strict conversion accepted an unsupported email input"
+        "strict conversion accepted unsupported form controls"
     );
     assert!(strict.stdout.is_empty());
     assert!(permissive.status.success());
     assert!(!permissive.stdout.is_empty());
 
-    let location = format!("{}:2:3:", html.display());
-    for output in [&strict, &permissive] {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(
-            stderr.lines().any(|line| line.starts_with(&location)
-                && line.contains("source loss")
-                && line.contains("email")),
-            "expected a source loss at {location} for the email input, got {stderr:?}"
-        );
+    for (line_number, behavior) in [(2, "email"), (3, "disabled"), (4, "readonly")] {
+        let location = format!("{}:{line_number}:3:", html.display());
+        for output in [&strict, &permissive] {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(
+                stderr.lines().any(|line| line.starts_with(&location)
+                    && line.contains("source loss")
+                    && line.contains(behavior)),
+                "expected a source loss at {location} for {behavior}, got {stderr:?}"
+            );
+        }
     }
     assert!(inspected.status.success());
     let scene =
         css_gpui::ir::SceneIr::from_json(&String::from_utf8(inspected.stdout).unwrap()).unwrap();
-    assert_eq!(scene.nodes.len(), 1, "the input should remain in the IR");
-    assert_eq!(scene.nodes[0].source.dom_path, "0/0/0");
+    assert_eq!(
+        scene.nodes.len(),
+        3,
+        "unsupported inputs should remain in the IR"
+    );
+    assert!(scene.nodes.iter().all(|node| node.control_kind.is_none()));
 }

@@ -7,7 +7,7 @@
 #[cfg(test)]
 mod tests;
 
-use crate::extractor::{control_kind, input_type};
+use crate::extractor::{control_kind, input_type, unsupported_text_input_attribute};
 use crate::resolver::selector::Selector;
 use crate::source_graph::SceneSourceGraph;
 use crate::{CssRule, TraceSpan};
@@ -72,11 +72,15 @@ pub fn form_control_losses(graph: &SceneSourceGraph) -> impl Iterator<Item = For
         }
         let element = match tag {
             tag if tag.eq_ignore_ascii_case("input") => {
-                let kind = input_type(node)?;
-                if kind.eq_ignore_ascii_case("hidden") {
-                    return None;
+                if let Some(attribute) = unsupported_text_input_attribute(node) {
+                    format!("<input {attribute}>")
+                } else {
+                    let kind = input_type(node)?;
+                    if kind.eq_ignore_ascii_case("hidden") {
+                        return None;
+                    }
+                    format!("<input type={kind:?}>")
                 }
-                format!("<input type={kind:?}>")
             }
             tag if tag.eq_ignore_ascii_case("select") || tag.eq_ignore_ascii_case("textarea") => {
                 format!("<{tag}>")

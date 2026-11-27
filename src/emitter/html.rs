@@ -49,11 +49,21 @@ fn render_node(node: &IrNode, all_nodes: &[IrNode], depth: usize) -> String {
         NodeKind::Box | NodeKind::Control => {
             let tag = element_tag(node);
             let class = &node.id;
-            if node.control_kind == Some(ControlKind::TextInput) {
+            if let Some(value) = node
+                .control_kind
+                .as_ref()
+                .and_then(ControlKind::text_input_value)
+            {
                 let placeholder = node.text_content.as_deref().unwrap_or_default();
                 let placeholder = escape_html(placeholder).replace('"', "&quot;");
+                let value = if value.is_empty() {
+                    String::new()
+                } else {
+                    let value = escape_html(value).replace('"', "&quot;");
+                    format!(" value=\"{value}\"")
+                };
                 return format!(
-                    "{indent}<input type=\"text\" class=\"{class}\" placeholder=\"{placeholder}\">"
+                    "{indent}<input type=\"text\" class=\"{class}\" placeholder=\"{placeholder}\"{value}>"
                 );
             }
             let inner = render_children(Some(&node.id), all_nodes, depth + 1);
