@@ -7,6 +7,9 @@ publish = false
 [dependencies]
 gpui = { version = "=0.2.2", default-features = false, features = ["windows-manifest"] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+gpui = { version = "=0.2.2", default-features = false, features = ["x11"] }
+
 [profile.dev]
 debug = 0
 incremental = false

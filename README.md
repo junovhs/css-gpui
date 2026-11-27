@@ -15,6 +15,10 @@ cargo run --locked --example inspect -- fixtures/v0.1/stacked_info_card/source.h
 
 The example writes the resolved scene as JSON to stdout and reports recognized unsupported constructs on stderr.
 
+## Build the standalone toolbar
+
+On Linux with X11 or XWayland, edit [the toolbar CSS](fixtures/toolbar/source.css) and run `python3 fixtures/toolbar/build.py` from the repository root. The command writes readable Rust and a runnable GPUI executable. See the [toolbar build instructions](docs/first-milestone.md#build-and-run-the-toolbar) for prerequisites and output paths.
+
 ## Project notes
 
 - [Founding brief](docs/founding.md) — the authoring workflow and what makes the output worth keeping.
