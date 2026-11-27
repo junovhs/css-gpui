@@ -109,6 +109,8 @@ pub enum Capability {
     ButtonControl,
     /// An editable single-line text input.
     TextInputControl,
+    /// A named radio option or an explicit label that activates one.
+    RadioControl,
     /// Standalone SVG artwork with its original colors and shapes.
     SvgArtwork,
 }
@@ -130,6 +132,7 @@ impl Capability {
             InteractionPaint,
             ButtonControl,
             TextInputControl,
+            RadioControl,
             SvgArtwork,
         ]
     }
@@ -200,7 +203,7 @@ fn node_capabilities(node: &IrNode) -> BTreeSet<Capability> {
         NodeKind::Text => {
             caps.insert(Capability::Typography);
         }
-        NodeKind::Box | NodeKind::Control | NodeKind::Svg(_) => {
+        NodeKind::Box | NodeKind::Control | NodeKind::Svg(_) | NodeKind::RadioLabel { .. } => {
             if matches!(node.kind, NodeKind::Svg(_)) {
                 caps.insert(Capability::SvgArtwork);
             }
@@ -230,12 +233,18 @@ fn node_capabilities(node: &IrNode) -> BTreeSet<Capability> {
             if node.typography.is_some() || node.layout.text_align.is_some() {
                 caps.insert(Capability::Typography);
             }
+            if matches!(node.kind, NodeKind::RadioLabel { .. }) {
+                caps.insert(Capability::RadioControl);
+            }
             match node.control_kind {
                 Some(ControlKind::Button) => {
                     caps.insert(Capability::ButtonControl);
                 }
                 Some(ControlKind::TextInput | ControlKind::TextInputWithValue(_)) => {
                     caps.insert(Capability::TextInputControl);
+                }
+                Some(ControlKind::Radio(_)) => {
+                    caps.insert(Capability::RadioControl);
                 }
                 None => {}
             }
@@ -322,6 +331,18 @@ pub fn collect_resources(scene: &SceneIr) -> SceneResources {
                     colors.insert(color.0.clone());
                 }
             }
+        }
+        if let Some(ControlKind::Radio(radio)) = node.control_kind.as_ref() {
+            colors.extend(
+                [
+                    &radio.checked_paint.background_color,
+                    &radio.checked_paint.border_color,
+                    &radio.checked_paint.text_color,
+                ]
+                .into_iter()
+                .flatten()
+                .map(|color| color.0.clone()),
+            );
         }
         if let Some(typography) = &node.typography {
             colors.insert(typography.color.0.clone());

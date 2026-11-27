@@ -5,6 +5,7 @@ mod fixture_manifest;
 pub mod ir;
 pub mod layout;
 pub mod paint;
+mod radio;
 pub mod resolver;
 mod source_graph;
 pub mod target;

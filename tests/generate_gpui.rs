@@ -149,3 +149,161 @@ fn interaction_paint_survives_scene_json_and_unsupported_states_are_reported() {
         "{errors}"
     );
 }
+
+#[test]
+fn radio_groups_and_labels_survive_scene_json_and_reference_html() {
+    use css_gpui::ir::{ControlKind, NodeKind, SceneIr};
+
+    let directory = std::env::temp_dir().join(format!("css-gpui-radio-{}", std::process::id()));
+    fs::create_dir_all(&directory).unwrap();
+    let html = directory.join("radios.html");
+    let css = directory.join("radios.css");
+    fs::write(
+        &html,
+        "<main>
+            <label for='dark'>Dark</label>
+            <input type='radio' name='theme' id='light' value='light' checked>
+            <input type='radio' name='theme' id='dark' value='dark' checked='false'>
+            <input type='radio' name='motion' id='off'>
+            <input type='radio' name='motion' id='on'>
+        </main>",
+    )
+    .unwrap();
+    fs::write(
+        &css,
+        "input { appearance: none; background-color: #ffffff; }
+         input:checked { background-color: #5599dd; }
+         #dark:checked { background-color: #253655; }
+         #on { background-color: #eeeeee !important; }",
+    )
+    .unwrap();
+
+    let direct = run_example("generate_gpui", &[], &html, &css);
+    assert!(
+        direct.status.success(),
+        "{}",
+        String::from_utf8_lossy(&direct.stderr)
+    );
+    let inspected = run_example("inspect", &[], &html, &css);
+    assert!(inspected.status.success());
+    let serialized = directory.join("scene.json");
+    fs::write(&serialized, &inspected.stdout).unwrap();
+    let replayed = run_example("generate_gpui", &[], Path::new("--scene-json"), &serialized);
+    fs::remove_dir_all(&directory).unwrap();
+    assert!(
+        replayed.status.success(),
+        "{}",
+        String::from_utf8_lossy(&replayed.stderr)
+    );
+    assert_eq!(replayed.stdout, direct.stdout);
+
+    let scene = SceneIr::from_json(std::str::from_utf8(&inspected.stdout).unwrap()).unwrap();
+    assert_eq!(scene.schema_version, 7);
+    let radios: Vec<_> = scene
+        .nodes
+        .iter()
+        .filter_map(|node| match &node.control_kind {
+            Some(ControlKind::Radio(radio)) => Some((
+                &node.id,
+                radio.name.as_str(),
+                radio.value.as_deref(),
+                radio.checked,
+                radio
+                    .checked_paint
+                    .background_color
+                    .as_ref()
+                    .map(|color| color.0.as_str()),
+            )),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        radios
+            .iter()
+            .map(|(_, name, value, checked, fill)| (*name, *value, *checked, *fill))
+            .collect::<Vec<_>>(),
+        [
+            ("theme", Some("light"), false, Some("#5599dd")),
+            ("theme", Some("dark"), true, Some("#253655")),
+            ("motion", None, false, Some("#5599dd")),
+            ("motion", None, false, None),
+        ]
+    );
+    let dark_id = radios[1].0;
+    assert!(scene.nodes.iter().any(|node| {
+        matches!(&node.kind, NodeKind::RadioLabel { target } if target == dark_id)
+    }));
+    let reference = css_gpui::emitter::emit(&scene);
+    assert!(reference.html.contains(&format!("for=\"{dark_id}\"")));
+    assert!(reference.html.contains(&format!(
+        "id=\"{dark_id}\" name=\"theme\" value=\"dark\" checked"
+    )));
+    assert!(reference.css.contains(&format!(
+        ".{dark_id}:checked {{\n  background-color: #253655;"
+    )));
+}
+
+#[test]
+fn strict_generation_reports_unsupported_radio_markup_and_checked_selectors() {
+    let directory =
+        std::env::temp_dir().join(format!("css-gpui-radio-losses-{}", std::process::id()));
+    fs::create_dir_all(&directory).unwrap();
+    let html = directory.join("radios.html");
+    let css = directory.join("radios.css");
+    fs::write(
+        &html,
+        "<main>
+          <input type='radio' name='one' id='good' checked>
+          <input type='radio' name='one' id='bad' disabled>
+          <input type='radio' name='unreset' id='unreset'>
+          <input type='radio' id='unnamed'>
+          <label><input type='radio' name='implicit'>Implicit</label>
+          <label for='bad'>Disabled</label>
+          <label for='missing'>Unresolved</label>
+          <form><input type='radio' name='form-owned'></form>
+          <input type='checkbox'>
+        </main>",
+    )
+    .unwrap();
+    fs::write(
+        &css,
+        "#good { appearance: none; }
+         #good:checked + label { background-color: #abcdef; }
+         #good:hover { background-color: #abcdef; }
+         #good:focus { background-color: #abcdef; }
+         #good:checked:hover { background-color: #abcdef; }
+         #good:checked { width: 40px; }
+         input[type='checkbox']:checked { background-color: #abcdef; }",
+    )
+    .unwrap();
+
+    let strict = run_example("generate_gpui", &[], &html, &css);
+    fs::remove_dir_all(&directory).unwrap();
+    assert!(!strict.status.success());
+    assert!(strict.stdout.is_empty());
+    let errors = String::from_utf8_lossy(&strict.stderr);
+    for (source, line_number, behavior) in [
+        (&html, 3, "disabled"),
+        (&html, 4, "appearance: none"),
+        (&html, 5, "nonempty literal name"),
+        (&html, 6, "explicit label"),
+        (&html, 7, "radio label association"),
+        (&html, 8, "unresolved label"),
+        (&html, 9, "form ownership"),
+        (&html, 10, "checkbox"),
+        (&css, 2, ":checked + label"),
+        (&css, 3, ":hover"),
+        (&css, 4, ":focus"),
+        (&css, 5, ":checked:hover"),
+        (&css, 6, "width"),
+        (&css, 7, "checkbox"),
+    ] {
+        let location = format!("{}:{line_number}:", source.display());
+        assert!(
+            errors.lines().any(|line| line.starts_with(&location)
+                && line.contains("source loss")
+                && line.contains(behavior)),
+            "{errors}"
+        );
+    }
+}

@@ -65,6 +65,10 @@ impl<'a> Selector<'a> {
         })
     }
 
+    pub(super) fn is_compound(&self) -> bool {
+        self.tail.is_empty()
+    }
+
     pub(super) fn specificity(&self) -> Specificity {
         self.specificity
     }

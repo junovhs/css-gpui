@@ -16,7 +16,7 @@ mod values;
 pub use model::ComputedStyle;
 
 use crate::ir::paint::InteractionPaint;
-use crate::{CssRule, HtmlNode, HtmlNodeKind, SceneSourceGraph};
+use crate::{CssRule, HtmlNode, HtmlNodeKind, SceneSourceGraph, radio::RadioMarkup};
 use cascade::{apply_inheritance, apply_with_lengths, split_important};
 use interaction::{
     Interaction, StateSelector, StateValueLoss, has_element_children, paint_difference,
@@ -111,6 +111,7 @@ fn resolve(
     let initial_variables = Variables::new();
     let mut root_font_size = 16.0;
 
+    let radios = RadioMarkup::new(&graph.html_nodes);
     let rules = parse_rules(graph, None);
     let state_rules: Vec<_> = graph
         .css_rules
@@ -146,7 +147,9 @@ fn resolve(
         };
         let inherited = parent.map_or(&initial_variables, |(_, variables)| variables);
         let matches = matching_rules(node, &graph.html_nodes, &rules);
-        let (mut style, variables) = cascade(matches.clone(), inherited, lengths, |_, _, _| true);
+        let radio = radios.radios.contains_key(&node.id);
+        let (mut style, variables) =
+            cascade(matches.clone(), inherited, lengths, radio, |_, _, _| true);
         if let Some((parent_style, _)) = parent {
             apply_inheritance(&mut style, parent_style);
         } else if node.name.as_deref() == Some("html") {
@@ -160,7 +163,7 @@ fn resolve(
                         .iter()
                         .filter(|(_, selector)| {
                             selector.matches(node, &graph.html_nodes)
-                                && selector.supports_element(node, &graph.html_nodes)
+                                && selector.supports_element(node, &graph.html_nodes, &radios)
                         })
                         .collect();
                     (!selectors.is_empty()).then_some((*rule, selectors))
@@ -178,8 +181,12 @@ fn resolve(
                             .max_by_key(|(_, specificity)| *specificity)?;
                         Some((specificity, *rule, Some(index)))
                     }));
-                    let (mut current, _) =
-                        cascade(matches, inherited, lengths, |source, property, value| {
+                    let (mut current, _) = cascade(
+                        matches,
+                        inherited,
+                        lengths,
+                        radio,
+                        |source, property, value| {
                             if property == "color" && has_children {
                                 return false;
                             }
@@ -188,20 +195,25 @@ fn resolve(
                                 return false;
                             }
                             true
-                        });
+                        },
+                    );
                     if let Some((parent_style, _)) = parent {
                         apply_inheritance(&mut current, parent_style);
                     }
                     paint_difference(&style, &current)
                 };
-                let interaction = InteractionPaint {
-                    resting_text_color: None,
-                    hover: paint_at(Interaction::Hover),
-                    focus: paint_at(Interaction::Focus),
-                    hover_focus: paint_at(Interaction::HoverFocus),
-                };
-                if interaction != InteractionPaint::default() {
-                    style.interaction = Some(interaction);
+                if radio {
+                    style.checked_paint = paint_at(Interaction::Checked);
+                } else {
+                    let interaction = InteractionPaint {
+                        resting_text_color: None,
+                        hover: paint_at(Interaction::Hover),
+                        focus: paint_at(Interaction::Focus),
+                        hover_focus: paint_at(Interaction::HoverFocus),
+                    };
+                    if interaction != InteractionPaint::default() {
+                        style.interaction = Some(interaction);
+                    }
                 }
             }
         }
@@ -220,6 +232,7 @@ fn resolve(
                     em: style.font_size.unwrap_or(lengths.em),
                     ..lengths
                 },
+                false,
                 |_, _, _| true,
             );
             let content = decoration.paint_effects.get("content").map(String::as_str);
@@ -320,6 +333,7 @@ fn cascade(
     mut matches: Vec<MatchedRule<'_>>,
     inherited: &Variables,
     mut lengths: LengthContext,
+    radio: bool,
     mut validate_state_value: impl FnMut(StateDeclaration, &str, Option<&str>) -> bool,
 ) -> (ComputedStyle, Variables) {
     matches.sort_by_key(|&(specificity, rule, _)| (specificity, rule.id));
@@ -369,6 +383,12 @@ fn cascade(
     // em lengths use the element's final font size. On font-size itself, em
     // and percentages refer to the parent's computed font size.
     let mut style = ComputedStyle::default();
+    if radio {
+        // Radios keep Chromium's user-agent margin even with appearance disabled.
+        style.margin_top = 3.0;
+        style.margin_right = 3.0;
+        style.margin_left = 5.0;
+    }
     if let Some((_, value)) = declarations
         .iter()
         .rev()

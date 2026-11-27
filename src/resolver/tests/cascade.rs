@@ -53,11 +53,10 @@ fn apply_display_sets_field() {
 }
 
 #[test]
-fn appearance_none_is_an_explicit_noop_for_ir_state() {
+fn appearance_none_is_tracked_as_a_source_reset() {
     let mut style = ComputedStyle::default();
-    let baseline = style.clone();
     apply_declaration(&mut style, "appearance", "none");
-    assert_eq!(style, baseline);
+    assert!(style.appearance_none);
 }
 
 #[test]

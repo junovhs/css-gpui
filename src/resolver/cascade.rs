@@ -86,9 +86,7 @@ pub(super) fn apply_with_lengths(
             }
         }
         "border" => expand_border(style, value, lengths),
-        // `appearance: none` is an accepted source-level reset. It has no IR
-        // field because controls are always emitted with the canonical reset.
-        "appearance" => {}
+        "appearance" => style.appearance_none = value == "none",
 
         // --- Position / layout longhands ---
         "position" => style.position = value.to_owned(),

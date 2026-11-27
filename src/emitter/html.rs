@@ -46,9 +46,19 @@ fn render_node(node: &IrNode, all_nodes: &[IrNode], depth: usize) -> String {
             }
             format!("{indent}<img class=\"{class}\" src=\"data:image/svg+xml,{uri}\" alt=\"\">")
         }
-        NodeKind::Box | NodeKind::Control => {
+        NodeKind::Box | NodeKind::Control | NodeKind::RadioLabel { .. } => {
             let tag = element_tag(node);
-            let class = &node.id;
+            let class = escape_attribute(&node.id);
+            if let Some(ControlKind::Radio(radio)) = node.control_kind.as_ref() {
+                let name = escape_attribute(&radio.name);
+                let value = radio.value.as_ref().map_or_else(String::new, |value| {
+                    format!(" value=\"{}\"", escape_attribute(value))
+                });
+                let checked = if radio.checked { " checked" } else { "" };
+                return format!(
+                    "{indent}<input type=\"radio\" class=\"{class}\" id=\"{class}\" name=\"{name}\"{value}{checked}>"
+                );
+            }
             if let Some(value) = node
                 .control_kind
                 .as_ref()
@@ -66,11 +76,15 @@ fn render_node(node: &IrNode, all_nodes: &[IrNode], depth: usize) -> String {
                     "{indent}<input type=\"text\" class=\"{class}\" placeholder=\"{placeholder}\"{value}>"
                 );
             }
+            let association = match &node.kind {
+                NodeKind::RadioLabel { target } => format!(" for=\"{}\"", escape_attribute(target)),
+                _ => String::new(),
+            };
             let inner = render_children(Some(&node.id), all_nodes, depth + 1);
             if inner.is_empty() {
-                format!("{indent}<{tag} class=\"{class}\"></{tag}>")
+                format!("{indent}<{tag} class=\"{class}\"{association}></{tag}>")
             } else {
-                format!("{indent}<{tag} class=\"{class}\">\n{inner}\n{indent}</{tag}>")
+                format!("{indent}<{tag} class=\"{class}\"{association}>\n{inner}\n{indent}</{tag}>")
             }
         }
     }
@@ -79,8 +93,13 @@ fn render_node(node: &IrNode, all_nodes: &[IrNode], depth: usize) -> String {
 fn element_tag(node: &IrNode) -> &'static str {
     match (&node.kind, &node.control_kind) {
         (NodeKind::Control, Some(ControlKind::Button)) => "button",
+        (NodeKind::RadioLabel { .. }, _) => "label",
         _ => "div",
     }
+}
+
+fn escape_attribute(value: &str) -> String {
+    escape_html(value).replace('"', "&quot;")
 }
 
 fn escape_html(s: &str) -> String {

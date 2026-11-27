@@ -12,6 +12,7 @@
 //! variant that can carry an authored text input value (ISS-29). Version 3
 //! adds optional flex wrapping (ISS-30). Version 4 adds text alignment (ISS-31).
 //! Version 5 adds letter spacing (ISS-32). Version 6 adds interaction paint (ISS-33).
+//! Version 7 adds named radios, explicit labels, and local checked paint (ISS-35).
 
 pub mod layout;
 pub mod paint;
@@ -81,6 +82,8 @@ pub enum NodeKind {
     Control,
     /// A standalone SVG leaf with its original vector markup.
     Svg(String),
+    /// An explicit label that activates the radio with the given IR node id.
+    RadioLabel { target: String },
 }
 
 /// Specific kind of a native UI control node.
@@ -90,6 +93,7 @@ pub enum ControlKind {
     Button,
     TextInput,
     TextInputWithValue(String),
+    Radio(RadioControl),
 }
 
 impl ControlKind {
@@ -98,9 +102,23 @@ impl ControlKind {
         match self {
             Self::TextInput => Some(""),
             Self::TextInputWithValue(value) => Some(value),
-            Self::Button => None,
+            Self::Button | Self::Radio(_) => None,
         }
     }
+}
+
+/// A document-owned radio option and its resolved paint while checked.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RadioControl {
+    /// Nonempty document-wide group name.
+    pub name: String,
+    /// Authored value, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+    /// Effective checkedness when the scene first renders.
+    pub checked: bool,
+    #[serde(default, skip_serializing_if = "paint::StatePaint::is_empty")]
+    pub checked_paint: paint::StatePaint,
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +169,7 @@ pub struct IrNode {
 pub struct SceneIr {
     /// Version `1` for the original schema, `2` for authored text input values,
     /// `3` for explicit flex wrapping, `4` for text alignment, `5` for letter spacing,
-    /// and `6` for hover and focus paint.
+    /// `6` for hover and focus paint, and `7` for radios and checked paint.
     pub schema_version: u32,
     /// Matches the `id` field in `manifest.toml`, e.g. `"profile_card_absolute"`.
     pub scene_id: String,

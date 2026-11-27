@@ -1,6 +1,9 @@
 use crate::extractor::{INVISIBLE_TAGS, TRANSPARENT_TAGS, control_kind};
 use crate::ir::paint::{Color, StatePaint};
-use crate::{HtmlNode, HtmlNodeKind};
+use crate::{
+    HtmlNode, HtmlNodeKind,
+    radio::{RadioMarkup, is_checkable, is_radio},
+};
 
 use super::ComputedStyle;
 use super::selector::{Selector, Specificity};
@@ -10,11 +13,13 @@ pub(crate) enum Interaction {
     Hover,
     Focus,
     HoverFocus,
+    Checked,
 }
 
 impl Interaction {
     pub(super) fn allows(self, requirement: Self) -> bool {
-        self == requirement || self == Self::HoverFocus
+        self == requirement
+            || (self == Self::HoverFocus && matches!(requirement, Self::Hover | Self::Focus))
     }
 }
 
@@ -33,6 +38,8 @@ impl<'a> StateSelector<'a> {
             (element, Interaction::HoverFocus)
         } else if let Some(element) = text.strip_suffix(":hover") {
             (element, Interaction::Hover)
+        } else if let Some(element) = text.strip_suffix(":checked") {
+            (element, Interaction::Checked)
         } else {
             (text.strip_suffix(":focus")?, Interaction::Focus)
         };
@@ -41,11 +48,15 @@ impl<'a> StateSelector<'a> {
             return None;
         }
         let element = Selector::parse(if element.is_empty() { "*" } else { element })?;
+        if state == Interaction::Checked && !element.is_compound() {
+            return None;
+        }
         Some(Self { element, state })
     }
 
     pub(crate) fn matches(&self, node: &HtmlNode, nodes: &[HtmlNode]) -> bool {
-        self.element.matches(node, nodes)
+        (self.state != Interaction::Checked || is_checkable(node))
+            && self.element.matches(node, nodes)
     }
 
     pub(super) fn specificity(&self) -> Specificity {
@@ -58,7 +69,18 @@ impl<'a> StateSelector<'a> {
         specificity
     }
 
-    pub(crate) fn supports_element(&self, node: &HtmlNode, nodes: &[HtmlNode]) -> bool {
+    pub(crate) fn supports_element(
+        &self,
+        node: &HtmlNode,
+        nodes: &[HtmlNode],
+        radios: &RadioMarkup<'_>,
+    ) -> bool {
+        if self.state == Interaction::Checked {
+            return radios.radios.contains_key(&node.id);
+        }
+        if is_radio(node) {
+            return false;
+        }
         let ancestors = std::iter::successors(Some(node), |node| {
             node.parent_id.and_then(|id| nodes.get(id))
         });

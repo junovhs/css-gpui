@@ -9,6 +9,7 @@ mod tests;
 
 use crate::extractor::{control_kind, input_type, unsupported_text_input_attribute};
 use crate::ir::{FlexWrap, TextAlign};
+use crate::radio::RadioMarkup;
 use crate::resolver::{
     cascade::{split_important, supports_letter_spacing},
     interaction::{
@@ -59,8 +60,9 @@ pub struct Diagnostic {
 pub fn analyze(graph: &SceneSourceGraph) -> Vec<Diagnostic> {
     let mut out: Vec<Diagnostic> = Vec::new();
     let mut has_state_rules = false;
+    let radios = RadioMarkup::new(&graph.html_nodes);
     for rule in &graph.css_rules {
-        has_state_rules |= analyze_rule(rule, graph, &mut out);
+        has_state_rules |= analyze_rule(rule, graph, &radios, &mut out);
     }
     if has_state_rules {
         for (source, loss) in state_value_losses(graph) {
@@ -102,13 +104,32 @@ pub fn form_control_losses(graph: &SceneSourceGraph) -> impl Iterator<Item = For
         .iter()
         .flat_map(|rule| &rule.selectors)
         .any(|selector| {
-            StateSelector::parse(selector)
-                .is_some_and(|selector| selector.state != Interaction::Hover)
+            StateSelector::parse(selector).is_some_and(|selector| {
+                matches!(selector.state, Interaction::Focus | Interaction::HoverFocus)
+            })
         });
+    let radios = RadioMarkup::new(&graph.html_nodes);
+    let missing_appearance: std::collections::HashSet<_> = if radios.radios.is_empty() {
+        Default::default()
+    } else {
+        crate::resolver::resolve_scene(graph)
+            .into_iter()
+            .flat_map(|scene| scene.nodes)
+            .filter(|node| radios.radios.contains_key(&node.node.id) && !node.style.appearance_none)
+            .map(|node| node.node.id)
+            .collect()
+    };
     graph.html_nodes.iter().filter_map(move |node| {
         let tag = node.name.as_deref()?;
         let range = node.start_tag_range.as_ref()?;
-        let element = if control_kind(node).is_some() {
+        let element = if let Some(reason) = radios.losses.get(&node.id) {
+            format!("<{tag}> ({reason})")
+        } else if radios.radios.contains_key(&node.id) {
+            if !missing_appearance.contains(&node.id) {
+                return None;
+            }
+            format!("<{tag} type=radio> (requires appearance: none)")
+        } else if control_kind(node).is_some() {
             if !uses_focus {
                 return None;
             }
@@ -146,13 +167,18 @@ pub fn form_control_losses(graph: &SceneSourceGraph) -> impl Iterator<Item = For
 // Per-rule analysis
 // ---------------------------------------------------------------------------
 
-fn analyze_rule(rule: &CssRule, graph: &SceneSourceGraph, out: &mut Vec<Diagnostic>) -> bool {
+fn analyze_rule(
+    rule: &CssRule,
+    graph: &SceneSourceGraph,
+    radios: &RadioMarkup<'_>,
+    out: &mut Vec<Diagnostic>,
+) -> bool {
     let mut has_state = false;
     let mut has_other_selector = false;
     for selector in &rule.selectors {
         if let Some(state) = StateSelector::parse(selector) {
             has_state = true;
-            analyze_state_selector(rule, selector, &state, graph, out);
+            analyze_state_selector(rule, selector, &state, &graph.html_nodes, radios, out);
             continue;
         }
         has_other_selector = true;
@@ -215,14 +241,14 @@ fn analyze_state_selector(
     rule: &CssRule,
     selector: &str,
     state: &StateSelector<'_>,
-    graph: &SceneSourceGraph,
+    nodes: &[crate::HtmlNode],
+    radios: &RadioMarkup<'_>,
     out: &mut Vec<Diagnostic>,
 ) {
-    let nodes = &graph.html_nodes;
     let matching = nodes.iter().filter(|node| state.matches(node, nodes));
     if matching
         .clone()
-        .any(|node| !state.supports_element(node, nodes))
+        .any(|node| !state.supports_element(node, nodes, radios))
     {
         out.push(Diagnostic {
             kind: DiagnosticKind::UnsupportedSelector,
@@ -236,7 +262,7 @@ fn analyze_state_selector(
         });
     }
 
-    let mut applicable = matching.filter(|node| state.supports_element(node, nodes));
+    let mut applicable = matching.filter(|node| state.supports_element(node, nodes, radios));
     let has_applicable_elements = applicable.clone().next().is_some();
     let has_element_children = applicable.any(|node| has_element_children(node, nodes));
     for declaration in &rule.declarations {
@@ -244,7 +270,7 @@ fn analyze_state_selector(
         let (kind, message) = if !supports_state_property(&declaration.property) {
             (
                 DiagnosticKind::UnsupportedProperty,
-                "this property cannot change on hover or focus",
+                "this property cannot change with interactive state",
             )
         } else if declaration.property == "color" && has_element_children {
             (

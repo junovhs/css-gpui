@@ -12,11 +12,12 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 
 use crate::ir::{
-    BoxSizing, ControlKind, ExecutionMode, IrNode, LineHeight, NodeKind, SceneIr, SourceRef,
+    BoxSizing, ControlKind, ExecutionMode, IrNode, LineHeight, NodeKind, RadioControl, SceneIr,
+    SourceRef,
 };
 use crate::layout::{LaidOutNode, LaidOutScene};
 use crate::source_graph::SceneSourceGraph;
-use crate::{HtmlNode, HtmlNodeKind};
+use crate::{HtmlNode, HtmlNodeKind, radio::RadioMarkup};
 
 /// Tags that are invisible structural boilerplate — skipped entirely along
 /// with all of their descendants.
@@ -67,6 +68,7 @@ pub fn extract_ir(
     let node_map: HashMap<usize, &LaidOutNode> =
         laid_out.nodes.iter().map(|n| (n.node.id, n)).collect();
 
+    let radio_markup = RadioMarkup::new(&graph.html_nodes);
     let mut skipped_ids: HashSet<usize> = HashSet::new();
     let mut html_to_ir_id: HashMap<usize, String> = HashMap::new();
     let mut ir_nodes: Vec<IrNode> = Vec::new();
@@ -86,6 +88,7 @@ pub fn extract_ir(
                     html_node,
                     &graph.html_nodes,
                     &node_map,
+                    &radio_markup,
                     &mut html_to_ir_id,
                     &mut ir_nodes,
                     &mut skipped_ids,
@@ -105,8 +108,26 @@ pub fn extract_ir(
         }
     }
 
+    for (label, target) in &radio_markup.labels {
+        if let (Some(label_id), Some(target_id)) =
+            (html_to_ir_id.get(label), html_to_ir_id.get(target))
+        {
+            let label = ir_nodes.iter_mut().find(|node| &node.id == label_id);
+            if let Some(label) = label {
+                label.kind = NodeKind::RadioLabel {
+                    target: target_id.clone(),
+                };
+            }
+        }
+    }
+
     Ok(SceneIr {
-        schema_version: if ir_nodes.iter().any(|node| node.paint.interaction.is_some()) {
+        schema_version: if ir_nodes
+            .iter()
+            .any(|node| matches!(node.control_kind, Some(ControlKind::Radio(_))))
+        {
+            7
+        } else if ir_nodes.iter().any(|node| node.paint.interaction.is_some()) {
             6
         } else if ir_nodes.iter().any(|node| node.letter_spacing.is_some()) {
             5
@@ -141,6 +162,7 @@ fn process_element(
     html_node: &HtmlNode,
     html_nodes: &[HtmlNode],
     node_map: &HashMap<usize, &LaidOutNode>,
+    radio_markup: &RadioMarkup<'_>,
     html_to_ir_id: &mut HashMap<usize, String>,
     ir_nodes: &mut Vec<IrNode>,
     skipped_ids: &mut HashSet<usize>,
@@ -174,7 +196,16 @@ fn process_element(
         .and_then(|pid| html_to_ir_id.get(&pid))
         .cloned();
 
-    let control_kind = control_kind(html_node);
+    let control_kind = if let Some(&name) = radio_markup.radios.get(&html_node.id) {
+        Some(ControlKind::Radio(RadioControl {
+            name: name.to_owned(),
+            value: input_attribute(html_node, "value").map(str::to_owned),
+            checked: radio_markup.initial.get(name) == Some(&html_node.id),
+            checked_paint: lo.style.checked_paint.clone(),
+        }))
+    } else {
+        control_kind(html_node)
+    };
     let mut kind = if control_kind.is_some() {
         NodeKind::Control
     } else {
@@ -406,7 +437,7 @@ pub(crate) fn input_type(node: &HtmlNode) -> Option<&str> {
     input_attribute(node, "type")
 }
 
-fn input_attribute<'a>(node: &'a HtmlNode, name: &str) -> Option<&'a str> {
+pub(crate) fn input_attribute<'a>(node: &'a HtmlNode, name: &str) -> Option<&'a str> {
     node.attributes
         .iter()
         .find(|(key, _)| key.eq_ignore_ascii_case(name))

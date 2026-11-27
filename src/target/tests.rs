@@ -241,6 +241,7 @@ fn scene_capabilities_reports_every_required_family() {
                 Capability::SvgArtwork
                     | Capability::GridLayout
                     | Capability::TextInputControl
+                    | Capability::RadioControl
                     | Capability::LetterSpacing
                     | Capability::InteractionPaint
             ))
@@ -343,6 +344,7 @@ fn expected_conformance_strips_provenance_and_round_trips_through_json() {
                 Capability::SvgArtwork
                     | Capability::GridLayout
                     | Capability::TextInputControl
+                    | Capability::RadioControl
                     | Capability::LetterSpacing
                     | Capability::InteractionPaint
             ))

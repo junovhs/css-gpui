@@ -6,13 +6,16 @@ use crate::ir::layout::{
 };
 use crate::ir::paint::{Paint, StatePaint};
 use crate::ir::typography::{LineHeight, Typography};
-use crate::ir::{IrNode, LetterSpacing, NodeKind};
+use crate::ir::{ControlKind, IrNode, LetterSpacing, NodeKind};
 
 /// Emit a complete `<style>` block for all non-Text nodes in `nodes`.
 pub fn build_css(nodes: &[IrNode]) -> String {
     let mut rules = vec!["body {\n  margin: 0;\n}".to_owned()];
     for node in nodes.iter().filter(|node| node.kind != NodeKind::Text) {
         rules.extend(emit_rule(node));
+        if let Some(ControlKind::Radio(radio)) = node.control_kind.as_ref() {
+            rules.extend(emit_state_rule(node, ":checked", &radio.checked_paint));
+        }
         if let Some(interaction) = node.paint.interaction.as_ref() {
             rules.extend(emit_state_rule(node, ":hover", &interaction.hover));
             rules.extend(emit_state_rule(node, ":focus", &interaction.focus));
@@ -37,12 +40,24 @@ fn emit_rule(node: &IrNode) -> Option<String> {
     // inset borders, and text-baseline drift on round-trip.
     if node.kind == NodeKind::Control {
         decls.push("appearance: none".to_owned());
+        if matches!(node.control_kind, Some(ControlKind::Radio(_)))
+            && node.layout.margin == EdgeInset::zero()
+        {
+            decls.push("margin: 0".to_owned());
+        }
         if node.paint.border.is_none() {
             decls.push("border: 0".to_owned());
         }
         if node.layout.padding == EdgeInset::zero() {
             decls.push("padding: 0".to_owned());
         }
+    }
+    // Radio inputs and labels do not default to block flow in the browser.
+    if node.layout.display == Display::Block
+        && (matches!(node.control_kind, Some(ControlKind::Radio(_)))
+            || matches!(node.kind, NodeKind::RadioLabel { .. }))
+    {
+        decls.push("display: block".to_owned());
     }
     decls.extend(layout_decls(&node.layout));
     decls.extend(paint_decls(&node.paint));
