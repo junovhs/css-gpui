@@ -200,6 +200,12 @@ pub fn parse_px(value: &str) -> Option<f32> {
 /// Convert supported solid CSS colors into hex, including optional alpha.
 pub fn parse_color(value: &str) -> Option<String> {
     let value = value.trim();
+    if value.eq_ignore_ascii_case("white") {
+        return Some("#ffffff".to_owned());
+    }
+    if value.eq_ignore_ascii_case("black") {
+        return Some("#000000".to_owned());
+    }
     if let Some(hex) = value.strip_prefix('#') {
         return (matches!(hex.len(), 3 | 4 | 6 | 8)
             && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))

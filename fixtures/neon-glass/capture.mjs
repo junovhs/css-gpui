@@ -4,9 +4,11 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 
-const [playwrightRoot, outputPath, mode] = process.argv.slice(2);
-const recordEffects = mode === "--effects";
-assert(playwrightRoot && outputPath && (!mode || recordEffects), 'Usage: node capture.mjs <Playwright installation directory> <output directory> [--effects]');
+const [playwrightRoot, outputPath, ...flags] = process.argv.slice(2);
+const nativeFonts = flags.includes('--native');
+const recordEffects = flags.includes('--effects') || nativeFonts;
+assert(playwrightRoot && outputPath && flags.every((flag) => ['--effects', '--native'].includes(flag)),
+    'Usage: node capture.mjs <Playwright installation directory> <output directory> [--effects|--native]');
 const require = createRequire(resolve(playwrightRoot, 'package.json'));
 const { chromium } = require('playwright');
 assert.equal(require('playwright/package.json').version, '1.60.0');
@@ -126,7 +128,11 @@ try {
                 return [name, [x, y, width, height]];
             }));
         });
-        geometry.push({ ...viewport, boxes });
+        const rows = await page.locator('#menu li').evaluateAll((elements) => elements.map((element) => {
+            const { x, y, width, height } = element.getBoundingClientRect();
+            return { label: element.textContent.trim(), bounds: [x, y, width, height] };
+        }));
+        geometry.push({ ...viewport, boxes, rows });
         const menu = page.locator('#menu');
         const row = menu.getByText('Calculator', { exact: true });
         const positions = [
@@ -221,6 +227,17 @@ try {
             await writeFile(resolve(output, file), (await resources.get(url)).body);
         }
         await writeFile(resolve(output, 'effects.json'), JSON.stringify(effects, null, 2) + '\n');
+    }
+    if (nativeFonts) {
+        assert.equal(require('wawoff2/package.json').version, '2.0.1');
+        const { decompress } = require('wawoff2');
+        const fonts = resolve(output, 'fonts');
+        await mkdir(fonts, { recursive: true });
+        for (const url of Object.keys(reference.assets).filter((url) => url.endsWith('.woff2'))) {
+            const { body } = resources.has(url) ? await resources.get(url) : await fetchResource(url);
+            const file = url.split('/').at(-1).replace(/\.woff2$/, '.ttf');
+            await writeFile(resolve(fonts, file), await decompress(body));
+        }
     }
     await writeFile(resolve(output, 'frames.json'), JSON.stringify({
         platform: process.platform, chromium: chromiumVersion, sourceSha256: sha256(source), frames,

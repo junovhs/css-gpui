@@ -41,11 +41,7 @@ pub fn layers(value: &str) -> impl Iterator<Item = &str> {
 }
 
 pub fn rgba(value: &str) -> Option<[u8; 4]> {
-    let normalized = match value {
-        "black" => "#000".to_owned(),
-        "white" => "#fff".to_owned(),
-        _ => parse_color(value)?,
-    };
+    let normalized = parse_color(value)?;
     let mut result = [0, 0, 0, 255];
     let hex = normalized.strip_prefix('#')?;
     match hex.len() {
@@ -115,7 +111,10 @@ impl Gradient {
         let mut parsed: Vec<_> = parts
             .into_iter()
             .map(|part| split_stop(part, conic))
-            .collect::<Option<_>>()?;
+            .collect::<Option<Vec<_>>>()?
+            .into_iter()
+            .flatten()
+            .collect();
         parsed.first_mut()?.0.get_or_insert(0.0);
         parsed.last_mut()?.0.get_or_insert(1.0);
         let mut start = 0;
@@ -197,29 +196,38 @@ impl Gradient {
     }
 }
 
-fn split_stop(input: &str, conic: bool) -> Option<(Option<f32>, [u8; 4])> {
+type Stop = (Option<f32>, [u8; 4]);
+
+fn split_stop(input: &str, conic: bool) -> Option<Vec<Stop>> {
     let end = if let Some(end) = input.find(')') {
         end + 1
     } else {
         input.find(char::is_whitespace).unwrap_or(input.len())
     };
     let color = rgba(&input[..end])?;
-    let position = input[end..].trim();
-    let position = match position {
-        "" => None,
-        "0" => Some(0.0),
-        _ => Some(if let Some(percentage) = position.strip_suffix('%') {
-            percentage.parse::<f32>().ok()? / 100.0
-        } else if conic {
-            degrees(position)? / 360.0
-        } else {
+    let mut stops = Vec::new();
+    for position in input[end..].split_ascii_whitespace() {
+        let position = match position {
+            "0" => 0.0,
+            _ => {
+                if let Some(percentage) = position.strip_suffix('%') {
+                    percentage.parse::<f32>().ok()? / 100.0
+                } else if conic {
+                    degrees(position)? / 360.0
+                } else {
+                    return None;
+                }
+            }
+        };
+        if !position.is_finite() || stops.len() == 2 {
             return None;
-        }),
-    };
-    if position.is_some_and(|value| !value.is_finite()) {
-        return None;
+        }
+        stops.push((Some(position), color));
     }
-    Some((position, color))
+    if stops.is_empty() {
+        stops.push((None, color));
+    }
+    Some(stops)
 }
 
 fn degrees(input: &str) -> Option<f32> {

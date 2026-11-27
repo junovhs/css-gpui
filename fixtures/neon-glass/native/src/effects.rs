@@ -19,17 +19,12 @@ struct Asset {
 }
 
 impl Asset {
-    fn load(directory: &Path, url: &str) -> Result<Self, Box<dyn Error>> {
-        let file = url.rsplit('/').next().ok_or("invalid asset URL")?;
-        if file.is_empty() || file == "." || file == ".." || file.contains('\\') {
-            return Err("invalid asset name".into());
-        }
-        let image = image::open(directory.join(file))?.into_rgba8();
-        Ok(Self {
+    fn load(url: &str, image: RgbaImage) -> Self {
+        Self {
             url: url.to_owned(),
             dimensions: image.dimensions(),
             pixels: image.pixels().map(|pixel| pixel.0).collect(),
-        })
+        }
     }
 
     fn image(&self) -> ImagePixels<'_> {
@@ -57,8 +52,33 @@ pub struct CompositedFrame {
     pub glow_layers: usize,
 }
 
+pub struct PreparedBackdrop {
+    dimensions: (u32, u32),
+    pixels: Vec<[u8; 4]>,
+    blur: Backdrop,
+}
+
+impl PreparedBackdrop {
+    pub fn stage(&self) -> RgbaImage {
+        rgba_image(self.dimensions.0, self.dimensions.1, &self.pixels)
+    }
+}
+
 impl GlassComposer {
     pub fn load(scene: SceneIr, assets: &Path) -> Result<Self, Box<dyn Error>> {
+        Self::from_images(scene, |url| {
+            let file = url.rsplit('/').next().ok_or("invalid asset URL")?;
+            if file.is_empty() || file == "." || file == ".." || file.contains('\\') {
+                return Err("invalid asset name".into());
+            }
+            Ok(image::open(assets.join(file))?.into_rgba8())
+        })
+    }
+
+    pub fn from_images(
+        scene: SceneIr,
+        decode: impl Fn(&str) -> Result<RgbaImage, Box<dyn Error>>,
+    ) -> Result<Self, Box<dyn Error>> {
         let body = scene
             .canvas
             .as_ref()
@@ -83,7 +103,7 @@ impl GlassComposer {
         let photo_url = background_image_urls(body)
             .next()
             .ok_or("scene is missing its background image")?;
-        let photo = Asset::load(assets, photo_url)?;
+        let photo = Asset::load(photo_url, decode(photo_url)?);
         let noise_url = scene
             .nodes
             .iter()
@@ -97,7 +117,7 @@ impl GlassComposer {
                 )
             })
             .ok_or("scene is missing the luminance mask")?;
-        let noise = Asset::load(assets, noise_url)?;
+        let noise = Asset::load(noise_url, decode(noise_url)?);
         Ok(Self {
             scene,
             panel_index,
@@ -114,20 +134,44 @@ impl GlassComposer {
         panel: Rect,
         offset: (f32, f32),
     ) -> Result<CompositedFrame, String> {
+        let prepared = self.prepare(dimensions, offset)?;
+        self.rasterize_prepared(&prepared, panel)
+    }
+
+    pub fn prepare(
+        &self,
+        dimensions: (u32, u32),
+        offset: (f32, f32),
+    ) -> Result<PreparedBackdrop, String> {
         let (width, height) = dimensions;
         let body = self.scene.canvas.as_ref().unwrap();
-        let menu = &self.scene.nodes[self.panel_index];
-        let radius = menu.paint.border_radius.unwrap_or(0.0);
-        let backdrop = Background::new(
+        let background = Background::new(
             body,
             |url| (url == self.photo.url).then(|| self.photo.image()),
             offset,
         )?;
+        let pixels = background.rasterize(width, height);
+        let blur = Backdrop::new(width, height, &pixels, self.blur)
+            .ok_or("invalid backdrop dimensions")?;
+        Ok(PreparedBackdrop {
+            dimensions,
+            pixels,
+            blur,
+        })
+    }
+
+    pub fn rasterize_prepared(
+        &self,
+        prepared: &PreparedBackdrop,
+        panel: Rect,
+    ) -> Result<CompositedFrame, String> {
+        let dimensions = prepared.dimensions;
+        let (width, height) = dimensions;
+        let menu = &self.scene.nodes[self.panel_index];
+        let radius = menu.paint.border_radius.unwrap_or(0.0);
         let foreground = Background::new(&menu.paint, |_| None, (0.0, 0.0))?;
-        let mut frame = backdrop.rasterize(width, height);
-        let stage = rgba_image(width, height, &frame);
-        let blur =
-            Backdrop::new(width, height, &frame, self.blur).ok_or("invalid backdrop dimensions")?;
+        let mut frame = prepared.pixels.clone();
+        let stage = prepared.stage();
         for shadow in self.shadows.iter().rev() {
             shadow.paint(&mut frame, width, height, panel, radius);
         }
@@ -136,7 +180,7 @@ impl GlassComposer {
             .border
             .as_ref()
             .and_then(|border| Some((border.width, rgba(&border.color.0)?)));
-        let glass = composite_surface(&blur, panel, radius, |x, y, w, h| {
+        let glass = composite_surface(&prepared.blur, panel, radius, |x, y, w, h| {
             let tint = foreground.sample(x, y, w, h);
             let Some((width, border)) = border else {
                 return tint;

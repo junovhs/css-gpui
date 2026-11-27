@@ -84,6 +84,25 @@ node fixtures/neon-glass/backdrop-reference.mjs $browser $env:NEON_BACKDROP_REFE
 cargo test --locked --test backdrop -- --include-ignored --nocapture
 ```
 
+## Run the standalone native menu
+
+Prepare the verified assets and OpenType fonts, then build and run:
+
+```powershell
+npm.cmd install --prefix $browser --no-audit --no-fund --save-exact wawoff2@2.0.1
+node fixtures/neon-glass/capture.mjs $browser $frames --native
+$env:NEON_GLASS_REFERENCE = $frames
+cargo run --locked --manifest-path fixtures/neon-glass/native/Cargo.toml --features interactive --example menu
+```
+
+The build embeds the authored image, noise mask, compiled scene and the pinned font subsets. The capture converts the verified WOFF2 bytes to OpenType using [wawoff2](https://github.com/fontello/wawoff2). The resulting executable runs with Chromium closed and with no capture directory or environment variable at runtime. Pass `-- 90` to start with the shifted backdrop. Right-click outside the menu to move or open it, move over a row to highlight it, and left-click outside to close it.
+
+The native replay checks the generated Calculator bounds, viewport clamping, row hover and selection, the 200 ms selection reset, the 250 ms opacity transition, and the 500 ms close visibility delay. It exercises the two comparison backdrops and the narrow window. On Windows, the stage uses normal-width Asap because GPUI's DirectWrite font lookup requests normal stretch. The menu itself uses the pinned Asap face. The search field is a static preview. The demo reproduces the pointer sequence and settled effects. It approximates the source's flash and filter animation and omits live hue sliders and editing.
+
+```powershell
+cargo test --locked --manifest-path fixtures/neon-glass/native/Cargo.toml --features interactive --all-targets -- --include-ignored
+```
+
 ## Input inventory
 
 - HTML uses a stage with header and hue controls and a fixed menu aside. The menu has six decorative shine and glow spans, a search label and text input, and two sections of focusable list rows separated by a rule.

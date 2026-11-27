@@ -1,4 +1,6 @@
 pub mod effects;
+#[cfg(feature = "interactive")]
+pub mod menu;
 
 #[cfg(test)]
 mod geometry {

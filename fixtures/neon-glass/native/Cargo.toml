@@ -4,6 +4,13 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 
+[features]
+interactive = []
+
+[[example]]
+name = "menu"
+required-features = ["interactive"]
+
 [dependencies]
 css-gpui = { path = "../../.." }
 image = { version = "=0.25.10", default-features = false, features = ["jpeg", "png"] }
