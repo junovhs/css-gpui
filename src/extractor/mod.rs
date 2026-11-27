@@ -106,7 +106,9 @@ pub fn extract_ir(
     }
 
     Ok(SceneIr {
-        schema_version: if ir_nodes.iter().any(|node| node.layout.flex_wrap.is_some()) {
+        schema_version: if ir_nodes.iter().any(|node| node.layout.text_align.is_some()) {
+            4
+        } else if ir_nodes.iter().any(|node| node.layout.flex_wrap.is_some()) {
             3
         } else if ir_nodes
             .iter()

@@ -62,6 +62,44 @@ impl FlexWrap {
     }
 }
 
+/// Horizontal alignment of inline content within its containing block.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TextAlign {
+    Start,
+    Center,
+    End,
+    Left,
+    Right,
+}
+
+impl TextAlign {
+    pub(crate) fn from_css_keyword(value: &str) -> Option<Self> {
+        if value.eq_ignore_ascii_case("initial") {
+            return Some(Self::Start);
+        }
+        [
+            Self::Start,
+            Self::Center,
+            Self::End,
+            Self::Left,
+            Self::Right,
+        ]
+        .into_iter()
+        .find(|variant| value.eq_ignore_ascii_case(variant.css_keyword()))
+    }
+
+    pub(crate) fn css_keyword(self) -> &'static str {
+        match self {
+            Self::Start => "start",
+            Self::Center => "center",
+            Self::End => "end",
+            Self::Left => "left",
+            Self::Right => "right",
+        }
+    }
+}
+
 /// CSS `align-items` value supported in v0.1.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -176,6 +214,9 @@ pub struct Layout {
     /// Authored line wrapping. An omitted value uses the CSS initial value `nowrap`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub flex_wrap: Option<FlexWrap>,
+    /// Computed CSS text alignment, including values inherited from ancestors.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_align: Option<TextAlign>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub align_items: Option<AlignItems>,
     #[serde(skip_serializing_if = "Option::is_none")]

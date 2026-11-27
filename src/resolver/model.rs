@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::ir::{FlexWrap, paint::Decoration};
+use crate::ir::{FlexWrap, TextAlign, paint::Decoration};
 
 /// Fully resolved CSS properties for a single HTML element node in the v0.1 subset.
 ///
@@ -63,6 +63,7 @@ pub struct ComputedStyle {
     pub font_weight: Option<u16>,
     /// Raw CSS `line-height` value, e.g. `"normal"` or `"24px"`.
     pub line_height: Option<String>,
+    pub text_align: Option<TextAlign>,
 }
 
 impl Default for ComputedStyle {
@@ -106,6 +107,7 @@ impl Default for ComputedStyle {
             font_size: None,
             font_weight: None,
             line_height: None,
+            text_align: None,
         }
     }
 }

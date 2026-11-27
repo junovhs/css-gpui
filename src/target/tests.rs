@@ -35,6 +35,7 @@ fn base_layout() -> Layout {
         padding: EdgeInset::zero(),
         flex_direction: None,
         flex_wrap: None,
+        text_align: None,
         align_items: None,
         justify_content: None,
         align_self: None,

@@ -173,6 +173,88 @@ fn flex_wrap_survives_scene_json_and_both_targets() -> Result<(), Box<dyn std::e
     Ok(())
 }
 
+#[test]
+fn text_alignment_survives_scene_json_and_both_targets() -> Result<(), Box<dyn std::error::Error>> {
+    use crate::target::{TargetEmitter, gpui::GpuiTarget};
+
+    let compile = |html, css| -> Result<SceneIr, Box<dyn std::error::Error>> {
+        let graph = crate::SceneSourceGraph::from_strings("text-align", html, css)?;
+        assert!(crate::diagnostics::analyze(&graph).is_empty());
+        let resolved = resolve_scene(&graph)?;
+        Ok(extract_ir(&compute_layout(&resolved), &graph)?)
+    };
+    let html = r#"<html><body><main><div class="inherit">Inherited</div><div class="start">Start</div><div class="end">End</div><div class="left">Left</div><div class="right">Right</div></main></body></html>"#;
+    let scene = compile(
+        html,
+        r#"
+            body { text-align: CENTER; }
+            .inherit { text-align: right; text-align: inherit; }
+            .start { text-align: initial; }
+            .end { text-align: end; }
+            .left { text-align: left; }
+            .right { text-align: right; }
+        "#,
+    )?;
+    assert_eq!(scene.schema_version, 4);
+    let json = scene.to_json()?;
+    let serialized: serde_json::Value = serde_json::from_str(&json)?;
+    let values: Vec<_> = serialized["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|node| node["kind"] == "box")
+        .map(|node| node["layout"]["text_align"].as_str())
+        .collect();
+    assert_eq!(
+        values,
+        [
+            Some("center"),
+            Some("center"),
+            Some("start"),
+            Some("end"),
+            Some("left"),
+            Some("right"),
+        ]
+    );
+    let restored = SceneIr::from_json(&json)?;
+    let emitted = crate::emitter::emit(&restored);
+    let reparsed = compile(&emitted.html, &emitted.css)?;
+    assert_eq!(
+        reparsed
+            .nodes
+            .iter()
+            .map(|node| &node.layout)
+            .collect::<Vec<_>>(),
+        restored
+            .nodes
+            .iter()
+            .map(|node| &node.layout)
+            .collect::<Vec<_>>(),
+    );
+
+    let native = GpuiTarget.emit(&restored);
+    assert!(native.declared_loss.is_empty());
+    for builder in [".text_center()", ".text_left()", ".text_right()"] {
+        assert!(native.artifact.contains(builder), "{builder}");
+    }
+
+    let legacy = compile(html, "")?;
+    assert_eq!(legacy.schema_version, 1);
+    assert!(!legacy.to_json()?.contains("\"text_align\""));
+    assert_eq!(SceneIr::from_json(&legacy.to_json()?)?, legacy);
+
+    let invalid = crate::SceneSourceGraph::from_strings(
+        "unsupported-text-align",
+        "<div>Text</div>",
+        "div { text-align: justify; }",
+    )?;
+    let losses = crate::diagnostics::analyze(&invalid);
+    assert!(matches!(losses.as_slice(), [loss]
+        if loss.kind == crate::diagnostics::DiagnosticKind::UnsupportedValue
+            && loss.property.as_deref() == Some("text-align")));
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Text nodes
 // ---------------------------------------------------------------------------

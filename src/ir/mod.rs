@@ -10,7 +10,7 @@
 //!
 //! Version 1 scenes keep their original format. Version 2 adds a control
 //! variant that can carry an authored text input value (ISS-29). Version 3
-//! adds optional flex wrapping (ISS-30).
+//! adds optional flex wrapping (ISS-30). Version 4 adds text alignment (ISS-31).
 
 pub mod layout;
 pub mod paint;
@@ -18,7 +18,7 @@ pub mod typography;
 
 pub use layout::{
     AlignItems, AlignSelf, BoxSizing, Cursor, Display, EdgeInset, FlexDirection, FlexWrap,
-    JustifyContent, Layout, Position,
+    JustifyContent, Layout, Position, TextAlign,
 };
 pub use paint::{Border, Color, Paint};
 pub use typography::{LineHeight, Typography};
@@ -146,7 +146,7 @@ pub struct IrNode {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SceneIr {
     /// Version `1` for the original schema, `2` for authored text input values,
-    /// and `3` for explicit flex wrapping.
+    /// `3` for explicit flex wrapping, and `4` for text alignment.
     pub schema_version: u32,
     /// Matches the `id` field in `manifest.toml`, e.g. `"profile_card_absolute"`.
     pub scene_id: String,

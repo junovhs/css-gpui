@@ -1,4 +1,4 @@
-use crate::ir::FlexWrap;
+use crate::ir::{FlexWrap, TextAlign};
 
 use super::model::ComputedStyle;
 use super::values::{LengthContext, value_parts};
@@ -6,8 +6,8 @@ use super::values::{LengthContext, value_parts};
 /// Apply a single CSS declaration to `style`, expanding shorthands in place.
 ///
 /// Unknown or unsupported properties are silently ignored; diagnostics are
-/// the responsibility of `DIA-01`. The `inherit` keyword is skipped here
-/// and handled by the inheritance pass in `resolve_scene`.
+/// the responsibility of `DIA-01`. Text alignment defers `inherit` and
+/// `unset` to the inheritance pass in `resolve_scene`.
 #[cfg(test)]
 pub fn apply_declaration(style: &mut ComputedStyle, property: &str, value: &str) {
     apply_with_lengths(style, property, value, LengthContext::default());
@@ -20,7 +20,7 @@ pub(super) fn apply_with_lengths(
     lengths: LengthContext,
 ) {
     let value = value.trim();
-    if value == "inherit" {
+    if value == "inherit" && property != "text-align" {
         return;
     }
 
@@ -155,6 +155,13 @@ pub(super) fn apply_with_lengths(
                 _ => value.parse::<u16>().ok(),
             }
         }
+        "text-align" => {
+            if value.eq_ignore_ascii_case("inherit") || value.eq_ignore_ascii_case("unset") {
+                style.text_align = None;
+            } else if let Some(alignment) = TextAlign::from_css_keyword(value) {
+                style.text_align = Some(alignment);
+            }
+        }
         "line-height" => {
             style.line_height = Some(
                 lengths
@@ -185,6 +192,9 @@ pub fn apply_inheritance(child: &mut ComputedStyle, parent: &ComputedStyle) {
     }
     if child.line_height.is_none() {
         child.line_height = parent.line_height.clone();
+    }
+    if child.text_align.is_none() {
+        child.text_align = parent.text_align;
     }
 }
 

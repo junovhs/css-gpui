@@ -1,7 +1,7 @@
 use gpui::{
     App, Bounds, ClipboardItem, Context, CursorStyle, Div, ElementInputHandler, Entity,
     EntityInputHandler, FocusHandle, Keystroke, MouseButton, Pixels, Point, ShapedLine,
-    SharedString, TextRun, UTF16Selection, Window, canvas, fill, point, px, size,
+    SharedString, TextAlign, TextRun, UTF16Selection, Window, canvas, fill, point, px, size,
 };
 use std::ops::Range;
 
@@ -350,7 +350,13 @@ fn input_text(input: Entity<TextInput>, placeholder: &'static str) -> impl Style
             let top = bounds.top() + (bounds.size.height - line_height) / 2.0;
             let cursor = line.x_for_index(state.cursor);
             let scroll = (cursor - bounds.size.width + px(1.0)).max(px(0.0));
-            let origin = point(bounds.left() - scroll, top);
+            let spare_width = (bounds.size.width - line.width).max(px(0.0));
+            let alignment_offset = match style.text_align {
+                TextAlign::Left => px(0.0),
+                TextAlign::Center => spare_width / 2.0,
+                TextAlign::Right => spare_width,
+            };
+            let origin = point(bounds.left() + alignment_offset - scroll, top);
             let focused = state.focus.is_focused(window);
             let selection = state.selection();
             let marked = state.marked.clone();
@@ -374,8 +380,9 @@ fn input_text(input: Entity<TextInput>, placeholder: &'static str) -> impl Style
                 }
                 let _ = line.paint(origin, line_height, window, cx);
                 if focused && selection.is_empty() {
+                    let cursor_x = (origin.x + cursor).min(bounds.right() - px(1.0));
                     window.paint_quad(fill(
-                        Bounds::new(point(origin.x + cursor, top), size(px(1.0), line_height)),
+                        Bounds::new(point(cursor_x, top), size(px(1.0), line_height)),
                         color,
                     ));
                 }

@@ -75,6 +75,19 @@ VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a \
   node benchmarks/css-compat/flex-wrap-probe.mjs /path/to/playwright-install "$scratch/flex-wrap"
 ```
 
+## Text alignment probe
+
+The probe renders 216 px blocks with start, inherited center and end alignment, plus a centered editable field. It compares the left and right edges of the text ink in Chromium and GPUI screenshots. The tolerance is 2 logical px per edge to account for font rasterization and subpixel rounding at 1× scale. The probe saves both frames and the positions. The compiler preserves left and right as physical CSS keywords and maps start and end using left-to-right flow. Bidirectional alignment, justification and wrapped-line parity are outside this probe.
+
+Use the same Playwright, Xvfb and Vulkan setup as the benchmark, with DejaVu Sans Mono installed.
+
+```sh
+scratch=$(mktemp -d)
+VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a \
+  --server-args='-screen 0 1600x1200x24' \
+  node benchmarks/css-compat/text-align-probe.mjs /path/to/playwright-install "$scratch/text-align"
+```
+
 ## Holdout and refresh
 
 The holdout is frozen with the evaluation sources. Keep it out of routine runs and out of compiler tuning. Run the same browser and native commands on that split with `--holdout` passed to `run.mjs` when evaluating a later candidate. Record holdout results separately and retire each disclosed holdout from future gate decisions.

@@ -206,7 +206,7 @@ fn node_capabilities(node: &IrNode) -> BTreeSet<Capability> {
             if node.paint.border_radius.is_some() {
                 caps.insert(Capability::BorderRadius);
             }
-            if node.typography.is_some() {
+            if node.typography.is_some() || node.layout.text_align.is_some() {
                 caps.insert(Capability::Typography);
             }
             match node.control_kind {

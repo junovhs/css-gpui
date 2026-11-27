@@ -5,7 +5,7 @@ use std::fmt::Write;
 use crate::ir::{
     AlignItems, AlignSelf, BoxSizing, Color, ControlKind, Cursor, Display, EdgeInset,
     FlexDirection, FlexWrap, IrNode, JustifyContent, LineHeight, NodeKind, Position, SceneIr,
-    Typography,
+    TextAlign, Typography,
 };
 
 use super::{Capability, CapabilityGap, TargetCapabilities, TargetEmission, TargetEmitter};
@@ -177,6 +177,15 @@ fn emit_child(
     let style_indent = indent + 8;
     let mut method = |call: &str| writeln!(rust, "{:style_indent$}.{call}", "").unwrap();
     emit_layout(node, parent, &mut method, losses);
+    // GPUI uses physical alignment. The source subset has left-to-right inline flow.
+    if node.layout.text_align != parent.and_then(|parent| parent.layout.text_align) {
+        match node.layout.text_align {
+            Some(TextAlign::Start | TextAlign::Left) => method("text_left()"),
+            Some(TextAlign::Center) => method("text_center()"),
+            Some(TextAlign::End | TextAlign::Right) => method("text_right()"),
+            None => {}
+        }
+    }
     if context.debug_bounds && !matches!(node.kind, NodeKind::Svg(_)) {
         method(&format!("debug_selector(|| {:?}.to_owned())", node.id));
     }
@@ -264,8 +273,14 @@ fn emit_child(
             {
                 let left = node.layout.padding.left;
                 let top = node.layout.padding.top;
+                let right = node.layout.padding.right;
+                let end_edge = if node.layout.text_align.is_some() {
+                    format!(".right(gpui::px({right:?}))")
+                } else {
+                    String::new()
+                };
                 method(&format!(
-                    "child(div().absolute().left(gpui::px({left:?})).top(gpui::px({top:?})).whitespace_nowrap().child({text:?}))"
+                    "child(div().absolute().left(gpui::px({left:?})){end_edge}.top(gpui::px({top:?})).whitespace_nowrap().child({text:?}))"
                 ));
             }
         }
