@@ -4,7 +4,6 @@ use css_gpui::{
     HtmlNode, SceneSourceGraph, diagnostics, extractor,
     ir::{Color, Position, SceneIr},
     layout, resolver,
-    target::TargetEmitter,
     target::gpui::GpuiTarget,
 };
 use serde_json::Value;
@@ -183,6 +182,20 @@ fn build_live(
     };
     let mut stage = scene.clone();
     stage.nodes.retain(|node| !inside(&node.source.dom_path));
+    let app = graph
+        .html_nodes
+        .iter()
+        .find(|node| attr(node, "id") == Some("app"))
+        .unwrap();
+    let app_layout = &mut stage
+        .nodes
+        .iter_mut()
+        .find(|node| node.source.dom_path == app.dom_path)
+        .unwrap()
+        .layout;
+    // The standalone stage is compiled for this viewport. GPUI's grid adds
+    // padding to stretched auto rows when only a minimum height is supplied.
+    app_layout.height = app_layout.height.or(app_layout.min_height);
     // GPUI 0.2.2's DirectWrite lookup asks for normal stretch. The stage's
     // condensed face has a condensed width class and cannot satisfy that lookup.
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
@@ -260,6 +273,17 @@ fn build_live(
     }
 
     let target = GpuiTarget;
+    let footer = graph
+        .html_nodes
+        .iter()
+        .find(|node| node.name.as_deref() == Some("footer"))
+        .unwrap();
+    let footer_id = &stage
+        .nodes
+        .iter()
+        .find(|node| node.source.dom_path == footer.dom_path)
+        .unwrap()
+        .id;
     let main_styles = graph
         .css_rules
         .iter()
@@ -314,6 +338,7 @@ fn build_live(
     let metadata = serde_json::json!({
         "geometry": case,
         "menuId": node.id,
+        "footerId": footer_id,
         "hover": hover,
         "initialSelection": initial_selection,
         "fadeMs": fade,
@@ -327,7 +352,7 @@ fn build_live(
     .unwrap();
     fs::write(
         output.join(format!("stage-{width}.rs")),
-        target.emit(&stage).artifact,
+        target.emit_with_debug_bounds(&stage).artifact,
     )
     .unwrap();
     fs::write(

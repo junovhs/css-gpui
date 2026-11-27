@@ -122,6 +122,7 @@ try {
                 firstRow: '#menu li',
                 lastRow: '#menu section:last-of-type li:last-child',
                 separator: '#menu hr',
+                footer: '#app > footer',
             };
             return Object.fromEntries(Object.entries(selectors).map(([name, selector]) => {
                 const { x, y, width, height } = document.querySelector(selector).getBoundingClientRect();
@@ -134,6 +135,18 @@ try {
         }));
         geometry.push({ ...viewport, boxes, rows });
         const menu = page.locator('#menu');
+        if (nativeFonts) {
+            const setShift = (position) => page.evaluate((value) => {
+                document.body.style.backgroundPosition = value;
+            }, position);
+            await setShift('calc(50% + 90px) center, center');
+            await settle(page);
+            await page.screenshot({
+                path: resolve(output, `chromium-startup-${viewport.width}-shift90.png`),
+                animations: 'disabled',
+            });
+            await setShift('');
+        }
         const row = menu.getByText('Calculator', { exact: true });
         const positions = [
             { name: 'upper-left', x: viewport.width < 480 ? 16 : 80, y: 120 },

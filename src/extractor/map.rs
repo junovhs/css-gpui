@@ -171,6 +171,7 @@ fn to_align_self(s: &str) -> Option<AlignSelf> {
     match s {
         "auto" => Some(AlignSelf::Auto),
         "flex-start" => Some(AlignSelf::FlexStart),
+        "end" => Some(AlignSelf::End),
         "center" => Some(AlignSelf::Center),
         _ => None,
     }

@@ -325,6 +325,7 @@ fn emit_layout(
     let alignment = match layout.align_self {
         Some(AlignSelf::FlexStart) => Some("FlexStart"),
         Some(AlignSelf::Center) => Some("Center"),
+        Some(AlignSelf::End) => Some("End"),
         _ => None,
     };
     if let Some(alignment) = alignment {

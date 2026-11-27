@@ -59,6 +59,7 @@ pub enum AlignSelf {
     Auto,
     FlexStart,
     Center,
+    End,
 }
 
 /// CSS `cursor` value supported in v0.1.

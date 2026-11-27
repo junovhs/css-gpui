@@ -93,6 +93,8 @@ struct Row {
 
 struct Config {
     menu: [f32; 4],
+    #[cfg(test)]
+    footer: Option<(String, [f32; 4])>,
     rows: Vec<Row>,
     fade: u64,
     hide: u64,
@@ -128,6 +130,13 @@ impl Config {
         let easing = serde_json::from_value(config["ease"].clone()).unwrap();
         Self {
             menu,
+            #[cfg(test)]
+            footer: config["geometry"]["boxes"]["footer"].as_array().map(|_| {
+                (
+                    config["footerId"].as_str().unwrap().to_owned(),
+                    serde_json::from_value(config["geometry"]["boxes"]["footer"].clone()).unwrap(),
+                )
+            }),
             rows,
             fade: config["fadeMs"].as_f64().unwrap() as u64,
             hide: config["hideMs"].as_f64().unwrap() as u64,
@@ -510,6 +519,37 @@ fn ease(progress: f32, [x1, y1, x2, y2]: [f32; 4]) -> f32 {
 mod tests {
     use super::*;
     use gpui::{Modifiers, TestAppContext, VisualTestContext, point, size};
+
+    #[gpui::test]
+    fn startup_footer_matches_chromium_bottom_inset(cx: &mut TestAppContext) {
+        for (width, height) in [(1100.0, 760.0), (390.0, 844.0)] {
+            let view = MenuView::new(90.0).unwrap();
+            let (view, cx) = cx.add_window_view(|_, _| view);
+            cx.simulate_resize(size(px(width), px(height)));
+            redraw(cx);
+            let (footer, panel) = cx.read(|app| {
+                let menu = view.read(app);
+                (
+                    menu.config()
+                        .footer
+                        .as_ref()
+                        .expect("recapture --native with footer geometry"),
+                    menu.panel(),
+                )
+            });
+            let bounds = cx.debug_bounds(&footer.0).expect("generated native footer");
+            let native_top = f32::from(bounds.origin.y);
+            let native_bottom = native_top + f32::from(bounds.size.height);
+            let browser_bottom = footer.1[1] + footer.1[3];
+            println!(
+                "{width}x{height} footer inset: GPUI {:.3}px, Chromium {:.3}px; native bounds {bounds:?}",
+                height - native_bottom,
+                height - browser_bottom,
+            );
+            assert!((native_bottom - browser_bottom).abs() <= 1.0);
+            assert!(native_top >= panel.y as f32 + panel.height as f32);
+        }
+    }
 
     #[gpui::test]
     fn replays_native_menu_over_both_browser_backdrops(cx: &mut TestAppContext) {

@@ -219,6 +219,7 @@ fn align_self_val(ase: &AlignSelf) -> &'static str {
         AlignSelf::Auto => "auto",
         AlignSelf::FlexStart => "flex-start",
         AlignSelf::Center => "center",
+        AlignSelf::End => "end",
     }
 }
 
