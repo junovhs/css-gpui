@@ -60,6 +60,18 @@ pub(super) fn apply_with_lengths(
     if matches!(
         property,
         "margin"
+            | "backface-visibility"
+            | "color"
+            | "background-color"
+            | "overflow"
+            | "overflow-x"
+            | "overflow-y"
+            | "visibility"
+            | "outline"
+            | "outline-color"
+            | "outline-style"
+            | "outline-width"
+            | "clip-path"
             | "perspective"
             | "perspective-origin"
             | "transform"
@@ -91,7 +103,13 @@ pub(super) fn apply_with_lengths(
             lengths,
         ),
         "background" => {
+            style.projection_properties.remove("background-color");
             style.background_color = parse_color(value);
+            if let Some(color) = &style.background_color {
+                style
+                    .projection_properties
+                    .insert("background-color".to_owned(), color.clone());
+            }
             style
                 .paint_effects
                 .retain(|name, _| !name.starts_with("background"));

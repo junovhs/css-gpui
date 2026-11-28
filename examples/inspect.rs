@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use css_gpui::{SceneSourceGraph, diagnostics, extractor, layout, projection, resolver};
+use css_gpui::{SceneSourceGraph, diagnostics, extractor, layout, planar, projection, resolver};
 use serde_json::json;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -14,18 +14,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     if let [mode, viewport, html, css, selection @ ..] = paths.as_slice() {
         match mode.to_str() {
             Some("--radio-snapshot") => {
-                let (scene, _) = resolve_snapshot(viewport, html, css, selection, false)?;
+                let (scene, _, _) = resolve_snapshot(viewport, html, css, selection, false)?;
                 return inspect_radio_snapshot(&scene);
             }
+            Some("--planar-preview") => {
+                let (scene, viewport, graph) =
+                    resolve_snapshot(viewport, html, css, selection, true)?;
+                return inspect_planar_preview(&scene, viewport, &graph);
+            }
             Some("--projection-snapshot") => {
-                let (scene, viewport) = resolve_snapshot(viewport, html, css, selection, true)?;
+                let (scene, viewport, _) = resolve_snapshot(viewport, html, css, selection, true)?;
                 return inspect_projection_snapshot(&scene, viewport);
             }
             _ => {}
         }
     }
     let [html_path, css_path] = paths.as_slice() else {
-        return Err("usage: inspect [--radio-snapshot|--projection-snapshot WIDTHxHEIGHT] <component.html> <component.css> [radio ID ...]".into());
+        return Err("usage: inspect [--radio-snapshot|--projection-snapshot|--planar-preview WIDTHxHEIGHT] <component.html> <component.css> [radio ID ...]".into());
     };
 
     let html = fs::read_to_string(html_path)?;
@@ -53,7 +58,7 @@ fn resolve_snapshot(
     css: &Path,
     selection: &[PathBuf],
     include_orientation: bool,
-) -> Result<(resolver::ResolvedScene, [f64; 2]), Box<dyn Error>> {
+) -> Result<(resolver::ResolvedScene, [f64; 2], SceneSourceGraph), Box<dyn Error>> {
     let (width, height) = viewport
         .to_str()
         .and_then(|size| size.split_once('x'))
@@ -97,7 +102,53 @@ fn resolve_snapshot(
         height as f32,
         &overrides,
     )?;
-    Ok((scene, [f64::from(width), f64::from(height)]))
+    Ok((scene, [f64::from(width), f64::from(height)], graph))
+}
+
+#[derive(serde::Deserialize)]
+struct PlanarInput {
+    root: String,
+    rgba: PathBuf,
+}
+
+fn inspect_planar_preview(
+    scene: &resolver::ResolvedScene,
+    viewport: [f64; 2],
+    graph: &SceneSourceGraph,
+) -> Result<(), Box<dyn Error>> {
+    let input: PlanarInput = serde_json::from_reader(io::stdin().lock())?;
+    let mut matches = scene.nodes.iter().filter(|resolved| {
+        if let Some(id) = input.root.strip_prefix('#') {
+            resolved
+                .node
+                .attributes
+                .iter()
+                .any(|(name, value)| name == "id" && value == id)
+        } else {
+            resolved.node.name.as_deref() == Some(input.root.as_str())
+        }
+    });
+    let root = matches
+        .next()
+        .ok_or("planar context root does not match an element")?;
+    if matches.next().is_some() {
+        return Err("planar context root must match exactly one element".into());
+    }
+    let frame = planar::preview(
+        graph,
+        scene,
+        root.node.id,
+        viewport.map(|length| length as u32),
+    )?;
+    fs::write(input.rgba, frame.rgba)?;
+    serde_json::to_writer(
+        io::stdout().lock(),
+        &json!({
+            "planes": frame.planes, "losses": frame.losses,
+        }),
+    )?;
+    println!();
+    Ok(())
 }
 
 fn inspect_radio_snapshot(scene: &resolver::ResolvedScene) -> Result<(), Box<dyn Error>> {

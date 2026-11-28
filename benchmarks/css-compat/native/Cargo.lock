@@ -1227,6 +1227,7 @@ name = "css-gpui-compat-host"
 version = "0.1.0"
 dependencies = [
  "gpui",
+ "image",
 ]
 
 [[package]]

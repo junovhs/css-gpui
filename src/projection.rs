@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use crate::resolver::values::{LengthContext, tokens, value_parts};
 
-type Point = [f64; 2];
+pub(crate) type Point = [f64; 2];
 type HomogeneousPoint = [f64; 4];
 
 /// An untransformed border box in document coordinates, with its cascaded CSS.
@@ -57,6 +57,15 @@ pub fn project_box(
     let Some(last) = layers.last() else {
         return Ok(None);
     };
+    let matrix = accumulated_matrix(layers, viewport, root_font_size)?;
+    Ok(Some(matrix.project_box(last.size, viewport)))
+}
+
+pub(crate) fn accumulated_matrix(
+    layers: &[Layer<'_>],
+    viewport: Point,
+    root_font_size: f32,
+) -> Result<Matrix, ProjectionError> {
     let mut matrix = Matrix::IDENTITY;
     let mut parent_origin = [0.0, 0.0];
     for (index, layer) in layers.iter().enumerate() {
@@ -114,13 +123,7 @@ pub fn project_box(
         }
         parent_origin = layer.origin;
     }
-    let [width, height] = last.size;
-    let corners = [[0.0, 0.0], [width, 0.0], [width, height], [0.0, height]]
-        .map(|[x, y]| matrix.apply([x, y, 0.0, 1.0]));
-    Ok(Some(ProjectedBox {
-        corners: corners.map(to_screen),
-        viewport_polygon: clip_to_viewport(&corners, viewport),
-    }))
+    Ok(matrix)
 }
 
 fn to_screen([x, y, _, w]: HomogeneousPoint) -> Option<Point> {
@@ -167,9 +170,45 @@ fn dot(left: HomogeneousPoint, right: HomogeneousPoint) -> f64 {
 }
 
 #[derive(Clone, Copy)]
-struct Matrix([[f64; 4]; 4]);
+pub(crate) struct Matrix([[f64; 4]; 4]);
 
 impl Matrix {
+    pub(crate) fn project_box(self, [width, height]: Point, viewport: Point) -> ProjectedBox {
+        let corners = [[0.0, 0.0], [width, 0.0], [width, height], [0.0, height]]
+            .map(|[x, y]| self.apply([x, y, 0.0, 1.0]));
+        ProjectedBox {
+            corners: corners.map(to_screen),
+            viewport_polygon: clip_to_viewport(&corners, viewport),
+        }
+    }
+
+    /// Inverse of the plane-to-screen homography and the composed depth row.
+    /// The cofactor also gives the transformed normal's z sign after dividing
+    /// by the full determinant, even for reflected planes.
+    pub(crate) fn sampling_plane(self) -> Option<SamplingPlane> {
+        let plane = |row: usize| [self.0[row][0], self.0[row][1], self.0[row][3]];
+        let cross = |[ax, ay, az]: [f64; 3], [bx, by, bz]: [f64; 3]| {
+            [ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx]
+        };
+        let product =
+            |a: [f64; 3], b: [f64; 3]| a.into_iter().zip(b).map(|(a, b)| a * b).sum::<f64>();
+        let [x, y, z, w] = [plane(0), plane(1), plane(2), plane(3)];
+        let adjugate_columns = [cross(y, w), cross(w, x), cross(x, y)];
+        let area = product(x, adjugate_columns[0]);
+        if !area.is_finite() || area.abs() <= f64::EPSILON {
+            return None;
+        }
+        let determinant = self.0[0][2] * product(y, cross(z, w))
+            - self.0[1][2] * product(x, cross(z, w))
+            + self.0[2][2] * area
+            - self.0[3][2] * product(x, cross(y, z));
+        Some(SamplingPlane {
+            inverse: std::array::from_fn(|row| adjugate_columns.map(|column| column[row] / area)),
+            depth: z,
+            back_facing: area * determinant < -f64::EPSILON,
+        })
+    }
+
     const IDENTITY: Self = Self([
         [1.0, 0.0, 0.0, 0.0],
         [0.0, 1.0, 0.0, 0.0],
@@ -219,6 +258,25 @@ impl Matrix {
 
     fn apply(self, point: HomogeneousPoint) -> HomogeneousPoint {
         self.0.map(|row| dot(row, point))
+    }
+}
+
+pub(crate) struct SamplingPlane {
+    inverse: [[f64; 3]; 3],
+    depth: [f64; 3],
+    pub back_facing: bool,
+}
+
+impl SamplingPlane {
+    /// Coordinates in the border plane and depth after perspective division.
+    pub(crate) fn sample(&self, x: f64, y: f64) -> Option<(Point, f64)> {
+        let [u, v, w] = self.inverse.map(|[a, b, c]| a * x + b * y + c);
+        (w > 0.0).then(|| {
+            (
+                [u / w, v / w],
+                self.depth[0] * u + self.depth[1] * v + self.depth[2] * w,
+            )
+        })
     }
 }
 

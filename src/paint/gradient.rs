@@ -41,6 +41,34 @@ pub fn layers(value: &str) -> impl Iterator<Item = &str> {
 }
 
 pub fn rgba(value: &str) -> Option<[u8; 4]> {
+    if let Some(args) = value
+        .strip_prefix("rgb(")
+        .or_else(|| value.strip_prefix("rgba("))
+        .and_then(|value| value.strip_suffix(')'))
+    {
+        let parts: Vec<_> = args.split(',').map(str::trim).collect();
+        let channel = |value: &str, maximum: f32| {
+            let ratio = if let Some(percent) = value.strip_suffix('%') {
+                percent.parse::<f32>().ok()? / 100.0
+            } else {
+                value.parse::<f32>().ok()? / maximum
+            };
+            ratio
+                .is_finite()
+                .then(|| (ratio.clamp(0.0, 1.0) * 255.0).round() as u8)
+        };
+        let [r, g, b, alpha] = match parts.as_slice() {
+            [r, g, b] => [*r, *g, *b, "1"],
+            [r, g, b, alpha] => [*r, *g, *b, *alpha],
+            _ => return None,
+        };
+        return Some([
+            channel(r, 255.0)?,
+            channel(g, 255.0)?,
+            channel(b, 255.0)?,
+            channel(alpha, 1.0)?,
+        ]);
+    }
     let normalized = parse_color(value)?;
     let mut result = [0, 0, 0, 255];
     let hex = normalized.strip_prefix('#')?;

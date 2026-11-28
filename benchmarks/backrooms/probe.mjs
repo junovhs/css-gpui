@@ -48,9 +48,9 @@ export async function withBackrooms(probe) {
                 await page.goto(url, { waitUntil: 'domcontentloaded' });
                 await page.addStyleTag({ content: '* { transition: none !important; animation: none !important; }' });
             };
-            const snapshot = (mode, width, height, selection, input) => JSON.parse(run(inspect,
-                [mode, `${width}x${height}`, htmlPath, cssPath, ...selection], input));
-            await probe({ page, snapshot, reset });
+            const snapshot = (mode, width, height, selection, input, linkedCss = cssPath) => JSON.parse(run(inspect,
+                [mode, `${width}x${height}`, htmlPath, linkedCss, ...selection], input));
+            await probe({ page, snapshot, reset, directory });
         } finally {
             await browser.close();
         }

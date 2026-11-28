@@ -3,9 +3,20 @@ name = "css-gpui-compat-host"
 version = "0.1.0"
 edition = "2024"
 publish = false
+default-run = "css-gpui-compat-host"
+
+[features]
+planar-preview = ["dep:image"]
+
+[[bin]]
+name = "css-gpui-planar-preview"
+path = "src/bin/planar-preview.rs"
+required-features = ["planar-preview"]
 
 [dependencies]
 gpui = { version = "=0.2.2", default-features = false, features = ["windows-manifest", "x11"] }
+
+image = { version = "=0.25.10", default-features = false, optional = true }
 
 [profile.dev]
 debug = 0

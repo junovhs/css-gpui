@@ -108,3 +108,72 @@ culling, depth ordering, authored paints, and motion. Live navigation and
 browser/native frame comparison remain open. At both viewports, ordinary
 strict GPUI conversion still exits at the source diagnostic stage with 5,102
 losses and emits zero bytes of Rust.
+
+## Settled GPUI corner preview
+
+The planar preview draws the original `content` subtree at the authored enter,
+walk and right-turn radio selections. Rust resolves its styles and box layout,
+projects element and generated faces through CSS perspective, and clips to the
+eye plane and viewport. It samples authored solid colors and supported gradient
+layers in local plane coordinates. It culls hidden backfaces and composites
+overlapping fragments by depth at each pixel. GPUI uploads the Rust raster as a
+texture. The capture reads the actual X11 window and checks every RGBA byte
+against the upload.
+
+The first Chromium reference keeps the full page. It includes the high-graphics
+radial overlay on `body > div::before`, which uses `mix-blend-mode: overlay`,
+plus the surrounding HUD and labels. The second reference hides paint outside
+the context and keeps the original materials, filters, and shadows inside it.
+A third reference recolors the sampled corner's tile pseudo-elements red and
+green in the authored cascade without changing their transforms, then measures
+screen coverage by color. Native and Chromium both render the same coverage
+stylesheet. The projection probe above checks box and vertex coordinates
+separately.
+
+| Viewport and state | Full-page RGB error | Isolated RGB error | Red coverage IoU | Green coverage IoU |
+| --- | ---: | ---: | ---: | ---: |
+| 390 × 844 enter | 42.13 | 12.31 | 0.527 | 0.925 |
+| 390 × 844 walk | 44.07 | 9.10 | empty in both | 1.000 |
+| 390 × 844 turn | 44.26 | 9.35 | 0.857 | 0.999 |
+| 1440 × 900 enter | 44.71 | 6.96 | 0.640 | 0.865 |
+| 1440 × 900 walk | 44.67 | 5.37 | 1.000 | 1.000 |
+| 1440 × 900 turn | 45.12 | 5.51 | 0.686 | 0.935 |
+
+RGB error is the mean absolute channel difference on a 0–255 scale. Coverage
+IoU is pixel intersection divided by union, with a threshold of 128 on the
+corresponding channel. Red is `::before` and green is `::after` for the corner
+sample. The six main frames contain 79–155 projected painted planes, including
+some that are occluded. The isolated comparison caps RGB error at 13 and checks
+green IoU of at least 0.85 and red IoU of at least 0.50 when present. These are
+bounded preview regression thresholds. The reported coverage gaps are measured
+raster differences. Native and isolated Chromium images both change between
+successive states by at least 20% of pixels at an 8-level channel threshold.
+
+The preview records per-plane losses for tiled radial and repeating wallpaper
+layers, unsupported gradient stops, outlines, shadows, blur, bounded layout
+failures and group overflow. The supported samples retain their base colors,
+leaf opacity and brightness. Differences in grouped compositing, occlusion,
+and edge sampling remain visible in the coverage and paint comparisons. The
+HUD, overlay, motion interpolation, keyboard and mouse activation, and audio
+are outside this snapshot. The verifier sets original radio checkedness
+directly in Chromium and passes the corresponding selections to Rust.
+Ordinary strict GPUI generation still reports 5,102 losses and emits zero
+bytes of Rust for each viewport.
+
+From the repository root on Linux with the Rust toolchain, the GPUI X11 and
+Vulkan build dependencies, Xvfb, xdotool, ImageMagick, and the Playwright setup
+above, run:
+
+```sh
+target_dir=$(mktemp -d)
+cargo build --locked --manifest-path benchmarks/css-compat/native/Cargo.toml \
+  --features planar-preview --bin css-gpui-planar-preview --target-dir "$target_dir"
+export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json
+node benchmarks/backrooms/planar.mjs /path/to/playwright-install \
+  "$target_dir/debug/css-gpui-planar-preview"
+```
+
+The last command accepts an optional output directory for local PNG captures,
+RGBA frames, and per-plane metadata. Rust uses the downloaded source and a
+viewport to generate each frame. The GPUI viewer receives only those Rust
+pixels. Chromium geometry and screenshots are used solely in the comparison.
