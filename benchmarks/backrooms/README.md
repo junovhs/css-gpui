@@ -146,23 +146,22 @@ transforms. Native and Chromium both render the same coverage stylesheet.
 | 1440 × 900 turn | 45.12 | 3.77 | 5.51 | 0.686 | 0.935 |
 
 RGB error is the mean absolute channel difference on a 0–255 scale. The two
-full-page columns use the authored Chromium page as the reference. Hiding the
-gradient in current GPUI reproduces the six earlier native readbacks byte for
-byte. The probe checks that the layer reduces full-page error by at least 25.
+full-page columns use the authored Chromium page as the reference. In the lighting-only comparison, hiding the gradient reproduced the six
+earlier native readbacks byte for byte. The probe checks that the layer reduces full-page error by at least 25.
 It also compares the signed RGB change from enabling the layer in the upper
 left, center, and lower right of the viewport. Coverage
 IoU is pixel intersection divided by union, with a threshold of 128 on the
 corresponding channel. Red is `::before` and green is `::after` for the corner
-sample. The six main frames contain 79–155 projected painted planes, including
-some that are occluded. The isolated comparison caps RGB error at 13 and checks
+sample. The lighting comparison contained 79–155 projected painted planes, including
+some that were occluded. The isolated comparison caps RGB error at 13 and checks
 green IoU of at least 0.85 and red IoU of at least 0.50 when present. These are
 bounded preview regression thresholds. The reported coverage gaps are measured
 raster differences. Native and isolated Chromium images both change between
 successive states by at least 20% of pixels at an 8-level channel threshold.
 
-The preview records per-plane losses for tiled radial and repeating wallpaper
-layers, unsupported gradient stops, outlines, shadows, blur, bounded layout
-failures and group overflow. The start screen adds inset shadows to the
+The preview records per-plane losses for unsupported wallpaper gradients,
+gradient stops, outlines, shadows, blur, bounded layout failures and group
+overflow. The start screen adds inset shadows to the
 viewport layer, so that layer remains a paint loss in the start state.
 Differences in grouped compositing, occlusion, and edge sampling remain visible
 in the coverage and paint comparisons. The HUD, motion interpolation, and
@@ -216,6 +215,67 @@ input traces, and per-plane metadata. The scene crops exclude the separate
 native strip. Chromium geometry and screenshots are used solely in the
 comparison.
 
+### Projected wallpaper
+
+The preview resolves each supported gradient image against its own
+`background-size`, `background-position`, and `background-repeat`.
+Short lists cycle using the original image slots. Sizes and positions
+resolve in the local painting box. Tile sampling supports repeat and
+no-repeat, then composites the layers over the background color. The
+preview supports centered elliptical radial layers, linear layers, and
+repeating linear layers with unitless zero or percentage stops and a
+positive period. It reports unsupported length stops, complex positions
+and repeat modes, and non-default origins, clips, and attachments.
+
+The authored foreground wall at the right turn has a 96 × 48 CSS-pixel
+face with seven layers on 4.8 × 3.2 px tiles. Two repeating linear
+gradients provide narrow strips. The projected Chromium crop becomes
+sharper after removing only `brightness(1)` from this face. The filter
+preserves color and changes how Chromium composites the projected
+surface. The preview rasterizes brightness-filtered tiled materials at
+one texel per CSS pixel and bilinearly samples the premultiplied texture
+during projection. Each visible filtered face builds its own texture
+during a settled render. Equivalent faces and successive renders
+currently build their textures independently. In nine interleaved
+right-turn runs of the release inspection command, median time with
+analytic sampling and with local texturing was 861 / 818 ms at portrait
+size and 1,229 / 1,044 ms at desktop size. This measured source resolution,
+settled rendering, and the RGBA write together.
+
+The corner probe captures both renderers with the authored wallpaper
+and with only the wall background images removed. The crop holds
+lighting, geometry and base wall colors fixed. All GPUI readbacks
+match the Rust raster.
+
+| Viewport | Crop bounds (left, top, right, bottom) | Chromium / GPUI wallpaper change | Signed change error before / after correction | Authored crop error with images omitted / before correction / after correction |
+| --- | --- | ---: | ---: | ---: |
+| 390 × 844 | 12, 65, 70, 385 | 2.20 / 2.08 | 1.64 / 0.86 | 1.76 / 2.10 / 1.73 |
+| 1440 × 900 | 180, 150, 390, 465 | 2.32 / 1.88 | 1.63 / 1.07 | 1.89 / 2.03 / 1.76 |
+
+Wallpaper change is the mean absolute channel difference between
+enabled and disabled frames. Signed change error compares both
+renderers' enabled-minus-disabled RGB values. The probe requires this
+error to be below 55% of the Chromium change and the raw crop to improve
+over omission. The probe also measures horizontal contrast in the
+wallpaper's RGB response to track the softness of its vertical marks.
+
+| Viewport | Chromium with filter | Chromium with filter off | GPUI with filter |
+| --- | ---: | ---: | ---: |
+| 390 × 844 | 0.909 | 2.207 | 0.860 |
+| 1440 × 900 | 0.355 | 0.801 | 0.224 |
+
+The portrait turn no longer reports the 27 authored radial wallpaper
+losses. The six settled corner comparisons improve at both widths.
+
+| Viewport | Enter full-page RGB error | Walk full-page RGB error | Turn full-page RGB error |
+| --- | ---: | ---: | ---: |
+| 390 × 844 | 10.72 → 6.94 | 7.59 → 6.27 | 7.98 → 6.68 |
+| 1440 × 900 | 5.41 → 3.53 | 4.33 → 3.42 | 3.77 → 3.22 |
+
+The optional output directory retains the `-turn-without-wall-images`
+captures, the matching Rust RGBA frames and the Chromium
+`-turn-without-wall-filter` capture.
+
 To build and open the local route without Playwright, use the same native
 binary and run:
 
@@ -263,17 +323,19 @@ The probe also edits the wall faces' background at the pose reached by
 click 17 and rebuilds the Rust scene with the changed stylesheet. Each
 edited X11 readback matched the new Rust raster byte for byte.
 
-| Viewport | Post-Enter RGB error before lighting | Post-Enter RGB error with lighting | Start RGB error | Settled Finish RGB error |
-| --- | ---: | ---: | ---: | ---: |
-| 390 × 844 | 39.30–52.34 | 2.24–10.72 | 48.91 | 5.32 |
-| 1440 × 900 | 37.29–53.29 | 0.83–5.41 | 50.96 | 3.21 |
+| Viewport | Post-Enter before lighting | Post-Enter after lighting | Post-Enter with wallpaper | Start before / after wallpaper | Settled Finish before / after wallpaper |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 390 × 844 | 39.30–52.34 | 2.24–10.72 | 2.16–7.51 | 48.91 / 51.56 | 5.32 / 5.28 |
+| 1440 × 900 | 37.29–53.29 | 0.83–5.41 | 0.78–4.92 | 50.96 / 50.60 | 3.21 / 3.14 |
 
 Post-Enter ranges include the 45 resting frames after each activation. RGB
 error is the mean absolute channel difference against the full Chromium page
-on a 0–255 scale. The high start error includes the authored title and the
-viewport layer's extra inset shadows. At the 8-level channel threshold, the
-wall edit changes 43.5% of Chromium pixels and 43.6% of GPUI pixels in
-portrait. On desktop it changes 70.7% and 77.4%, respectively.
+on a 0–255 scale. With wallpaper, 30 of the 45 post-Enter frames improve
+in portrait and 32 improve on desktop. The high start error includes the
+authored title and the viewport layer's extra inset shadows. At the
+8-level channel threshold, the wall edit changes 43.5% of Chromium pixels
+and 43.6% of GPUI pixels in portrait. On desktop it changes 70.7% and
+77.4%, respectively.
 
 The optional final argument retains local browser and GPUI captures, compiled
 RGBA frames, the GPUI bundle and comparison data. To open the compiled route,
@@ -306,7 +368,7 @@ All five GPUI readbacks per size equal the corresponding Rust rasters. Turning
 Top view off restores the previous view byte for byte in Chromium and GPUI.
 
 Rust resolves the overhead camera, floor boxes and generated wall geometry
-from the authored cascade. The 672 painted planes at each size include the
+from the authored cascade. The 687 painted planes at each size include the
 maze walls and floor. The preview paints the authored viewport-covering white
 body backing and composites the high-graphics viewport layer. CDP supplies
 comparison geometry. The isolated reference preserves scene materials and the
@@ -314,8 +376,8 @@ backing while hiding the surrounding controls and the viewport layer.
 
 | Viewport | Used boxes | Projected vertices (wall vertices) | Maximum box / vertex error (CSS px) | Full-page / isolated RGB error |
 | --- | ---: | ---: | ---: | ---: |
-| 390 × 844 | 65 | 236 (92) | 0.000031 / 0.000048 | 21.83 / 3.73 |
-| 1440 × 900 | 65 | 236 (92) | 0 / 0.000034 | 9.03 / 3.97 |
+| 390 × 844 | 65 | 236 (92) | 0.000031 / 0.000048 | 21.06 / 3.14 |
+| 1440 × 900 | 65 | 236 (92) | 0 / 0.000034 | 8.24 / 3.36 |
 
 The overhead comparison allows up to 1/64 CSS px of used-box error,
 0.035 CSS px of vertex error, and 30/6 RGB error in the full-page/isolated
@@ -325,8 +387,8 @@ input traces. The GPUI control strip uses the route's compiled destinations.
 
 The authored HUD, debug text inside the maze, grouped depth compositing and
 animated ending remain open on ISS-22. Top view still reports unsupported
-tiled materials, grouped opacity, outlines, generated content, and layout for
-bordered or aspect-ratio decorations. Strict GPUI conversion reports 5,102
+gradient variants, grouped opacity, outlines, generated content, and layout
+for bordered or aspect-ratio decorations. Strict GPUI conversion reports 5,102
 source losses and emits zero bytes of Rust at either viewport.
 
 ## Live native document preview
@@ -373,8 +435,8 @@ renderer.
 
 | Viewport | GPUI exact scene readbacks | Authored / isolated RGB error at `z-7` |
 | --- | ---: | ---: |
-| 390 × 844 | 9 | 7.33 / 6.15 |
-| 1440 × 900 | 9 | 4.93 / 6.91 |
+| 390 × 844 | 9 | 5.98 / 3.98 |
+| 1440 × 900 | 9 | 2.99 / 3.25 |
 
 With `--live`, the start-to-finish probe uses the same direct-source viewer.
 At each viewport it reaches Finish in 45 Chromium clicks and 45 GPUI

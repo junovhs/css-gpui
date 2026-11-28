@@ -101,14 +101,16 @@ enum Shape {
 pub struct Gradient {
     shape: Shape,
     oklab: bool,
+    repeating: bool,
     stops: Vec<(f32, [f32; 4])>,
 }
 
 impl Gradient {
     pub fn parse(input: &str) -> Option<Self> {
         let (kind, value) = input.split_once('(')?;
+        let repeating = kind == "repeating-linear-gradient";
         let shape = match kind {
-            "linear-gradient" => Shape::Linear(180.0),
+            "linear-gradient" | "repeating-linear-gradient" => Shape::Linear(180.0),
             "conic-gradient" => Shape::Conic(0.0),
             "radial-gradient" => Shape::Radial,
             _ => return None,
@@ -177,6 +179,9 @@ impl Gradient {
             }
             start = end;
         }
+        if repeating && parsed.first()?.0? >= parsed.last()?.0? {
+            return None;
+        }
         let stops = parsed
             .into_iter()
             .map(|(position, rgba)| {
@@ -196,6 +201,7 @@ impl Gradient {
                 Shape::Radial => Shape::Radial,
             },
             oklab,
+            repeating,
             stops,
         })
     }
@@ -221,6 +227,13 @@ impl Gradient {
                 // The corner is one radius away in the ellipse's coordinates.
                 (dx / width).hypot(dy / height) * std::f32::consts::SQRT_2
             }
+        };
+        let progress = if self.repeating {
+            let first = self.stops[0].0;
+            let period = self.stops.last().unwrap().0 - first;
+            (progress - first).rem_euclid(period) + first
+        } else {
+            progress
         };
         let upper = self
             .stops

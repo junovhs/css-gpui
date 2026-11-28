@@ -118,7 +118,14 @@ pub(super) fn apply_with_lengths(
             lengths,
         ),
         "background" => {
-            style.projection_properties.remove("background-color");
+            for property in [
+                "background-color",
+                "background-attachment",
+                "background-clip",
+                "background-origin",
+            ] {
+                style.projection_properties.remove(property);
+            }
             style.background_color = parse_color(value);
             if let Some(color) = &style.background_color {
                 style

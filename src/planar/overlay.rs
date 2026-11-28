@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use crate::{
     layout::{BorderBox, UsedBoxLayout},
     projection::Point,
-    resolver::ResolvedNode,
+    resolver::{ResolvedNode, values::LengthContext},
 };
 
 use super::{Loss, Material, css_value, material::number, raster::Overlay, record_loss};
@@ -62,14 +62,6 @@ pub(super) fn compile(
                 && matches!(css_value(effects, "content", "normal"), "\"\"" | "''")
                 && decoration.radius == 0.0
                 && simple_coordinates(css)
-                && defaults(
-                    css,
-                    &[
-                        ("background-attachment", "scroll"),
-                        ("background-clip", "border-box"),
-                        ("background-origin", "padding-box"),
-                    ],
-                )
                 && *flat_backdrop.get_or_insert_with(|| {
                     ancestors
                         .iter()
@@ -83,12 +75,25 @@ pub(super) fn compile(
                     .and_then(|color| crate::paint::rgba(color))
                     .or(inherited_color);
                 let mut exact = true;
-                let paint = Material::from_css(css, effects, color, &mut |property, value| {
+                let mut loss = |property: &str, value: &str| {
                     if property != "mix-blend-mode" {
                         exact = false;
                         record_loss(losses, &path, property, value);
                     }
-                });
+                };
+                let mut paint = Material::from_css(css, effects, color, &mut loss);
+                paint.configure_background(
+                    css,
+                    effects,
+                    bounds.size.map(|value| value as f32),
+                    LengthContext {
+                        em: style.decoration_box_styles[pseudo].font_size(),
+                        rem: layout.root_font_size(),
+                        viewport: Some((viewport[0] as f32, viewport[1] as f32)),
+                        percent: None,
+                    },
+                    &mut loss,
+                );
                 if exact {
                     if !paint.is_empty() {
                         ordered.push(((z, order), Overlay { bounds, paint }));

@@ -15,6 +15,18 @@ const replay = fileURLToPath(new URL('./replay-route.sh', import.meta.url));
 
 const cornerTiles = [6, 7, 8, 9].flatMap(column =>
     [6, 7, 8, 9, 10].map(row => `body content floor > tile.col-${column}.row-${row}`));
+const withoutWallImages = `
+    body content floor > tile::before, body content floor > tile::after {
+        background-image: none !important;
+    }
+`;
+const withoutForegroundWallFilter = `
+    body content floor > tile.col-8.row-8::before { filter: none !important; }
+`;
+const turnWallCrops = new Map([
+    [390, [12, 65, 70, 385]],
+    [1440, [180, 150, 390, 465]],
+]);
 const coverageCss = `
     ${withoutViewportLighting}
     html { background-color: #000 !important; }
@@ -38,8 +50,10 @@ await withBackrooms(async ({ page, snapshot, reset, directory }) => {
     await mkdir(out, { recursive: true });
     const coverageFile = join(directory, 'coverage.css');
     const unlitFile = join(directory, 'without-viewport-lighting.css');
+    const noWallImagesFile = join(directory, 'without-wall-images.css');
     await writeFile(coverageFile, coverageCss);
     await writeFile(unlitFile, withoutViewportLighting);
+    await writeFile(noWallImagesFile, withoutWallImages);
     for (const [width, height] of viewports) {
         const { states, bundle } = await prepareCorner(snapshot, out, width, height);
         const nativeCaptures = await replayNative(bundle, states, out, width, height);
@@ -73,6 +87,47 @@ await withBackrooms(async ({ page, snapshot, reset, directory }) => {
                 const unlitRgba = `${prefix}-without-overlay.rgba`;
                 const isolated = `${prefix}-isolated.png`;
                 await page.screenshot({ path: authored });
+                const authoredPixels = readPixels(authored, width, height);
+                let wallCrop;
+                if (name === 'turn') {
+                    const noWallImagesRgba = `${prefix}-without-wall-images.rgba`;
+                    const noWallImagesNative = `${prefix}-without-wall-images-native.png`;
+                    const noWallImagesChromium = `${prefix}-without-wall-images-chromium.png`;
+                    const noWallFilterChromium = `${prefix}-without-wall-filter-chromium.png`;
+                    const filterStyle = await page.addStyleTag({ content: withoutForegroundWallFilter });
+                    await page.screenshot({ path: noWallFilterChromium });
+                    await filterStyle.evaluate(node => node.remove());
+                    const wallStyle = await page.addStyleTag({ content: withoutWallImages });
+                    await page.screenshot({ path: noWallImagesChromium });
+                    await wallStyle.evaluate(node => node.remove());
+                    snapshot('--planar-preview', width, height, overrides,
+                        JSON.stringify({ root: 'content', rgba: noWallImagesRgba }), noWallImagesFile);
+                    const native = await readNative(noWallImagesRgba, noWallImagesNative, width, height);
+                    const browser = readPixels(noWallImagesChromium, width, height);
+                    const region = turnWallCrops.get(width);
+                    const comparison = compareEffects(width, region, actual, native, authoredPixels, browser);
+                    assert(comparison.chromiumChange >= 1 && comparison.nativeChange >= 1,
+                        `${prefix}: authored background images must affect the foreground wall crop`);
+                    assert(comparison.signedChangeError < 0.55 * comparison.chromiumChange,
+                        `${prefix}: wallpaper response must improve on omitting the images`);
+                    assert(comparison.authoredError < comparison.omittedError,
+                        `${prefix}: paint with wallpaper must improve the authored crop RGB error`);
+                    const detail = {
+                        chromium: horizontalDetail(width, region, authoredPixels, browser),
+                        chromiumFilterOff: horizontalDetail(width, region,
+                            readPixels(noWallFilterChromium, width, height), browser),
+                        native: horizontalDetail(width, region, actual, native),
+                    };
+                    // Vertical marks contribute contrast along the horizontal scanline.
+                    assert(detail.chromiumFilterOff >= 1.8 * detail.chromium,
+                        `${prefix}: disabling the authored filter must sharpen the pattern`);
+                    assert(detail.native >= 0.5 * detail.chromium && detail.native <= 1.25 * detail.chromium,
+                        `${prefix}: foreground texture contrast differs from Chromium`);
+                    assert(!losses.some(({ property, value }) =>
+                        property === 'background-image' && value.startsWith('radial-gradient(')),
+                    `${prefix}: supported radial wallpaper was reported as a loss`);
+                    wallCrop = { bounds: region, ...comparison, horizontalDetail: detail };
+                }
                 const unlitStyle = await page.addStyleTag({ content: withoutViewportLighting });
                 await page.screenshot({ path: browserUnlit });
                 await unlitStyle.evaluate(node => node.remove());
@@ -83,7 +138,6 @@ await withBackrooms(async ({ page, snapshot, reset, directory }) => {
                 await page.screenshot({ path: isolated });
 
                 const reference = readPixels(isolated, width, height);
-                const authoredPixels = readPixels(authored, width, height);
                 const unlitPixels = readPixels(browserUnlit, width, height);
                 const fullPage = compare(actual, authoredPixels);
                 const fullPageBefore = compare(unlit, authoredPixels);
@@ -136,7 +190,7 @@ await withBackrooms(async ({ page, snapshot, reset, directory }) => {
                 }
                 console.log(JSON.stringify({ width, height, name, selection, gpuiExactRgba: true,
                     paintedPlanes: planes.length, fullPage, fullPageBefore, fullPageWithoutOverlay,
-                    lighting, context, coverage, motion, lossesByProperty }));
+                    lighting, context, coverage, wallCrop, motion, lossesByProperty }));
             }
             if (activation) {
                 const clicked = await clickBrowserLabel(page, scope, activation);
@@ -262,19 +316,49 @@ function lightingRegions(width, height, native, nativeUnlit, chromium, chromiumU
         ['lower right', 0.71, 0.70, 0.92, 0.86],
     ];
     return regions.map(([region, x0, y0, x1, y1]) => {
-        const [left, top, right, bottom] = [x0 * width, y0 * height, x1 * width, y1 * height].map(Math.floor);
-        let error = 0;
-        let change = 0;
-        for (let y = top; y < bottom; y++) {
-            for (let x = left; x < right; x++) {
-                for (let index = (y * width + x) * 4, end = index + 3; index < end; index++) {
-                    const browserDelta = chromium[index] - chromiumUnlit[index];
-                    error += Math.abs(native[index] - nativeUnlit[index] - browserDelta);
-                    change += Math.abs(browserDelta);
-                }
+        const bounds = [x0 * width, y0 * height, x1 * width, y1 * height].map(Math.floor);
+        return { region, ...compareEffects(width, bounds, native, nativeUnlit, chromium, chromiumUnlit) };
+    });
+}
+
+function compareEffects(width, [left, top, right, bottom], native, nativeOff, chromium, chromiumOff) {
+    let error = 0;
+    let chromiumChange = 0;
+    let nativeChange = 0;
+    let authoredError = 0;
+    let disabledError = 0;
+    let omittedError = 0;
+    for (let y = top; y < bottom; y++) {
+        for (let x = left; x < right; x++) {
+            for (let index = (y * width + x) * 4, end = index + 3; index < end; index++) {
+                const browserDelta = chromium[index] - chromiumOff[index];
+                const nativeDelta = native[index] - nativeOff[index];
+                error += Math.abs(nativeDelta - browserDelta);
+                chromiumChange += Math.abs(browserDelta);
+                nativeChange += Math.abs(nativeDelta);
+                authoredError += Math.abs(native[index] - chromium[index]);
+                disabledError += Math.abs(nativeOff[index] - chromiumOff[index]);
+                omittedError += Math.abs(nativeOff[index] - chromium[index]);
             }
         }
-        const channels = (right - left) * (bottom - top) * 3;
-        return { region, signedChangeError: error / channels, chromiumChange: change / channels };
-    });
+    }
+    const channels = (right - left) * (bottom - top) * 3;
+    return { signedChangeError: error / channels, chromiumChange: chromiumChange / channels,
+        nativeChange: nativeChange / channels, authoredError: authoredError / channels,
+        disabledError: disabledError / channels, omittedError: omittedError / channels };
+}
+
+function horizontalDetail(width, [left, top, right, bottom], authored, noImages) {
+    let change = 0;
+    for (let y = top; y < bottom; y++) {
+        for (let x = left; x + 1 < right; x++) {
+            const offset = (y * width + x) * 4;
+            for (let channel = 0; channel < 3; channel++) {
+                const index = offset + channel;
+                change += Math.abs((authored[index + 4] - noImages[index + 4]) -
+                    (authored[index] - noImages[index]));
+            }
+        }
+    }
+    return change / ((right - left - 1) * (bottom - top) * 3);
 }

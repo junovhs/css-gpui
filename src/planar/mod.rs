@@ -17,7 +17,7 @@ use crate::{
     HtmlNodeKind, SceneSourceGraph,
     layout::UsedBoxLayout,
     projection::{self, Layer, Point},
-    resolver::{ResolvedNode, ResolvedScene},
+    resolver::{ResolvedNode, ResolvedScene, values::LengthContext},
 };
 
 use material::Material;
@@ -363,7 +363,7 @@ impl<'a> Compiler<'a> {
         let mut loss = |property: &str, value: &str| {
             material_losses.push((property.to_owned(), value.to_owned()))
         };
-        let material = Material::from_css(css, effects, text_color, &mut loss);
+        let mut material = Material::from_css(css, effects, text_color, &mut loss);
         if text && text_color.is_none_or(|color| color[3] > 0) {
             loss("content", "visible text on a 3D plane");
         }
@@ -445,6 +445,18 @@ impl<'a> Compiler<'a> {
         if polygon.len() < 3 {
             return;
         }
+        material.configure_background(
+            css,
+            effects,
+            size.map(|value| value as f32),
+            LengthContext {
+                em: layers.last().unwrap().font_size,
+                rem: self.root_font_size,
+                viewport: Some((self.viewport[0] as f32, self.viewport[1] as f32)),
+                percent: None,
+            },
+            &mut |property, value| material_losses.push((property.to_owned(), value.to_owned())),
+        );
         for (property, value) in material_losses {
             record_loss(&mut self.losses, &path, &property, &value);
         }
