@@ -5,11 +5,13 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compare, readPixels } from './pixels.mjs';
 import { viewports, withBackrooms } from './probe.mjs';
-import { routeLabels, writeRouteBundle } from './route.mjs';
+import { replayDocument, routeLabels, writeRouteBundle } from './route.mjs';
 
 const executable = process.argv[3] && resolve(process.argv[3]);
 assert(executable, 'Pass the css-gpui-planar-preview binary as the second argument');
-const captures = process.argv[4] && resolve(process.argv[4]);
+const [output] = process.argv.slice(4).filter(arg => arg !== '--live');
+const captures = output && resolve(output);
+const live = process.argv.includes('--live');
 const replay = fileURLToPath(new URL('./replay-route.sh', import.meta.url));
 const capture = fileURLToPath(new URL('./capture-planar.sh', import.meta.url));
 const navigationLabels = 'start-text label[for], buttons label[for], content label[for]';
@@ -21,7 +23,7 @@ const wallEdit = `
     }
 `;
 
-await withBackrooms(async ({ page, newPage, snapshot, reset, directory }) => {
+await withBackrooms(async ({ page, newPage, snapshot, reset, htmlPath, cssPath, directory }) => {
     const out = captures ?? directory;
     await mkdir(out, { recursive: true });
     const wallFile = join(directory, 'wall-edit.css');
@@ -45,8 +47,10 @@ await withBackrooms(async ({ page, newPage, snapshot, reset, directory }) => {
         await resetSettled();
         const browserStates = await replayBrowser(page, out, width, height, route);
         const states = compileRoute(snapshot, out, width, height, route, browserStates);
-        const bundle = await writeRouteBundle(out, width, height, states, 'full-route');
-        const nativePrefix = await replayNative(bundle, states, out, width, height);
+        const nativePrefix = live
+            ? await replayDocument(executable, htmlPath, cssPath, states, out, width, height, 'full-live')
+            : await replayNative(await writeRouteBundle(out, width, height, states, 'full-route'),
+                states, out, width, height);
         const frames = await compareFrames(out, width, height, nativePrefix, states, browserStates);
         const wall = await verifyWallEdit(snapshot, out, width, height, nativePrefix, states, browserStates, wallFile);
         console.log(JSON.stringify({

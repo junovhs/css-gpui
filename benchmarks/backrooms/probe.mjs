@@ -44,7 +44,7 @@ export async function withBackroomsSource(probe) {
         await writeFile(cssPath, '');
         const snapshot = (mode, width, height, selection, input, linkedCss = cssPath) => JSON.parse(run(inspect,
             [mode, `${width}x${height}`, htmlPath, linkedCss, ...selection], input));
-        await probe({ html, directory, snapshot });
+        await probe({ html, htmlPath, cssPath, directory, snapshot });
     } finally {
         await rm(directory, { recursive: true, force: true });
     }
@@ -56,7 +56,7 @@ export async function withBackrooms(probe) {
     const require = createRequire(join(resolve(playwright), 'package.json'));
     assert.equal(require('playwright/package.json').version, '1.60.0');
     const { chromium } = require('playwright');
-    await withBackroomsSource(async ({ html, directory, snapshot }) => {
+    await withBackroomsSource(async ({ html, htmlPath, cssPath, directory, snapshot }) => {
         const browser = await chromium.launch();
         try {
             const newPage = async () => {
@@ -73,7 +73,7 @@ export async function withBackrooms(probe) {
                 await target.goto(url, { waitUntil: 'domcontentloaded' });
                 await target.addStyleTag({ content: '* { transition: none !important; animation: none !important; }' });
             };
-            await probe({ page, newPage, snapshot, reset, directory });
+            await probe({ page, newPage, snapshot, reset, htmlPath, cssPath, directory });
         } finally {
             await browser.close();
         }

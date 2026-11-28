@@ -14,6 +14,11 @@ use serde::{Deserialize, Serialize};
 
 use super::read_frame;
 
+#[path = "planar_document.rs"]
+mod document;
+
+use document::{Activations, Document};
+
 const STRIP_HEIGHT: u32 = 48;
 actions!(planar_route, [TabNext, TabPrevious]);
 
@@ -25,19 +30,20 @@ struct CheckedState {
 }
 
 impl CheckedState {
-    fn activate(&mut self, label: &Label) -> bool {
+    fn after(&self, label: &Label) -> Option<Self> {
+        let mut next = self.clone();
         if label.checkbox {
-            if !self.checked.remove(&label.target) {
-                self.checked.insert(label.target.clone());
+            if !next.checked.remove(&label.target) {
+                next.checked.insert(label.target.clone());
             }
         } else {
             if self.selection.get(&label.group) == Some(&label.target) {
-                return false;
+                return None;
             }
-            self.selection
+            next.selection
                 .insert(label.group.clone(), label.target.clone());
         }
-        true
+        Some(next)
     }
 }
 
@@ -61,69 +67,129 @@ struct Frame<'a> {
     frame: usize,
     #[serde(flatten)]
     controls: &'a CheckedState,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    labels: Option<&'a [Label]>,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize, Serialize)]
 struct Label {
     group: String,
     target: String,
     caption: String,
     #[serde(default)]
+    class_name: String,
+    #[serde(default)]
     checkbox: bool,
 }
 
-struct Route {
-    states: Vec<State>,
-    images: Vec<Arc<RenderImage>>,
+struct SceneFrame {
+    controls: CheckedState,
+    labels: Vec<Label>,
+    image: Arc<RenderImage>,
+}
+
+enum Source {
+    Route(Vec<Arc<SceneFrame>>),
+    Document {
+        document: Arc<Document>,
+        activations: Activations,
+    },
+}
+
+struct Viewer {
+    source: Source,
+    frame: Arc<SceneFrame>,
     current: usize,
     height: u32,
+    pending: bool,
     report: bool,
     focus: FocusHandle,
 }
 
-impl Route {
+impl Viewer {
     fn destination(&self, label: &Label) -> Option<usize> {
-        let mut controls = self.states[self.current].controls.clone();
-        if !controls.activate(label) {
-            return None;
+        let controls = self.frame.controls.after(label)?;
+        match &self.source {
+            Source::Route(frames) => frames.iter().position(|frame| frame.controls == controls),
+            Source::Document { .. } => Some(self.current + 1),
         }
-        self.states
-            .iter()
-            .position(|state| state.controls == controls)
+    }
+
+    fn commit(&mut self, next: usize, target: &str, frame: Arc<SceneFrame>) {
+        println!(
+            "{}",
+            serde_json::json!({ "activated": target, "from": self.current, "to": next })
+        );
+        self.current = next;
+        self.frame = frame;
+        self.report = true;
     }
 
     fn activate(&mut self, from: usize, index: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if from != self.current {
+        if from != self.current || self.pending {
             return;
         }
-        let label = &self.states[from].labels[index];
-        if let Some(next) = self.destination(label) {
-            println!(
-                "{}",
-                serde_json::json!({ "activated": label.target, "from": from, "to": next })
-            );
-            self.current = next;
-            self.report = true;
-            window.focus(&self.focus);
-            cx.notify();
+        let label = self.frame.labels[index].clone();
+        let Some(next) = self.destination(&label) else {
+            return;
+        };
+        window.focus(&self.focus);
+        match &self.source {
+            Source::Route(frames) => {
+                self.commit(next, &label.target, frames[next].clone());
+            }
+            Source::Document {
+                document,
+                activations,
+            } => {
+                let document = Arc::clone(document);
+                let mut activations = activations.clone();
+                document.activate(&mut activations, &label);
+                let render = cx.background_spawn(async move {
+                    let result = document.render(&activations);
+                    (result, activations)
+                });
+                self.pending = true;
+                cx.spawn_in(window, async move |view, cx| {
+                    let (result, next_activations) = render.await;
+                    let _ = view.update_in(cx, |view, window, cx| {
+                        view.pending = false;
+                        match result {
+                            Ok(frame) => {
+                                if let Source::Document { activations, .. } = &mut view.source {
+                                    *activations = next_activations;
+                                }
+                                let _ = window.drop_image(view.frame.image.clone());
+                                view.commit(next, &label.target, Arc::new(frame));
+                            }
+                            Err(error) => eprintln!("could not activate {}: {error}", label.target),
+                        }
+                        cx.notify();
+                    });
+                })
+                .detach();
+            }
         }
+        cx.notify();
     }
 }
 
-impl Render for Route {
+impl Render for Viewer {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let current = self.current;
-        let state = &self.states[current];
-        let image = self.images[current].clone();
+        let image = self.frame.image.clone();
         let report = self.report.then(|| {
             serde_json::to_string(&Frame {
                 frame: current,
-                controls: &state.controls,
+                controls: &self.frame.controls,
+                labels: matches!(self.source, Source::Document { .. })
+                    .then_some(&self.frame.labels),
             })
-            .expect("serialize route readback")
+            .expect("serialize planar readback")
         });
         self.report = false;
-        let buttons = state
+        let buttons = self
+            .frame
             .labels
             .iter()
             .enumerate()
@@ -140,7 +206,7 @@ impl Render for Route {
                     .border_color(rgb(0x2c323a))
                     .text_size(px(19.0))
                     .child(label.caption.clone());
-                if self.destination(label).is_some() {
+                if !self.pending && self.destination(label).is_some() {
                     button
                         .tab_index(0)
                         .cursor_pointer()
@@ -204,10 +270,48 @@ pub(super) fn run(path: &Path) -> Result<(), Box<dyn Error>> {
         return Err("the planar route requires at least one frame".into());
     }
     let directory = path.parent().unwrap_or(Path::new(""));
-    let images = states
-        .iter()
-        .map(|state| read_frame(width, height, &directory.join(&state.rgba)))
-        .collect::<Result<_, _>>()?;
+    let frames = states
+        .into_iter()
+        .map(|state| {
+            Ok(Arc::new(SceneFrame {
+                controls: state.controls,
+                labels: state.labels,
+                image: read_frame(width, height, &directory.join(&state.rgba))?,
+            }))
+        })
+        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
+    let initial = frames[0].clone();
+    open(width, height, Source::Route(frames), initial);
+    Ok(())
+}
+
+pub(super) fn run_document(
+    viewport: &str,
+    html: &Path,
+    css: &Path,
+    root: &str,
+    scope: &str,
+) -> Result<(), Box<dyn Error>> {
+    let (width, height) = viewport
+        .split_once('x')
+        .ok_or("expected viewport WIDTHxHEIGHT")?;
+    let [width, height] = [width.parse()?, height.parse()?];
+    let document = Arc::new(Document::new([width, height], html, css, root, scope)?);
+    let activations = Activations::default();
+    let initial = Arc::new(document.render(&activations)?);
+    open(
+        width,
+        height,
+        Source::Document {
+            document,
+            activations,
+        },
+        initial,
+    );
+    Ok(())
+}
+
+fn open(width: u32, height: u32, source: Source, frame: Arc<SceneFrame>) {
     Application::new().run(move |app: &mut App| {
         app.bind_keys([
             KeyBinding::new("tab", TabNext, None),
@@ -229,10 +333,11 @@ pub(super) fn run(path: &Path) -> Result<(), Box<dyn Error>> {
                 app.new(|cx| {
                     let focus = cx.focus_handle();
                     window.focus(&focus);
-                    Route {
-                        states,
-                        images,
+                    Viewer {
+                        source,
+                        frame,
                         current: 0,
+                        pending: false,
                         height,
                         report: true,
                         focus,
@@ -243,5 +348,4 @@ pub(super) fn run(path: &Path) -> Result<(), Box<dyn Error>> {
         .expect("open GPUI planar route");
         app.activate(true);
     });
-    Ok(())
 }

@@ -34,9 +34,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     {
         return route::run(Path::new(bundle));
     }
+    if let [mode, viewport, html, css, root, scope] = args.as_slice()
+        && mode == "--document"
+    {
+        return route::run_document(viewport, Path::new(html), Path::new(css), root, scope);
+    }
     let [width, height, rgba] = args.as_slice() else {
         return Err(
-            "usage: css-gpui-planar-preview WIDTH HEIGHT FRAME.rgba | --route BUNDLE.json".into(),
+            "usage: css-gpui-planar-preview WIDTH HEIGHT FRAME.rgba | --route BUNDLE.json | --document WIDTHxHEIGHT HTML CSS ROOT CONTROL_SCOPE".into(),
         );
     };
     let (width, height) = (width.parse::<u32>()?, height.parse::<u32>()?);
@@ -59,12 +64,19 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn read_frame(width: u32, height: u32, rgba: &Path) -> Result<Arc<RenderImage>, Box<dyn Error>> {
-    let mut rgba = std::fs::read(rgba)?;
+    Ok(upload_frame(width, height, std::fs::read(rgba)?)?)
+}
+
+fn upload_frame(
+    width: u32,
+    height: u32,
+    mut rgba: Vec<u8>,
+) -> Result<Arc<RenderImage>, &'static str> {
     if !(1..=4096).contains(&width)
         || !(1..=4096).contains(&height)
         || rgba.len() != width as usize * height as usize * 4
     {
-        return Err("frame byte length does not match viewport".into());
+        return Err("frame byte length does not match viewport");
     }
     // GPUI's uploaded sprite texture expects BGRA byte order.
     for pixel in rgba.chunks_exact_mut(4) {

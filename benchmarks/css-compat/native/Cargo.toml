@@ -6,7 +6,7 @@ publish = false
 default-run = "css-gpui-compat-host"
 
 [features]
-planar-preview = ["dep:image", "dep:serde", "dep:serde_json"]
+planar-preview = ["dep:css-gpui", "dep:image", "dep:serde", "dep:serde_json"]
 
 [[bin]]
 name = "css-gpui-planar-preview"
@@ -16,6 +16,7 @@ required-features = ["planar-preview"]
 [dependencies]
 gpui = { version = "=0.2.2", default-features = false, features = ["windows-manifest", "x11"] }
 
+css-gpui = { path = "../../..", optional = true }
 image = { version = "=0.25.10", default-features = false, optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
@@ -23,3 +24,6 @@ serde_json = { version = "1", optional = true }
 [profile.dev]
 debug = 0
 incremental = false
+
+[profile.dev.package.css-gpui]
+opt-level = 3

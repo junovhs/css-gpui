@@ -1223,9 +1223,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "css-gpui"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "css-gpui-compat-host"
 version = "0.1.0"
 dependencies = [
+ "css-gpui",
  "gpui",
  "image",
  "serde",

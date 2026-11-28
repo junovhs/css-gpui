@@ -316,3 +316,57 @@ and animated ending remain open on ISS-22. Top view still reports unsupported
 tiled materials, grouped opacity, outlines, generated content, and layout for
 bordered or aspect-ratio decorations. Strict GPUI conversion reports 5,102
 source losses and emits zero bytes of Rust at either viewport.
+
+## Live native document preview
+
+Open saved local HTML and CSS directly in the GPUI preview. Use an empty CSS
+file when the document supplies its stylesheet inline. The final two arguments
+identify the painted subtree and the control scope. Each accepts a unique
+element tag or a `#id`.
+
+```sh
+"$target_dir/debug/css-gpui-planar-preview" --document 390x844 \
+  /tmp/backrooms/input.html /tmp/backrooms/linked.css content body
+```
+
+The viewer reads and parses the two files at startup. Each activation resolves
+the settled cascade and rasterizes the next scene from the in-memory source
+graph. The window keeps displaying the current scene during the background
+render and activates the next controls when the new scene is ready. The
+control strip accepts one activation at a time. The checked state, controls
+and scene change together after a successful render. Native execution uses
+local source and GPUI. The settled preview omits scripts, audio and motion.
+
+The strip exposes scoped radio labels and direct checkboxes supported by the
+resolver. It applies cascade visibility and pointer eligibility. The
+authored HUD, viewport hit testing and occlusion of controls still need
+native support.
+
+```sh
+node benchmarks/backrooms/live-branch.mjs /path/to/playwright-install \
+  "$target_dir/debug/css-gpui-planar-preview" /tmp/backrooms-live-branch
+node benchmarks/backrooms/full-route.mjs /path/to/playwright-install \
+  "$target_dir/debug/css-gpui-planar-preview" /tmp/backrooms-full-live --live
+```
+
+The branch probe uses real Chromium and X11 input at both benchmark
+viewports. It advances from `z-8` to `z-7`, which is outside the compiled
+corner route, returns to `z-8`, turns right, and toggles Top view on and off.
+It sends a rapid second native click while opening the branch and checks that
+only one move is applied. All nine native scene readbacks per viewport equal
+independently generated Rust rasters, and the ordered native trace matches
+the reference control state and targets. Returning to `z-8` and switching
+Top view off restore the preceding scene pixel for pixel within each
+renderer.
+
+| Viewport | GPUI exact scene readbacks | Isolated RGB error at `z-7` |
+| --- | ---: | ---: |
+| 390 × 844 | 9 | 6.15 |
+| 1440 × 900 | 9 | 6.91 |
+
+With `--live`, the start-to-finish probe uses the same direct-source viewer.
+At each viewport it reaches Finish in 45 Chromium clicks and 45 GPUI
+activations. All 46 native scene readbacks match the independent Rust rasters
+byte for byte. The full-page RGB error ranges from 39.30 to 52.34 at
+390 × 844 and from 37.29 to 53.29 at 1440 × 900. The compiled `--route`
+command opens retained route bundles.

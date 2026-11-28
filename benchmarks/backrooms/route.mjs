@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { viewports, withBackroomsSource } from './probe.mjs';
 
 // The bounded route names the authored controls to visit, independent of
@@ -43,6 +44,42 @@ export async function writeRouteBundle(out, width, height, states, name = 'route
     await writeFile(bundle, JSON.stringify({ width, height, states: states.map(({ rgba, selection, checked, labels }) =>
         ({ rgba, selection, checked, labels })) }, null, 2));
     return bundle;
+}
+
+// Send native input through X11. A sequence of snapshots is used solely as
+// the oracle for expected controls and pixel readbacks, never by the viewer.
+export async function replayDocument(executable, html, css, states, out, width, height, name) {
+    const prefix = join(out, `${width}x${height}-${name}-native`);
+    const replay = fileURLToPath(new URL('./replay-route.sh', import.meta.url));
+    const expected = [];
+    const inputs = [];
+    for (const [index, { selection, checked, labels, activation }] of states.entries()) {
+        if (index > 0) {
+            expected.push({ activated: states[index - 1].activation.target, from: index - 1, to: index });
+        }
+        expected.push({
+            frame: index, selection, ...(checked?.length ? { checked } : {}),
+            labels: labels.map(({ group, target, class_name, checkbox }) =>
+                ({ group, target, class_name, checkbox: Boolean(checkbox) })),
+        });
+        if (activation) {
+            const slot = labels.indexOf(activation);
+            assert(slot >= 0, `${prefix} frame ${index}: missing native activation`);
+            const x = Math.floor(width * (slot + 0.5) / labels.length);
+            const input = activation.doubleClick ? `double-${x}` : x;
+            inputs.push(`${input} ${index + 1} ${index + 1}`);
+        }
+    }
+    execFileSync('xvfb-run', ['-a', '-s', '-screen 0 1600x1000x24', 'bash', replay,
+        executable, '--document', String(width), String(height), prefix, html, css, 'content', 'body'], {
+        input: inputs.join('\n') + '\n', timeout: 20_000 + 4000 * inputs.length,
+    });
+    const trace = (await readFile(`${prefix}-trace.jsonl`, 'utf8')).trim().split('\n').map(line => JSON.parse(line));
+    for (const record of trace) {
+        for (const label of record.labels ?? []) delete label.caption;
+    }
+    assert.deepEqual(trace, expected, `${prefix}: live X11 input trace, available controls, and checked state`);
+    return prefix;
 }
 
 export function routeLabels(labels) {
