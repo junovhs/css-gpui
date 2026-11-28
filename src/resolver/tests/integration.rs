@@ -127,3 +127,111 @@ fn unknown_scene_fails_before_resolve() {
     let result = load_scene_source_graph(repo_root(), "does_not_exist");
     assert!(result.is_err(), "unknown scene must return an error");
 }
+
+#[test]
+fn radio_snapshot_cascades_anchored_selectors_across_elements() {
+    let html = r#"
+        <html><body>
+          <section id="primary" class="group">
+            <div><input type="radio" id="north" name="heading" checked></div>
+            <input type="radio" id="east" name="heading" checked>
+            text
+            <p id="adjacent" class="readout">Adjacent</p>
+            <p id="later" class="readout">Later</p>
+          </section>
+          <section id="secondary" class="group">
+            <input type="radio" id="open" name="door" checked>
+            <p id="independent" class="readout">Independent</p>
+          </section>
+        </body></html>
+    "#;
+    let css = r#"
+        .group { --ink: #111111; }
+        .group:has(> .missing:checked, > #east:checked):has(+ #secondary > #open:checked) {
+            --ink: #222222;
+        }
+        #primary { --ink: #333333; }
+        .group:has(> #north:checked) { --ink: #444444; }
+        .group:has(#north:checked) .readout { border-color: #555555; }
+        .readout { color: var(--ink); }
+        #east:checked + p { background: #666666; }
+        #east:checked ~ p { width: 30px; }
+        #east:checked ~ p::before { content: "active"; }
+        #east:checked { background: #777777; }
+    "#;
+    let graph = crate::SceneSourceGraph::from_strings("radio-snapshot", html, css).unwrap();
+    let by_dom_id = |node: &crate::HtmlNode, id: &str| {
+        node.attributes
+            .iter()
+            .any(|(key, value)| key == "id" && value == id)
+    };
+    let assert_state = |scene: &crate::resolver::ResolvedScene, east_selected: bool| {
+        let style = |id| {
+            &scene
+                .nodes
+                .iter()
+                .find(|node| by_dom_id(&node.node, id))
+                .unwrap()
+                .style
+        };
+        assert_eq!(
+            style("adjacent").color.as_deref(),
+            Some(if east_selected { "#222222" } else { "#333333" })
+        );
+        assert_eq!(style("independent").color.as_deref(), Some("#111111"));
+        assert_eq!(
+            style("adjacent").background_color.as_deref(),
+            east_selected.then_some("#666666")
+        );
+        assert_eq!(style("later").background_color, None);
+        assert_eq!(style("later").width, east_selected.then_some(30.0));
+        assert_eq!(!style("later").decorations.is_empty(), east_selected);
+        assert_eq!(
+            style("later").border_color.as_deref(),
+            (!east_selected).then_some("#555555")
+        );
+        assert_eq!(
+            style("east").background_color.as_deref(),
+            east_selected.then_some("#777777")
+        );
+    };
+
+    use crate::resolver::{ResolverError, resolve_scene_with_radio_selection};
+
+    let defaults = resolve_scene_with_radio_selection(&graph, 800.0, 600.0, &[]).unwrap();
+    assert_state(&defaults, true);
+
+    let north = graph
+        .html_nodes
+        .iter()
+        .find(|node| by_dom_id(node, "north"))
+        .unwrap()
+        .id;
+    let selected = resolve_scene_with_radio_selection(&graph, 800.0, 600.0, &[north]).unwrap();
+    assert_state(&selected, false);
+
+    let invalid = resolve_scene_with_radio_selection(&graph, 800.0, 600.0, &[usize::MAX]);
+    assert!(matches!(invalid, Err(ResolverError::UnsupportedRadio(id)) if id == usize::MAX));
+
+    let ordinary = resolve_scene(&graph).unwrap();
+    let east = ordinary
+        .nodes
+        .iter()
+        .find(|node| by_dom_id(&node.node, "east"))
+        .unwrap();
+    assert_eq!(east.style.background_color, None);
+    assert_eq!(
+        east.style
+            .checked_paint
+            .background_color
+            .as_ref()
+            .map(|color| color.0.as_str()),
+        Some("#777777")
+    );
+
+    let losses = crate::diagnostics::analyze(&graph);
+    assert!(losses.iter().any(|loss| {
+        loss.kind == crate::diagnostics::DiagnosticKind::UnsupportedSelector
+            && loss.selector.as_deref() == Some("#east:checked + p")
+    }));
+}
