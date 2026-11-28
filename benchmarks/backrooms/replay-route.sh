@@ -7,8 +7,8 @@ width=${3:?width required}
 height=${4:?height required}
 out=${5:?local capture prefix required}
 trace="$out-trace.jsonl"
-if [[ $source == --document ]]; then
-    args=(--document "${width}x${height}" "${@:6}")
+if [[ $source == --document || $source == --document-strip ]]; then
+    args=("$source" "${width}x${height}" "${@:6}")
 else
     args=(--route "$source")
 fi
@@ -52,6 +52,8 @@ while read -r input frame shot; do
         xdotool key --delay 150 Tab Tab Return
     elif [[ $input == double-* ]]; then
         xdotool mousemove --window "$wid" "${input#double-}" "$((height + 24))" click --repeat 2 --delay 0 1
+    elif [[ $input == *,* ]]; then
+        xdotool mousemove --window "$wid" "${input%,*}" "${input#*,}" click 1
     else
         xdotool mousemove --window "$wid" "$input" "$((height + 24))" click 1
     fi

@@ -38,9 +38,10 @@ python3 benchmarks/backrooms/play.py
 
 The first run downloads the pinned original HTML, checks the HTML and inline
 CSS fingerprints, and builds the GPUI viewer in release mode. The local
-source and binary are stored in `target/backrooms`. Click Enter and use the
-control strip below the scene to move and turn. Click Show workings out to
-reveal Top view. The default scene is 1152 × 648 plus the 48 px strip. Pass
+source and binary are stored in `target/backrooms`. Click Enter in the strip
+below the scene, then use the arrows in the viewport to move and turn. The
+strip also carries the floor switch and Finish actions. Click Show workings
+out to reveal Top view. The default scene is 1152 × 648 plus the 48 px strip. Pass
 `--viewport 1440x900` to sample the larger authored layout on a display with
 room for the strip.
 
@@ -50,9 +51,10 @@ source and opens the prepared app directly. Offline launch needs Python and
 the native runtime dependencies. The preview runs with the browser closed
 and no network access.
 
-The native strip exposes actions from the authored source, including the path
-to Finish. In-scene controls and HUD hit testing, the title treatment, audio,
-and the Enter, wraparound-turn and ending keyframes still lack native support.
+The preview positions movement controls from the authored CSS and checks
+clicks against their rounded shapes. Door hit testing in the 3D scene, the
+rest of the HUD, the title treatment, audio, and the Enter, wraparound-turn
+and ending keyframes still lack native support.
 Intermediate motion is capped at a 640 × 360 raster at the default viewport.
 The viewer settles at full resolution. The strict compiler still reports
 5,102 source losses and emits zero Rust bytes at either benchmark viewport.
@@ -417,7 +419,7 @@ images. The output includes per-frame paint and layout losses. The optional
 last argument keeps the screenshots, RGBA files, route bundles, and native
 input traces. The GPUI control strip uses the route's compiled destinations.
 
-The authored HUD, debug text inside the maze, grouped depth compositing and
+The rest of the authored HUD, debug text inside the maze, grouped depth compositing and
 animated ending remain open on ISS-22. Top view still reports unsupported
 gradient variants, grouped opacity, outlines, generated content, and layout
 for bordered or aspect-ratio decorations. Strict GPUI conversion reports 5,102
@@ -443,16 +445,20 @@ activation starts from the latest submitted camera pose. Unsupported motion
 uses the full-resolution settled preview. Native execution uses the local
 source and GPUI.
 
-The strip exposes scoped radio labels and direct checkboxes supported by the
-resolver. It applies cascade visibility and pointer eligibility. The
-authored HUD, viewport hit testing and occlusion of controls still need
-native support.
+The viewer presents supported flat, absolutely positioned, single-glyph
+labels over the scene. Their used boxes, stacking, shapes, content and
+eligibility come from the CSS and the current checked state. The strip
+exposes the remaining scoped radio labels and direct checkboxes. The
+scene-only benchmarks open the same source with `--document-strip` to
+capture scene rasters without the native controls in the viewport.
 
 ```sh
 node benchmarks/backrooms/live-branch.mjs /path/to/playwright-install \
   "$target_dir/debug/css-gpui-planar-preview" /tmp/backrooms-live-branch
 node benchmarks/backrooms/full-route.mjs /path/to/playwright-install \
   "$target_dir/debug/css-gpui-planar-preview" /tmp/backrooms-full-live --live
+node benchmarks/backrooms/full-route.mjs /path/to/playwright-install \
+  "$target_dir/debug/css-gpui-planar-preview" /tmp/backrooms-full-hud --authored-hud
 ```
 
 The branch probe uses real Chromium and X11 input at both benchmark
@@ -474,6 +480,14 @@ With `--live`, the start-to-finish probe uses the same direct-source viewer.
 At each viewport it reaches Finish in 45 Chromium clicks and 45 GPUI
 activations. All 46 native scene readbacks match the independent Rust rasters
 byte for byte. The compiled `--route` command opens retained route bundles.
+
+With `--authored-hud`, the probe clicks the movement controls in GPUI at the
+same viewport points as Chromium. It compares their visible bounds and
+authored glyphs, verifies the button fill in the X11 capture, and checks for
+byte-exact scene readbacks outside the measured button rectangles.
+At 390 × 844 and 1440 × 900, 42 of the 45 clicks use the movement controls
+in the viewport. All 46 captures per size match the independent scene rasters
+outside the movement controls, and visible bounds agree within 1/64 CSS px.
 
 
 ## Native camera transitions
@@ -530,8 +544,8 @@ xvfb-run -a -s '-screen 0 1600x1000x24' \
 
 The preview uses settled frames for perspective changes and unsupported
 transition syntax. CSS keyframes, the authored Enter sequence, the
-wraparound-turn keyframes, the animated ending, audio, and the authored HUD
-remain outside this motion check. Interruption starts each supported track
+wraparound-turn keyframes, the animated ending, audio, and the viewport
+controls remain outside this motion check. Interruption starts each supported track
 from the last submitted pose with its authored duration. Chromium's
 transition reversal and continued timelines for unchanged targets remain
 unmeasured. Strict generation remains separate and stops at 5,102 source

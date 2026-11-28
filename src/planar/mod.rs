@@ -5,11 +5,13 @@
 //! the visible planes and paint that the bounded renderer has to approximate or
 //! omit. The standard strict GPUI emitter is independent of this preview.
 
+mod controls;
 mod material;
 mod overlay;
 mod raster;
 mod transition;
 
+pub use controls::{ViewportControl, viewport_controls};
 pub use transition::{Pose, Transition};
 
 use std::{

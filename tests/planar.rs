@@ -1,6 +1,94 @@
 use css_gpui::{SceneSourceGraph, planar::preview, resolver::resolve_scene_with_radio_selection};
 
 #[test]
+fn viewport_controls_follow_checked_state_and_css_geometry() {
+    use css_gpui::{
+        planar::viewport_controls,
+        resolver::{checked_snapshot_controls, resolve_scene_with_checked_activations},
+    };
+
+    let html = r#"
+        <html><body>
+            <input type="radio" name="step" id="first" checked>
+            <input type="radio" name="step" id="second">
+            <main></main>
+            <aside><label for="second"></label><label for="first"></label></aside>
+        </body></html>
+    "#;
+    let css = r#"
+        body, main { position: absolute; inset: 0; }
+        body { overflow: hidden; }
+        main { perspective: 500px; }
+        input { display: none; }
+        aside { position: absolute; right: 2px; bottom: 4px; z-index: 2; transform: translateX(3px); }
+        label {
+            position: absolute; right: 5px; bottom: 10px; width: 20px; aspect-ratio: 2 / 1;
+            box-sizing: border-box; padding: 2px; border-radius: 4px;
+            background: #111; color: #fff;
+        }
+        label::after { content: "+"; }
+        label[for=first]::after { content: "−"; }
+        #first:checked ~ aside [for=first], #second:checked ~ aside [for=second] { pointer-events: none; }
+        @media (orientation: portrait) { label { right: 8px; } }
+    "#;
+    for (viewport, bounds, activated, target, glyph) in [
+        ([120, 90], [96.0, 66.0, 20.0, 10.0], false, "second", '+'),
+        ([90, 120], [63.0, 96.0, 20.0, 10.0], true, "first", '−'),
+    ] {
+        let [width, height] = viewport.map(|size| size as f32);
+        let graph = SceneSourceGraph::from_strings_at_viewport_size(
+            "viewport controls",
+            html,
+            css,
+            width,
+            height,
+        )
+        .unwrap();
+        let element = |name: &str| {
+            graph
+                .html_nodes
+                .iter()
+                .find(|node| node.name.as_deref() == Some(name))
+                .unwrap()
+                .id
+        };
+        let activated: Vec<_> = graph
+            .html_nodes
+            .iter()
+            .filter(|node| {
+                activated
+                    && node
+                        .attributes
+                        .iter()
+                        .any(|(key, value)| key == "id" && value == "second")
+            })
+            .map(|node| node.id)
+            .collect();
+        let scene =
+            resolve_scene_with_checked_activations(&graph, width, height, &activated).unwrap();
+        let candidates =
+            checked_snapshot_controls(&graph, &scene, element("body"), &activated).unwrap();
+        assert_eq!(candidates.labels.len(), 1);
+        let label = &candidates.labels[0];
+        assert_eq!(label.target, target);
+        let controls = viewport_controls(
+            &graph,
+            &scene,
+            element("main"),
+            viewport,
+            &candidates.labels,
+        );
+        let control = &controls[&label.node_id];
+        assert_eq!(control.bounds, bounds);
+        assert_eq!(control.glyph, glyph);
+        let [x, y, ..] = bounds;
+        assert!(!control.contains([x, y]));
+        assert!(control.contains([x + 10.0, y + 5.0]));
+        assert!(!control.contains([x + 20.0, y + 5.0]));
+    }
+}
+
+#[test]
 fn crossing_faces_use_pixel_depth_and_preserve_reflected_front_faces() {
     let html = "<main><i></i><b></b><em></em><strong></strong></main>";
     let css = r#"

@@ -43,7 +43,7 @@ function score(samples, name) {
 }
 
 async function testNative({ width, height, html, css, sample, out, states, interrupt }) {
-    const app = spawn(executable, ['--document', `${width}x${height}`, html, css, 'content', 'body'], {
+    const app = spawn(executable, ['--document-strip', `${width}x${height}`, html, css, 'content', 'body'], {
         env: { ...process.env, CSS_GPUI_TRACE_MOTION: '1' }, stdio: ['ignore', 'pipe', 'inherit'],
     });
     const trace = [];

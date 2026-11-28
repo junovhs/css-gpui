@@ -6,11 +6,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-use css_gpui::planar::{Pose, Transition};
+use css_gpui::planar::{Pose, Transition, ViewportControl};
 use gpui::{
     App, AppContext, Application, Bounds, Context, FocusHandle, InteractiveElement, IntoElement,
     KeyBinding, ParentElement, Render, RenderImage, StatefulInteractiveElement, Styled, Window,
-    WindowBounds, WindowOptions, actions, canvas, div, px, rgb, size,
+    WindowBounds, WindowOptions, actions, canvas, div, px, rgb, rgba, size,
 };
 use serde::{Deserialize, Serialize};
 
@@ -82,6 +82,8 @@ struct Label {
     class_name: String,
     #[serde(default)]
     checkbox: bool,
+    #[serde(skip_deserializing, skip_serializing_if = "Option::is_none")]
+    movement: Option<ViewportControl>,
 }
 
 struct SceneFrame {
@@ -121,6 +123,7 @@ struct Viewer {
     source: Source,
     frame: Arc<SceneFrame>,
     current: usize,
+    width: u32,
     height: u32,
     pending: bool,
     motion: Option<MotionFrame>,
@@ -411,6 +414,7 @@ impl Render for Viewer {
             .labels
             .iter()
             .enumerate()
+            .filter(|(_, label)| label.movement.is_none())
             .map(|(index, label)| {
                 let button = div()
                     .id(("route-label", index))
@@ -440,6 +444,62 @@ impl Render for Viewer {
                 }
             })
             .collect::<Vec<_>>();
+        let mut movement = self
+            .frame
+            .labels
+            .iter()
+            .enumerate()
+            .filter_map(|(index, label)| Some((index, label, label.movement.as_ref()?)))
+            .filter(|(_, _, control)| {
+                let [left, top, width, height] = control.bounds;
+                width > 0.0
+                    && height > 0.0
+                    && left < self.width as f32
+                    && top < self.height as f32
+                    && left + width > 0.0
+                    && top + height > 0.0
+            })
+            .collect::<Vec<_>>();
+        movement.sort_by_key(|(index, _, control)| (control.stacking_order, *index));
+        let movement = movement.into_iter().map(|(index, label, control)| {
+            let [left, top, width, height] = control.bounds;
+            let button = div()
+                .id(("movement-label", index))
+                .absolute()
+                .left(px(left))
+                .top(px(top))
+                .w(px(width))
+                .h(px(height))
+                .pt(px(control.padding_top))
+                .flex()
+                .justify_center()
+                .items_start()
+                .rounded(px(control.corner_radius))
+                .bg(rgba(u32::from_be_bytes(control.background)))
+                .text_color(rgba(u32::from_be_bytes(control.color)))
+                .text_size(px(control.font_size))
+                .child(control.glyph.to_string());
+            if self.pending {
+                return button;
+            }
+            let button = if self.destination(label).is_some() {
+                button.tab_index(0).cursor_pointer()
+            } else {
+                button
+            };
+            let control = control.clone();
+            button.on_click(
+                cx.listener(move |view, event: &gpui::ClickEvent, window, cx| {
+                    if let Some(point) = event.mouse_position()
+                        && !control.contains([point.x.into(), point.y.into()])
+                    {
+                        return;
+                    }
+                    cx.stop_propagation();
+                    view.activate(current, index, window, cx);
+                }),
+            )
+        });
 
         div()
             .id("route")
@@ -451,23 +511,30 @@ impl Render for Viewer {
             .flex()
             .flex_col()
             .child(
-                canvas(
-                    |_, _, _| {},
-                    move |bounds, (), window, _| {
-                        window
-                            .paint_image(bounds, Default::default(), image, 0, false)
-                            .expect("paint the route frame");
-                        if let Some(record) = motion_report {
-                            println!("{record}");
-                        }
-                        if let Some(record) = report {
-                            println!("{record}");
-                        }
-                    },
-                )
-                .w_full()
-                .h(px(self.height as f32))
-                .flex_shrink_0(),
+                div()
+                    .relative()
+                    .w_full()
+                    .h(px(self.height as f32))
+                    .flex_shrink_0()
+                    .overflow_hidden()
+                    .child(
+                        canvas(
+                            |_, _, _| {},
+                            move |bounds, (), window, _| {
+                                window
+                                    .paint_image(bounds, Default::default(), image, 0, false)
+                                    .expect("paint the route frame");
+                                if let Some(record) = motion_report {
+                                    println!("{record}");
+                                }
+                                if let Some(record) = report {
+                                    println!("{record}");
+                                }
+                            },
+                        )
+                        .size_full(),
+                    )
+                    .children(movement),
             )
             .child(
                 div()
@@ -512,12 +579,20 @@ pub(super) fn run_document(
     css: &Path,
     root: &str,
     scope: &str,
+    authored_controls: bool,
 ) -> Result<(), Box<dyn Error>> {
     let (width, height) = viewport
         .split_once('x')
         .ok_or("expected viewport WIDTHxHEIGHT")?;
     let [width, height] = [width.parse()?, height.parse()?];
-    let document = Arc::new(Document::new([width, height], html, css, root, scope)?);
+    let document = Arc::new(Document::new(
+        [width, height],
+        html,
+        css,
+        root,
+        scope,
+        authored_controls,
+    )?);
     let activations = Activations::default();
     let state = Arc::new(document.resolve(&activations)?);
     let initial = state.frame(document.image(&state, None)?);
@@ -565,6 +640,7 @@ fn open(width: u32, height: u32, source: Source, frame: Arc<SceneFrame>) {
                         motion: None,
                         motion_start: None,
                         trace_motion: std::env::var_os("CSS_GPUI_TRACE_MOTION").is_some(),
+                        width,
                         height,
                         report: true,
                         focus,

@@ -17,6 +17,7 @@ pub(super) struct Document {
     viewport: [u32; 2],
     root: usize,
     scope: usize,
+    authored_controls: bool,
     ids: BTreeMap<String, usize>,
 }
 
@@ -41,6 +42,7 @@ impl Document {
         css: &Path,
         root: &str,
         scope: &str,
+        authored_controls: bool,
     ) -> Result<Self, Box<dyn Error>> {
         if viewport.iter().any(|length| !(1..=4096).contains(length)) {
             return Err("planar preview requires each viewport dimension in 1..=4096".into());
@@ -65,6 +67,7 @@ impl Document {
             viewport,
             root,
             scope,
+            authored_controls,
             ids,
         })
     }
@@ -99,6 +102,17 @@ impl Document {
         let controls =
             resolver::checked_snapshot_controls(&self.graph, &scene, self.scope, &activations)
                 .map_err(|error| error.to_string())?;
+        let mut movement = if self.authored_controls {
+            planar::viewport_controls(
+                &self.graph,
+                &scene,
+                self.root,
+                self.viewport,
+                &controls.labels,
+            )
+        } else {
+            Default::default()
+        };
         let labels = controls
             .labels
             .into_iter()
@@ -108,6 +122,7 @@ impl Document {
                 target: label.target.to_owned(),
                 class_name: label.class_name.to_owned(),
                 checkbox: label.checkbox,
+                movement: movement.remove(&label.node_id),
             })
             .collect();
         let controls = CheckedState {

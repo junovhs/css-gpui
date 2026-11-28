@@ -9,9 +9,10 @@ import { replayDocument, routeLabels, writeRouteBundle } from './route.mjs';
 
 const executable = process.argv[3] && resolve(process.argv[3]);
 assert(executable, 'Pass the css-gpui-planar-preview binary as the second argument');
-const [output] = process.argv.slice(4).filter(arg => arg !== '--live');
+const [output] = process.argv.slice(4).filter(arg => !arg.startsWith('--'));
 const captures = output && resolve(output);
-const live = process.argv.includes('--live');
+const authoredHud = process.argv.includes('--authored-hud');
+const live = authoredHud || process.argv.includes('--live');
 const replay = fileURLToPath(new URL('./replay-route.sh', import.meta.url));
 const capture = fileURLToPath(new URL('./capture-planar.sh', import.meta.url));
 const navigationLabels = 'start-text label[for], buttons label[for], content label[for]';
@@ -48,14 +49,20 @@ await withBackrooms(async ({ page, newPage, snapshot, reset, htmlPath, cssPath, 
         const browserStates = await replayBrowser(page, out, width, height, route);
         const states = compileRoute(snapshot, out, width, height, route, browserStates);
         const nativePrefix = live
-            ? await replayDocument(executable, htmlPath, cssPath, states, out, width, height, 'full-live')
+            ? await replayDocument(executable, htmlPath, cssPath, states, out, width, height,
+                authoredHud ? 'full-authored' : 'full-live', authoredHud ? browserStates : undefined)
             : await replayNative(await writeRouteBundle(out, width, height, states, 'full-route'),
                 states, out, width, height);
         const frames = await compareFrames(out, width, height, nativePrefix, states, browserStates);
         const wall = await verifyWallEdit(snapshot, out, width, height, nativePrefix, states, browserStates, wallFile);
         console.log(JSON.stringify({
             width, height, browserClicks: route.length - 1, nativeClicks: route.length - 1,
-            gpuiExactRgbaFrames: frames.length, wallEdit: wall,
+            ...(authoredHud ? {
+                gpuiExactRgbaFramesOutsideHud: frames.length,
+                authoredMovementClicks: route.slice(1).filter(({ activation }, index) =>
+                    browserStates[index].labels.some(label => label.movement && sameLabel(label, activation))).length,
+            } : { gpuiExactRgbaFrames: frames.length }),
+            wallEdit: wall,
             checkpoints: route.slice(1).flatMap(({ activation, selection }, index) =>
                 ['bookends', 'floor'].includes(activation.group)
                     ? [{ step: index + 1, target: activation.target, selection }] : []),
@@ -95,7 +102,10 @@ async function browserState(page, selection) {
                         const x = left + (right - left) * fx;
                         const y = top + (bottom - top) * fy;
                         if (document.elementFromPoint(x, y)?.closest('label') === label) {
-                            return [{ target: target.id, group: target.name, class_name: label.className, x, y }];
+                            const movement = !selection && label.closest('buttons') && part === label
+                                ? [rect.left, rect.top, rect.width, rect.height] : null;
+                            const arrow = movement && JSON.parse(getComputedStyle(label, '::after').content);
+                            return [{ target: target.id, group: target.name, class_name: label.className, x, y, movement, arrow }];
                         }
                     }
                 }
@@ -213,8 +223,35 @@ async function compareFrames(out, width, height, nativePrefix, states, browserSt
     const frames = [];
     for (const [index, { rgba, selection, planes, losses }] of states.entries()) {
         const native = readPixels(`${nativePrefix}-${index}.png`, width, height);
-        assert(native.equals(await readFile(join(out, rgba))), `${rgba}: native readback differs from Rust frame`);
+        const rust = await readFile(join(out, rgba));
         const browser = readPixels(browserStates[index].png, width, height);
+        if (authoredHud) {
+            const movements = browserStates[index].labels.flatMap(label => label.movement ? [label.movement] : []);
+            const coordinates = movements.map(([x, y, w, h]) =>
+                [Math.max(0, Math.floor(x)), Math.max(0, Math.floor(y)),
+                    Math.min(width, Math.ceil(x + w)), Math.min(height, Math.ceil(y + h))]);
+            const nativeScene = Buffer.from(native);
+            for (const [left, top, right, bottom] of coordinates) {
+                const probe = ((top + 8) * width + left + 8) * 4;
+                assert.deepEqual(native.subarray(probe, probe + 4), browser.subarray(probe, probe + 4),
+                    `${rgba}: authored button fill differs from Chromium`);
+                let nativeGlyph = 0;
+                let browserGlyph = 0;
+                for (let y = top; y < bottom; y++) {
+                    const start = (y * width + left) * 4;
+                    for (let x = left + 8; x < right - 8 && y >= top + 8 && y < bottom - 8; x++) {
+                        const pixel = (y * width + x) * 4;
+                        nativeGlyph += Number(native[pixel] >= 224);
+                        browserGlyph += Number(browser[pixel] >= 224);
+                    }
+                    rust.copy(nativeScene, start, start, (y * width + right) * 4);
+                }
+                assert(nativeGlyph >= 8 && browserGlyph >= 8, `${rgba}: arrow missing from the rendered button`);
+            }
+            assert(nativeScene.equals(rust), `${rgba}: native readback differs from Rust outside the authored movement HUD`);
+        } else {
+            assert(native.equals(rust), `${rgba}: native readback differs from Rust frame`);
+        }
         const lossesByProperty = Object.create(null);
         for (const { property } of losses) lossesByProperty[property] = (lossesByProperty[property] ?? 0) + 1;
         frames.push({ index, selection, planes, fullPage: compare(native, browser), lossesByProperty });
@@ -237,7 +274,9 @@ async function verifyWallEdit(snapshot, out, width, height, nativePrefix, states
         executable, String(width), String(height), rgba, editedNative], { timeout: 15_000 });
     const editedPixels = readPixels(editedNative, width, height);
     assert(editedPixels.equals(await readFile(rgba)), `${rgba}: GPUI wall edit differs from the rebuilt frame`);
-    const native = compare(readPixels(`${nativePrefix}-${index}.png`, width, height), editedPixels);
+    const baseline = authoredHud ? await readFile(join(out, states[index].rgba))
+        : readPixels(`${nativePrefix}-${index}.png`, width, height);
+    const native = compare(baseline, editedPixels);
     const chromium = compare(readPixels(png, width, height), readPixels(editedPng, width, height));
     assert(native.changedFraction >= 0.01 && chromium.changedFraction >= 0.01,
         `${rgba}: wall edit changed fewer than 1% of pixels in Chromium or GPUI`);

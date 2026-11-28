@@ -101,11 +101,36 @@ impl<'a> UsedBoxLayout<'a> {
                 ));
             }
             let container = self.containing_block(Some(id))?;
-            Some(self.absolute_box(id, style, container)?)
+            Some(self.absolute_box(
+                id,
+                self.style_box(id, style, container, false)?,
+                container,
+                false,
+            )?)
         } else {
             self.element_box(id)?
         };
         Ok(used.map(|used| used.border))
+    }
+
+    /// Lay out an absolute box, optionally with an explicit containing block.
+    /// The caller may establish that the element has no in-flow content,
+    /// so an unstretched auto dimension can collapse to its padding.
+    pub(crate) fn absolute_border_box(
+        &mut self,
+        id: usize,
+        area: Option<BorderBox>,
+        empty: bool,
+    ) -> Result<BorderBox, BoxLayoutError> {
+        let node = self.node(id)?;
+        let style = &node.style.used_box_style;
+        style.require(id, "position", "static", &["absolute"])?;
+        let area = match area {
+            Some(area) => area,
+            None => self.containing_block(node.node.parent_id)?,
+        };
+        let sized = self.style_box(id, style, area, true)?;
+        Ok(self.absolute_box(id, sized, area, empty)?.border)
     }
 
     fn node(&self, id: usize) -> Result<&'a ResolvedNode, BoxLayoutError> {
@@ -147,7 +172,8 @@ impl<'a> UsedBoxLayout<'a> {
         }
         if style.value("position", "static") == "absolute" {
             let container = self.containing_block(node.node.parent_id)?;
-            let used = self.absolute_box(id, style, container)?;
+            let sized = self.style_box(id, style, container, false)?;
+            let used = self.absolute_box(id, sized, container, false)?;
             self.boxes.insert(id, Some(used));
             return Ok(Some(used));
         }
@@ -195,9 +221,9 @@ impl<'a> UsedBoxLayout<'a> {
         id: usize,
         style: &'a UsedBoxStyle,
         area: BorderBox,
+        transfer_ratio: bool,
     ) -> Result<SizedBox, BoxLayoutError> {
         for (name, initial) in [
-            ("aspect-ratio", "auto"),
             ("min-width", "auto"),
             ("min-height", "auto"),
             ("max-width", "none"),
@@ -253,6 +279,35 @@ impl<'a> UsedBoxLayout<'a> {
             offsets[i] = read(offset, "auto", area.size[1 - i % 2])?;
         }
         let total_padding = [padding[3] + padding[1], padding[0] + padding[2]];
+        let ratio = style.value("aspect-ratio", "auto");
+        if ratio != "auto" {
+            if !transfer_ratio {
+                return Err(invalid(id, format!("unsupported aspect-ratio: {ratio}")));
+            }
+            let (width, height) = ratio.split_once('/').unwrap_or((ratio, "1"));
+            let positive = |value: &str| {
+                value
+                    .trim()
+                    .parse::<f64>()
+                    .ok()
+                    .filter(|value| value.is_finite() && *value > 0.0)
+            };
+            let ratio = positive(width)
+                .zip(positive(height))
+                .map(|(width, height)| width / height)
+                .ok_or_else(|| invalid(id, "unsupported aspect-ratio"))?;
+            // Transfer an explicit dimension only when the other axis is
+            // auto-sized from content, rather than stretched between insets.
+            match dimensions {
+                [Some(width), None] if offsets[0].is_none() || offsets[2].is_none() => {
+                    dimensions[1] = Some(width / ratio);
+                }
+                [None, Some(height)] if offsets[1].is_none() || offsets[3].is_none() => {
+                    dimensions[0] = Some(height * ratio);
+                }
+                _ => {}
+            }
+        }
         for (dimension, padding) in dimensions.iter_mut().zip(total_padding) {
             if let Some(length) = *dimension {
                 if length < 0.0 {
@@ -276,10 +331,10 @@ impl<'a> UsedBoxLayout<'a> {
     fn absolute_box(
         &self,
         id: usize,
-        style: &'a UsedBoxStyle,
+        sized: SizedBox,
         area: BorderBox,
+        empty: bool,
     ) -> Result<UsedBox, BoxLayoutError> {
-        let sized = self.style_box(id, style, area)?;
         let mut border = area;
         for (axis, [start, end]) in [[3, 1], [0, 2]].into_iter().enumerate() {
             let [leading, trailing] = [start, end].map(|edge| sized.offsets[edge]);
@@ -293,6 +348,7 @@ impl<'a> UsedBoxLayout<'a> {
                 (None, Some(start), Some(end)) => {
                     (space - start - end - margin - opposite_margin).max(padding)
                 }
+                (None, _, _) if empty => padding,
                 _ => return Err(invalid(id, "auto size requires both insets")),
             };
             let offset = match (leading, trailing) {
@@ -394,7 +450,7 @@ impl<'a> UsedBoxLayout<'a> {
             ] {
                 style.require(id, name, initial, &[initial])?;
             }
-            let sized = self.style_box(id, style, area)?;
+            let sized = self.style_box(id, style, area, false)?;
             let [Some(width), Some(height)] = sized.dimensions else {
                 return Err(invalid(
                     id,

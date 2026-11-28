@@ -35,9 +35,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         return route::run(Path::new(bundle));
     }
     if let [mode, viewport, html, css, root, scope] = args.as_slice()
-        && mode == "--document"
+        && matches!(mode.as_str(), "--document" | "--document-strip")
     {
-        return route::run_document(viewport, Path::new(html), Path::new(css), root, scope);
+        return route::run_document(
+            viewport,
+            Path::new(html),
+            Path::new(css),
+            root,
+            scope,
+            mode == "--document",
+        );
     }
     let [width, height, rgba] = args.as_slice() else {
         return Err(

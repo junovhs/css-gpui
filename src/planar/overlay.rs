@@ -126,7 +126,11 @@ fn context_z_index(root: &ResolvedNode) -> Option<i32> {
     if atomic { z_index(css) } else { None }
 }
 
-fn flat_ancestor(node: &ResolvedNode, layout: &mut UsedBoxLayout, viewport: Point) -> bool {
+pub(super) fn flat_ancestor(
+    node: &ResolvedNode,
+    layout: &mut UsedBoxLayout,
+    viewport: Point,
+) -> bool {
     let style = &node.style;
     let css = &style.projection_properties;
     simple_coordinates(css)
