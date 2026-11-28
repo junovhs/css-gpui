@@ -5,6 +5,19 @@ use crate::ir::{
     paint::{Decoration, InteractionPaint, StatePaint},
 };
 
+/// Cascaded physical sizing and positioning values for the bounded box layout.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct UsedBoxStyle {
+    pub(crate) properties: BTreeMap<String, String>,
+    pub(crate) font_size: Option<f32>,
+}
+
+impl UsedBoxStyle {
+    pub fn font_size(&self) -> f32 {
+        self.font_size.unwrap_or(16.0)
+    }
+}
+
 /// Fully resolved CSS properties for a single HTML element node in the v0.1 subset.
 ///
 /// All lengths are in CSS pixels (`f32`). Colors are normalized lowercase hex strings.
@@ -61,6 +74,8 @@ pub struct ComputedStyle {
     pub projection_properties: BTreeMap<String, String>,
     /// Cascaded projection properties of generated pseudo-elements.
     pub decoration_projection_properties: BTreeMap<String, BTreeMap<String, String>>,
+    pub used_box_style: UsedBoxStyle,
+    pub decoration_box_styles: BTreeMap<String, UsedBoxStyle>,
     pub decorations: Vec<Decoration>,
     pub interaction: Option<InteractionPaint>,
     pub checked_paint: StatePaint,
@@ -114,6 +129,8 @@ impl Default for ComputedStyle {
             paint_placement: BTreeMap::new(),
             projection_properties: BTreeMap::new(),
             decoration_projection_properties: BTreeMap::new(),
+            used_box_style: UsedBoxStyle::default(),
+            decoration_box_styles: BTreeMap::new(),
             decorations: Vec::new(),
             interaction: None,
             checked_paint: StatePaint::default(),

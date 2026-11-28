@@ -12,7 +12,7 @@ const tolerance = 0.035;
 await withBackrooms(async ({ page, snapshot, reset }) => {
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('DOM.enable');
-    const total = { vertices: 0, wallVertices: 0, viewportPolygons: 0,
+    const total = { boxes: 0, maxBoxError: 0, vertices: 0, wallVertices: 0, viewportPolygons: 0,
         wallViewportPolygons: 0, clippedAtEye: 0, crossingEyeInViewport: 0, maxError: 0 };
     for (const [width, height] of viewports) {
         await reset(width, height);
@@ -29,20 +29,32 @@ await withBackrooms(async ({ page, snapshot, reset }) => {
                     perspective: none !important;
                 }`,
             });
-            const bounds = {};
+            const referenceBounds = {};
             try {
                 for (const [key, id] of boxes) {
                     const [[left, top], [right], [, bottom]] = await borderQuad(cdp, id);
-                    bounds[key] = { origin: [left, top], size: [right - left, bottom - top] };
+                    referenceBounds[key] = { origin: [left, top], size: [right - left, bottom - top] };
                 }
             } finally {
                 await untransformed.evaluate(node => node.remove());
             }
 
-            const projected = snapshot('--projection-snapshot', width, height, selection,
-                JSON.stringify({ bounds, chains }));
+            const { bounds, projected } = snapshot('--projection-snapshot', width, height, selection,
+                JSON.stringify({ chains }));
+            const name = `${width}x${height} ${selection.join(' ')}`;
+            assert.deepEqual(Object.keys(bounds).sort(), Object.keys(referenceBounds).sort(), name);
+            let maxBoxError = 0;
+            for (const [key, box] of Object.entries(bounds)) {
+                const expected = referenceBounds[key];
+                for (const property of ['origin', 'size']) {
+                    const error = Math.hypot(...box[property].map((value, axis) => value - expected[property][axis]));
+                    assert(error <= 1 / 64, `${name} ${key} ${property}: ${box[property]} vs ${expected[property]}`);
+                    maxBoxError = Math.max(maxBoxError, error);
+                }
+            }
             assert.deepEqual(Object.keys(projected).sort(), [...reference.keys()].sort());
-            const stats = { vertices: 0, wallVertices: 0, viewportPolygons: 0,
+            const stats = { boxes: Object.keys(bounds).length, maxBoxError,
+                vertices: 0, wallVertices: 0, viewportPolygons: 0,
                 wallViewportPolygons: 0, clippedAtEye: 0,
                 crossingEyeInViewport: 0, outsideViewport: 0, wallsInViewport: 0, maxError: 0 };
             for (const [key, { corners, viewport_polygon: polygon }] of Object.entries(projected)) {
@@ -79,15 +91,15 @@ await withBackrooms(async ({ page, snapshot, reset }) => {
                         && y >= -tolerance && y <= height + tolerance, info);
                 }
             }
-            const name = `${width}x${height} ${selection.join(' ')}`;
             assert(stats.vertices >= 40, `${name}: too few vertices checked`);
             assert(stats.viewportPolygons >= 6, `${name}: too few complete polygons checked`);
             assert(stats.wallVertices >= 8 && stats.wallsInViewport > 0, `${name}: too few corner walls checked`);
             assert(stats.crossingEyeInViewport > 0, `${name}: no mixed eye-plane sample intersects the viewport`);
-            for (const key of Object.keys(total).filter(key => key !== 'maxError')) {
+            for (const key of Object.keys(total).filter(key => !key.startsWith('max'))) {
                 total[key] += stats[key];
             }
             total.maxError = Math.max(total.maxError, stats.maxError);
+            total.maxBoxError = Math.max(total.maxBoxError, stats.maxBoxError);
             console.log(JSON.stringify({ width, height, selection, ...stats }));
         }
     }

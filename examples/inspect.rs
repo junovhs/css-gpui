@@ -132,14 +132,8 @@ fn inspect_radio_snapshot(scene: &resolver::ResolvedScene) -> Result<(), Box<dyn
 }
 
 #[derive(serde::Deserialize)]
-struct BorderBox {
-    origin: [f64; 2],
-    size: [f64; 2],
-}
-
-#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ProjectionInput {
-    bounds: BTreeMap<String, BorderBox>,
     chains: Vec<Vec<String>>,
 }
 
@@ -148,12 +142,7 @@ fn inspect_projection_snapshot(
     viewport: [f64; 2],
 ) -> Result<(), Box<dyn Error>> {
     let input: ProjectionInput = serde_json::from_reader(io::stdin().lock())?;
-    let root_font_size = scene
-        .nodes
-        .iter()
-        .find(|node| node.node.name.as_deref() == Some("html"))
-        .and_then(|node| node.style.font_size)
-        .unwrap_or(16.0);
+    let mut layout = layout::UsedBoxLayout::new(scene, viewport);
 
     let mut paths = BTreeMap::new();
     let mut counts = BTreeMap::new();
@@ -172,6 +161,7 @@ fn inspect_projection_snapshot(
         nodes.insert(path, node);
     }
 
+    let mut bounds = BTreeMap::new();
     let mut output = BTreeMap::new();
     for chain in &input.chains {
         let target = chain.last().ok_or("empty projection chain")?;
@@ -192,23 +182,31 @@ fn inspect_projection_snapshot(
                         .ok_or_else(|| format!("unknown pseudo-element {key}"))?,
                     None => &node.style.projection_properties,
                 };
-                let bounds = input
-                    .bounds
-                    .get(key)
-                    .ok_or_else(|| format!("missing box {key}"))?;
+                let border = layout
+                    .border_box(node.node.id, pseudo)
+                    .map_err(|error| format!("{key}: {error}"))?
+                    .ok_or_else(|| format!("no used box for {key}"))?;
+                bounds.insert(key, border);
+                let font_size = match pseudo {
+                    Some(pseudo) => node.style.decoration_box_styles[pseudo].font_size(),
+                    None => node.style.used_box_style.font_size(),
+                };
                 Ok::<_, String>(projection::Layer {
-                    origin: bounds.origin,
-                    size: bounds.size,
-                    font_size: node.style.font_size.unwrap_or(16.0),
+                    origin: border.origin,
+                    size: border.size,
+                    font_size,
                     css,
                 })
             })
             .collect::<Result<Vec<_>, _>>()?;
-        let projected = projection::project_box(&layers, viewport, root_font_size)
+        let projected = projection::project_box(&layers, viewport, layout.root_font_size())
             .map_err(|error| format!("{target}: {error}"))?;
         output.insert(target, projected);
     }
-    serde_json::to_writer(io::stdout().lock(), &output)?;
+    serde_json::to_writer(
+        io::stdout().lock(),
+        &json!({"bounds": bounds, "projected": output}),
+    )?;
     println!();
     Ok(())
 }

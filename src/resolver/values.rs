@@ -254,8 +254,8 @@ impl LengthContext {
             "px" => 1.0,
             "em" => self.em,
             "rem" => self.rem,
-            "vw" | "svw" => self.viewport?.0 / 100.0,
-            "vh" | "svh" => self.viewport?.1 / 100.0,
+            "vw" | "svw" | "dvw" => self.viewport?.0 / 100.0,
+            "vh" | "svh" | "dvh" => self.viewport?.1 / 100.0,
             "%" => self.percent? / 100.0,
             _ => return None,
         };

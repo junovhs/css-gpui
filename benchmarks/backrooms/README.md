@@ -65,10 +65,8 @@ the level-two label's legacy `:before` content. The pinned CSS
 contains 10,622 flat `:has()` calls. Each includes `:checked`. The
 snapshot exercises checked sibling selectors, compound and negated
 `:has()`, and a grouped override that replaces the authored default.
-Snapshot results establish cascade parity for these samples. Native label
-activation, media-dependent sizing, full 3D projection and frame comparison
-for Backrooms remain open. Strict generation continues to report unsupported
-live relational state.
+Snapshot results establish cascade parity for these samples. Strict generation
+continues to report unsupported live relational state.
 
 ## Corner projection snapshots
 
@@ -85,10 +83,13 @@ the portrait media query that changes the camera scale. The projector
 composes the nested transform lists, transform origins and parent perspective
 in a continuous `preserve-3d` context.
 
-Chromium supplies the untransformed border boxes to Rust as layout inputs,
-including the positions produced by the original floor's changing flex wrap.
-A separate Chromium DevTools measurement of the original transformed border
-quads supplies the reference. Across eight snapshots the probe compared
+Rust derives used border boxes from the authored cascade, including the
+centered absolute camera, percentage sizes, visible tiles in the wrapping
+floor, and absolutely positioned generated faces. The probe sends only
+the sampled DOM paths to Rust. Chromium DevTools independently measures
+untransformed border boxes and transformed border quads for comparison.
+Across eight snapshots, all 548 border boxes matched within 0.000031 CSS px
+against a 1/64 CSS px tolerance. Projection from the Rust boxes matched
 1,372 finite vertices, including 436 on wall faces, and 282 viewport polygons
 for boxes whose four corners were in front of the eye. Of those polygons,
 106 came from wall faces. The maximum coordinate error was 0.00224 CSS px
@@ -100,9 +101,10 @@ viewport. Twenty-nine of those boxes retained a viewport polygon. The Rust
 test `a_face_crossing_the_eye_is_clipped_before_perspective_division` checks
 the exact clipped outline of an independent wall crossing the eye.
 
-This isolates projected geometry. Standalone layout still needs a native
-source of the responsive, wrapped border boxes. Rendering still needs backface
-culling, visibility and depth ordering, authored paints, and motion. Live
-navigation and browser/native frame comparison remain open. At both viewports,
-ordinary strict GPUI conversion still exits at the source diagnostic stage
-with 5,102 losses and emits zero bytes of Rust.
+The bounded layout covers unbordered absolute boxes with explicit insets and
+sized flex items with row wrapping and start or end line packing. It uses a
+settled viewport and the authored cascade. Rendering still needs backface
+culling, depth ordering, authored paints, and motion. Live navigation and
+browser/native frame comparison remain open. At both viewports, ordinary
+strict GPUI conversion still exits at the source diagnostic stage with 5,102
+losses and emits zero bytes of Rust.

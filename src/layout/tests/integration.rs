@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-use crate::layout::compute_layout;
-use crate::load_scene_source_graph;
-use crate::resolver::resolve_scene;
+use crate::layout::{BorderBox, UsedBoxLayout, compute_layout};
+use crate::resolver::{resolve_scene, resolve_scene_with_radio_selection};
+use crate::{SceneSourceGraph, load_scene_source_graph};
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -119,5 +119,73 @@ fn profile_card_border_radius_and_width_in_geometry() -> Result<(), Box<dyn std:
 
     assert_eq!(card.geometry.border_width, 1.0);
     assert_eq!(card.geometry.border_radius, 16.0);
+    Ok(())
+}
+
+#[test]
+fn source_boxes_follow_containing_blocks_and_visible_flex_items()
+-> Result<(), Box<dyn std::error::Error>> {
+    let html = r#"<!doctype html><html><body><aside><section>
+        <i id="first"></i><i id="skip"></i><i id="second"></i><i id="third"></i>
+        </section></aside></body></html>"#;
+    let css = r#"
+        html { font-size: 10px; }
+        aside { position: absolute; inset: 4px 8px; margin: auto; width: 10rem; height: 50dvh; }
+        section { position: absolute; inset: 0; padding: 5px 10px; display: flex;
+                  flex-wrap: wrap; align-content: flex-end; }
+        i { position: relative; width: 50%; height: 15px; }
+        #skip { display: none; }
+        #second { top: 2px; }
+        #third::before { content: ""; position: absolute; right: 0; bottom: 0;
+                         width: 200%; height: 100%; }
+        #third::after { content: ""; display: none; }
+    "#;
+    let graph = SceneSourceGraph::from_strings_at_viewport_size("boxes", html, css, 240.0, 200.0)?;
+    let resolved = resolve_scene_with_radio_selection(&graph, 240.0, 200.0, &[])?;
+    let ids = |tag: &str| {
+        resolved
+            .nodes
+            .iter()
+            .find(|node| node.node.name.as_deref() == Some(tag))
+            .map(|node| node.node.id)
+            .unwrap()
+    };
+    let id = |id: &str| {
+        resolved
+            .nodes
+            .iter()
+            .find(|node| {
+                node.node
+                    .attributes
+                    .iter()
+                    .any(|(key, value)| key == "id" && value == id)
+            })
+            .map(|node| node.node.id)
+            .unwrap()
+    };
+    let mut layout = UsedBoxLayout::new(&resolved, [240.0, 200.0]);
+    for (node, pseudo, origin, size) in [
+        (ids("aside"), None, [70.0, 50.0], [100.0, 100.0]),
+        (ids("section"), None, [70.0, 50.0], [100.0, 100.0]),
+        (id("first"), None, [80.0, 115.0], [40.0, 15.0]),
+        (id("second"), None, [120.0, 117.0], [40.0, 15.0]),
+        (id("third"), Some("before"), [40.0, 130.0], [80.0, 15.0]),
+    ] {
+        let actual = layout.border_box(node, pseudo)?.expect("expected a box");
+        let expected = BorderBox { origin, size };
+        for (actual_value, expected_value) in actual
+            .origin
+            .into_iter()
+            .chain(actual.size)
+            .zip(expected.origin.into_iter().chain(expected.size))
+        {
+            assert!(
+                (actual_value - expected_value).abs() <= 1.0 / 64.0,
+                "node {node} {pseudo:?}: {actual:?} vs {expected:?}"
+            );
+        }
+    }
+    assert_eq!(layout.border_box(id("skip"), None)?, None);
+    assert_eq!(layout.border_box(id("third"), Some("after"))?, None);
     Ok(())
 }

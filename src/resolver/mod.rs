@@ -13,7 +13,7 @@ mod model;
 pub(crate) mod selector;
 pub(crate) mod values;
 
-pub use model::ComputedStyle;
+pub use model::{ComputedStyle, UsedBoxStyle};
 
 use crate::ir::paint::InteractionPaint;
 use crate::{CssRule, HtmlNode, HtmlNodeKind, SceneSourceGraph, radio::RadioMarkup};
@@ -292,6 +292,9 @@ fn resolve(
             style
                 .decoration_projection_properties
                 .insert((*name).to_owned(), decoration.projection_properties);
+            style
+                .decoration_box_styles
+                .insert((*name).to_owned(), decoration.used_box_style);
             let mut placement = decoration.paint_placement;
             for corner in ["border-top-right-radius", "border-bottom-left-radius"] {
                 if !placement.contains_key(corner)
@@ -475,6 +478,7 @@ fn cascade(
             apply_with_lengths(&mut style, property, &value, lengths);
         }
     }
+    style.used_box_style.font_size = Some(lengths.em);
     (style, variables)
 }
 

@@ -1,6 +1,6 @@
 use crate::ir::{FlexWrap, LetterSpacing, TextAlign};
 
-use super::model::ComputedStyle;
+use super::model::{ComputedStyle, UsedBoxStyle};
 use super::values::{LengthContext, value_parts};
 
 pub(crate) fn split_important(value: &str) -> (&str, bool) {
@@ -29,6 +29,7 @@ pub(super) fn apply_with_lengths(
     lengths: LengthContext,
 ) {
     let value = value.trim();
+    record_box_property(&mut style.used_box_style, property, value);
     if value == "inherit" && !matches!(property, "text-align" | "letter-spacing") {
         return;
     }
@@ -348,18 +349,95 @@ pub fn parse_color(value: &str) -> Option<String> {
 // Shorthand helpers
 // ---------------------------------------------------------------------------
 
+fn edge_values(value: &str) -> Option<[&str; 4]> {
+    let values: Vec<_> = value_parts(value).collect();
+    match values.as_slice() {
+        [all] => Some([*all; 4]),
+        [tb, lr] => Some([*tb, *lr, *tb, *lr]),
+        [top, lr, bottom] => Some([*top, *lr, *bottom, *lr]),
+        [top, right, bottom, left] => Some([*top, *right, *bottom, *left]),
+        _ => None,
+    }
+}
+
+fn record_box_property(style: &mut UsedBoxStyle, property: &str, value: &str) {
+    let sides = match property {
+        "inset" => ["top", "right", "bottom", "left"],
+        "margin" => ["margin-top", "margin-right", "margin-bottom", "margin-left"],
+        "padding" => [
+            "padding-top",
+            "padding-right",
+            "padding-bottom",
+            "padding-left",
+        ],
+        _ => {
+            if matches!(
+                property,
+                "position"
+                    | "display"
+                    | "box-sizing"
+                    | "width"
+                    | "height"
+                    | "min-width"
+                    | "min-height"
+                    | "max-width"
+                    | "max-height"
+                    | "aspect-ratio"
+                    | "top"
+                    | "right"
+                    | "bottom"
+                    | "left"
+                    | "margin-top"
+                    | "margin-right"
+                    | "margin-bottom"
+                    | "margin-left"
+                    | "padding-top"
+                    | "padding-right"
+                    | "padding-bottom"
+                    | "padding-left"
+                    | "align-content"
+                    | "align-items"
+                    | "align-self"
+                    | "justify-content"
+                    | "gap"
+                    | "column-gap"
+                    | "row-gap"
+                    | "order"
+                    | "flex"
+                    | "flex-flow"
+                    | "flex-grow"
+                    | "flex-shrink"
+                    | "flex-basis"
+                    | "flex-direction"
+                    | "flex-wrap"
+            ) || (property.starts_with("border")
+                && !property.ends_with("-radius")
+                && !property.ends_with("color"))
+            {
+                style
+                    .properties
+                    .insert(property.to_owned(), value.to_owned());
+            }
+            return;
+        }
+    };
+    if let Some(edges) = edge_values(value) {
+        style.properties.extend(
+            sides
+                .into_iter()
+                .zip(edges)
+                .map(|(side, length)| (side.to_owned(), length.to_owned())),
+        );
+    }
+}
+
 fn record_inset(
     placement: &mut std::collections::BTreeMap<String, String>,
     value: &str,
     lengths: LengthContext,
 ) {
-    let values: Vec<_> = value_parts(value).collect();
-    let edges = match values.as_slice() {
-        [all] => [*all; 4],
-        [tb, lr] => [*tb, *lr, *tb, *lr],
-        [top, lr, bottom] => [*top, *lr, *bottom, *lr],
-        [top, right, bottom, left] => [*top, *right, *bottom, *left],
-        _ => return,
+    let Some(edges) = edge_values(value) else {
+        return;
     };
     for (side, length) in ["top", "right", "bottom", "left"].into_iter().zip(edges) {
         let value = lengths

@@ -21,10 +21,12 @@
 //! dimension fields. `DIA-01` reports these as unresolved geometry.
 
 pub use model::{Geometry, LaidOutNode, LaidOutScene};
+pub use used::{BorderBox, BoxLayoutError, UsedBoxLayout};
 
 use crate::resolver::{ComputedStyle, ResolvedScene};
 
 mod model;
+mod used;
 
 #[cfg(test)]
 mod tests;
