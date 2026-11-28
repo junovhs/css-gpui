@@ -1,3 +1,4 @@
+pub mod carousel;
 pub mod diagnostics;
 pub mod emitter;
 pub mod extractor;

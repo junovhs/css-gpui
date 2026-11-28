@@ -56,6 +56,15 @@ pub(super) fn apply_with_lengths(
         record_inset(&mut style.paint_placement, value, lengths);
     }
 
+    if matches!(
+        property,
+        "margin" | "perspective" | "transform" | "transform-style" | "transition"
+    ) {
+        style
+            .projection_properties
+            .insert(property.to_owned(), value.to_owned());
+    }
+
     match property {
         // --- Shorthands ---
         "margin" => expand_edges(

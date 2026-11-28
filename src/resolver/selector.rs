@@ -29,6 +29,7 @@ enum Condition<'a> {
     FirstChild,
     LastChild,
     NthOfType(usize),
+    NthChild { stride: i32, offset: i32 },
     AnyOf(Vec<Selector<'a>>),
     Not(Vec<Selector<'a>>),
 }
@@ -186,6 +187,18 @@ impl Condition<'_> {
             Self::LastChild => siblings()
                 .next_back()
                 .is_some_and(|other| other.id == node.id),
+            Self::NthChild { stride, offset } => {
+                let Some(index) = siblings().position(|other| other.id == node.id) else {
+                    return false;
+                };
+                let difference = index as i64 + 1 - i64::from(*offset);
+                let stride = i64::from(*stride);
+                if stride == 0 {
+                    difference == 0
+                } else {
+                    difference % stride == 0 && difference / stride >= 0
+                }
+            }
             Self::NthOfType(index) => index.checked_sub(1).is_some_and(|index| {
                 siblings()
                     .filter(|other| other.name == node.name)
@@ -208,6 +221,12 @@ fn pseudo_class<'a>(input: &mut &'a str, specificity: &mut Specificity) -> Optio
         "root" => Condition::Root,
         "first-child" => Condition::FirstChild,
         "last-child" => Condition::LastChild,
+        "nth-child" if take(input, "(") => {
+            let (value, rest) = input.split_once(')')?;
+            *input = rest;
+            let (stride, offset) = nth_child(value.trim_ascii())?;
+            Condition::NthChild { stride, offset }
+        }
         "nth-of-type" if take(input, "(") => {
             let (value, rest) = input.split_once(')')?;
             *input = rest;
@@ -240,6 +259,39 @@ fn pseudo_class<'a>(input: &mut &'a str, specificity: &mut Specificity) -> Optio
     };
     specificity.1 += 1;
     Some(condition)
+}
+
+fn nth_child(value: &str) -> Option<(i32, i32)> {
+    match value {
+        "even" => return Some((2, 0)),
+        "odd" => return Some((2, 1)),
+        _ => {}
+    }
+    if let Some((stride, offset)) = value.split_once('n') {
+        let stride = match stride {
+            "" | "+" => 1,
+            "-" => -1,
+            stride => stride.parse().ok()?,
+        };
+        let offset = offset.trim_ascii_start();
+        let offset = if offset.is_empty() {
+            0
+        } else {
+            let sign = match offset.as_bytes()[0] {
+                b'+' => 1,
+                b'-' => -1,
+                _ => return None,
+            };
+            let digits = offset[1..].trim_ascii_start();
+            if !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+                return None;
+            }
+            sign * digits.parse::<i32>().ok()?
+        };
+        Some((stride, offset))
+    } else {
+        Some((0, value.parse().ok()?))
+    }
 }
 
 fn attribute_value<'a>(input: &mut &'a str) -> Option<&'a str> {

@@ -37,3 +37,45 @@ The frozen output was recorded with Chromium 148.0.7778.96 on Linux x64. Two loc
 - **Projection and motion.** The scene uses `perspective: 1000px` with the default centered perspective origin (105, 70). The carousel preserves 3D, starts at `translateZ(-288px)`, and transitions its transform for one second with default `ease` timing. Each child applies the authored `rotateY(...) translateZ(288px)` transform in 40° increments with origin (95, 60). The carousel origin is (104, 69). The 1 px horizontal difference between the panel center and the parent origin gives the front quads small subpixel shifts after a turn. The scene’s visible overflow allows projected panels to extend beyond its border.
 - **Depth, alpha and text.** The panel fill alone has 0.8 alpha. Each plane carries the fill, opaque 2 px black border and opaque white number. Composite the planes in 3D depth order so rear fills, borders and numerals show through nearer fills. The browser’s default visible back face exposes reversed rear text through the front red panel. The text is centered with an 80 px bold sans-serif font and 116 px line height. Chromium used Liberation Sans Bold for the numerals in this recording. [Wide initial frame](reference/720-initial.png)
 - **Host event boundary.** The original JS attaches DOM `click` listeners to the two HTML buttons. Next increments `selectedIndex` by one and Previous decrements it by one. Each writes `translateZ(-288px) rotateY(angle)` to the carousel’s inline transform, where `angle = selectedIndex / 9 * -360` degrees. The native host needs to preserve button activation and those signed index steps. The script has no modulo or reset, so Previous at index 0 sets index −1 and turns +40° to panel 9. Keeping the angle continuous preserves one-step motion across the seam. CSS owns projection, paint and interpolation.
+
+## Standalone GPUI replay
+
+On Linux with X11, Vulkan, the XKB/X11 development libraries, Fontconfig and Liberation Sans installed, build and run from the repository root with Rust 1.95.
+
+```sh
+scratch=$(mktemp -d)
+manifest=fixtures/carousel-rotate/native/Cargo.toml
+cargo +1.95.0 build --locked --manifest-path "$manifest" --target-dir "$scratch/build"
+exe="$scratch/build/debug/css-gpui-carousel"
+"$exe" 720 280
+```
+
+The build reads the unchanged HTML and CSS through the compiler's source graph and cascade. A fixture-specific typed projection carries the scene dimensions, ordered panels, positions, transforms, perspective, timing, colors, label text and typography into the executable. It embeds that data at build time. The GPUI application runs without Chromium, source files or captured geometry. The native button handlers bind the frozen script's signed click steps and extract its turn formula and inline depth.
+
+The viewport projects each panel around its CSS origin and samples it back into its local coordinates. It composites panel fills, borders and glyphs rear-to-front in a CPU rasterizer and presents the result as a GPUI texture. The host uses GPUI controls with mouse activation and Tab, Enter and Space support. The signed angle animates using the CSS duration and default ease curve.
+
+To replay both widths, install Xvfb, xdotool, ImageMagick, NumPy and Pillow. Use the Chromium replay instructions above to populate `$out`, or use the checked-in reference directory. Set the Vulkan ICD path to the lavapipe file on your machine for headless capture.
+
+```sh
+export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json
+fixture=fixtures/carousel-rotate
+xvfb-run -a -s '-screen 0 1280x800x24' "$fixture/native/capture.sh" "$exe" "$scratch/native"
+sed 's/hsla(  0,/hsla(180,/' "$fixture/source.css" > "$scratch/edited.css"
+CAROUSEL_CSS="$scratch/edited.css" cargo +1.95.0 build --locked \
+  --manifest-path "$manifest" --target-dir "$scratch/build"
+xvfb-run -a -s '-screen 0 1280x800x24' "$fixture/native/capture.sh" \
+  "$exe" "$scratch/edited" --initial-only
+browser=${out:-"$fixture/reference"}
+python3 "$fixture/native/compare.py" "$browser" "$scratch/native" --edited "$scratch/edited"
+```
+
+The capture clicks the GPUI buttons through X11 and compares the resulting window pixels and the quads used by the renderer. Across the eight settled frames, the maximum corner-coordinate difference was 0.00061 CSS px against a 0.01 px tolerance. The comparison measured the following over the full viewport width in the scene's vertical band, with glyphs measured within the browser's front text bounds.
+
+| Check | Acceptance | Observed at both widths |
+| --- | ---: | ---: |
+| Colored coverage intersection over union | ≥ 0.97 | 0.991–0.998 |
+| Near-black stroke intersection over union | ≥ 0.80 | 0.841–0.950 |
+| Mean absolute RGB error over visible pixels | ≤ 4.0 / 255 | 1.48–2.46 / 255 |
+| Near-white front glyph intersection over union | ≥ 0.87 | 0.898–0.997 |
+
+The hue-only edit repaints the same flat window region from RGB (255, 51, 51) to (51, 255, 255). A mid-turn native capture differs visibly from both endpoints. Chromium comparison covers settled states. The proof covers the frozen ring of disjoint planes, its default origins and back faces, simple numeral rasterization and approximate browser-default controls. It leaves general CSS 3D layouts, intersecting planes, near-plane clipping, browser glyph antialiasing, exact control theming and interrupted-transition parity outside its comparison.
