@@ -55,6 +55,7 @@ struct EmissionContext<'a> {
     hover_colors: &'a [(String, Color)],
     standard_interactivity: bool,
     has_focus_paint: bool,
+    viewport_height: bool,
     uses_letter_spacing: bool,
     uses_state_div: bool,
 }
@@ -114,7 +115,13 @@ fn emit_scene(
     } else {
         4
     };
-    writeln!(rust, "{:indent$}div().flex().flex_col().w_full()", "").unwrap();
+    let viewport_height = scene.nodes.iter().any(|node| {
+        node.layout.bottom.is_some()
+            && (node.layout.position == Position::Fixed
+                || (node.layout.position == Position::Absolute && node.parent_id.is_none()))
+    });
+    let height = if viewport_height { ".h_full()" } else { "" };
+    writeln!(rust, "{:indent$}div().flex().flex_col().w_full(){height}", "").unwrap();
     let mut declared_loss = Vec::new();
     let mut context = EmissionContext {
         scene,
@@ -122,6 +129,7 @@ fn emit_scene(
         hover_colors,
         standard_interactivity,
         has_focus_paint,
+        viewport_height,
         uses_letter_spacing: false,
         uses_state_div: false,
     };
@@ -243,6 +251,14 @@ fn emit_child(
     let style_indent = indent + 8;
     let mut method = |call: &str| writeln!(rust, "{:style_indent$}.{call}", "").unwrap();
     emit_layout(node, parent, &mut method, losses);
+    if context.viewport_height
+        && parent.is_none()
+        && !matches!(node.layout.position, Position::Absolute | Position::Fixed)
+    {
+        // The definite root height anchors viewport-relative boxes. Its in-flow
+        // children still keep their own heights as they would in block flow.
+        method("flex_shrink_0()");
+    }
     // GPUI uses physical alignment. The source subset has left-to-right inline flow.
     if node.layout.text_align != parent.and_then(|parent| parent.layout.text_align) {
         match node.layout.text_align {
@@ -585,6 +601,8 @@ fn emit_layout(
         method("absolute()");
         length(method, "left", layout.left);
         length(method, "top", layout.top);
+        length(method, "right", layout.right);
+        length(method, "bottom", layout.bottom);
     }
     let border = node
         .paint

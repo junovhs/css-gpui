@@ -15,6 +15,8 @@ fn default_layout() -> Layout {
         box_sizing: BoxSizing::ContentBox,
         top: None,
         left: None,
+        right: None,
+        bottom: None,
         width: None,
         height: None,
         aspect_ratio: None,

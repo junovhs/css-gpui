@@ -1,5 +1,6 @@
 use crate::ir::{FlexWrap, LetterSpacing, TextAlign};
 
+use super::inset::{SIDES, pixels};
 use super::model::{ComputedStyle, UsedBoxStyle};
 use super::values::{LengthContext, value_parts};
 
@@ -29,18 +30,37 @@ pub(super) fn apply_with_lengths(
     lengths: LengthContext,
 ) {
     let value = value.trim();
+    if property == "inset" {
+        if let Some(edges) = edge_values(value) {
+            for (side, length) in SIDES.into_iter().zip(edges) {
+                apply_with_lengths(style, side, length, lengths);
+            }
+        }
+        return;
+    }
     record_box_property(&mut style.used_box_style, property, value);
     if value == "inherit" && !matches!(property, "text-align" | "letter-spacing") {
         return;
     }
 
+    let offset = match property {
+        "top" => Some(&mut style.top),
+        "right" => Some(&mut style.right),
+        "bottom" => Some(&mut style.bottom),
+        "left" => Some(&mut style.left),
+        _ => None,
+    };
+    if let Some(offset) = offset {
+        *offset = lengths.pixels(value).or_else(|| pixels(lengths, value));
+        style.paint_placement.insert(
+            property.to_owned(),
+            offset.map_or_else(|| value.to_owned(), |pixels| format!("{pixels}px")),
+        );
+        return;
+    }
     if matches!(
         property,
-        "left"
-            | "top"
-            | "right"
-            | "bottom"
-            | "width"
+        "width"
             | "height"
             | "aspect-ratio"
             | "z-index"
@@ -53,8 +73,6 @@ pub(super) fn apply_with_lengths(
         style
             .paint_placement
             .insert(property.to_owned(), positioned);
-    } else if property == "inset" {
-        record_inset(&mut style.paint_placement, value, lengths);
     }
 
     // The planar sampler uses a supported transition shorthand only when
@@ -165,8 +183,6 @@ pub(super) fn apply_with_lengths(
         "position" => style.position = value.to_owned(),
         "display" => style.display = value.to_owned(),
         "box-sizing" => style.box_sizing = value.to_owned(),
-        "top" => style.top = lengths.pixels(value),
-        "left" => style.left = lengths.pixels(value),
         "width" => style.width = lengths.pixels(value),
         "height" => style.height = lengths.pixels(value),
         "min-width" => style.min_width = lengths.pixels(value),
@@ -406,20 +422,17 @@ pub fn parse_color(value: &str) -> Option<String> {
 // Shorthand helpers
 // ---------------------------------------------------------------------------
 
-fn edge_values(value: &str) -> Option<[&str; 4]> {
-    let values: Vec<_> = value_parts(value).collect();
-    match values.as_slice() {
-        [all] => Some([*all; 4]),
-        [tb, lr] => Some([*tb, *lr, *tb, *lr]),
-        [top, lr, bottom] => Some([*top, *lr, *bottom, *lr]),
-        [top, right, bottom, left] => Some([*top, *right, *bottom, *left]),
-        _ => None,
-    }
+pub(super) fn edge_values(value: &str) -> Option<[&str; 4]> {
+    let mut values = value_parts(value);
+    let top = values.next()?;
+    let right = values.next().unwrap_or(top);
+    let bottom = values.next().unwrap_or(top);
+    let left = values.next().unwrap_or(right);
+    values.next().is_none().then_some([top, right, bottom, left])
 }
 
 fn record_box_property(style: &mut UsedBoxStyle, property: &str, value: &str) {
     let sides = match property {
-        "inset" => ["top", "right", "bottom", "left"],
         "margin" => ["margin-top", "margin-right", "margin-bottom", "margin-left"],
         "padding" => [
             "padding-top",
@@ -485,22 +498,6 @@ fn record_box_property(style: &mut UsedBoxStyle, property: &str, value: &str) {
                 .zip(edges)
                 .map(|(side, length)| (side.to_owned(), length.to_owned())),
         );
-    }
-}
-
-fn record_inset(
-    placement: &mut std::collections::BTreeMap<String, String>,
-    value: &str,
-    lengths: LengthContext,
-) {
-    let Some(edges) = edge_values(value) else {
-        return;
-    };
-    for (side, length) in ["top", "right", "bottom", "left"].into_iter().zip(edges) {
-        let value = lengths
-            .pixels(length)
-            .map_or_else(|| length.to_owned(), |pixels| format!("{pixels}px"));
-        placement.insert(side.to_owned(), value);
     }
 }
 

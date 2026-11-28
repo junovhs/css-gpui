@@ -28,6 +28,14 @@ dimension, and no in-flow content or min/max size constraints. GPUI
 generation accounts for padding and a supported solid border using the
 authored `box-sizing`. See the [browser and native bounds probe](benchmarks/css-compat/README.md#aspect-ratio-probe).
 
+Strict generation also accepts physical `inset` shorthand and `right` and
+`bottom` offsets on supported left-to-right absolute and fixed boxes. Offsets
+accept `auto`, zero, and signed lengths in px, em, rem, or supported viewport
+units. On each axis, the box needs a resolved size and a non-auto edge, or an
+unconstrained auto size with both edges set. Absolute boxes use a directly
+positioned block or flex parent or the initial viewport containing block. See
+the [physical inset probe](benchmarks/css-compat/README.md#physical-inset-probe).
+
 ## Build the standalone toolbar
 
 On Linux with X11 or XWayland, edit [the toolbar CSS](fixtures/toolbar/source.css) and run `python3 fixtures/toolbar/build.py` from the repository root. The command writes readable Rust and a runnable GPUI executable. See the [toolbar build instructions](docs/first-milestone.md#build-and-run-the-toolbar) for prerequisites and output paths.

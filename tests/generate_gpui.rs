@@ -520,3 +520,133 @@ main { position: relative; }
         );
     }
 }
+
+#[test]
+fn strict_generation_cascades_physical_insets_through_scene_json() {
+    let fixture = Path::new("benchmarks/css-compat/probes/physical-inset");
+    let html = fixture.join("probe.html");
+    let css = fixture.join("probe.css");
+    let graph = css_gpui::SceneSourceGraph::from_strings_at_viewport_size(
+        "physical-inset",
+        &fs::read_to_string(&html).unwrap(),
+        &fs::read_to_string(&css).unwrap(),
+        400.0,
+        600.0,
+    )
+    .unwrap();
+    let resolved = css_gpui::resolver::resolve_scene_at_viewport(&graph, 400.0, 600.0).unwrap();
+    let scene =
+        css_gpui::extractor::extract_ir(&css_gpui::layout::compute_layout(&resolved), &graph)
+            .unwrap();
+    let json = scene.to_json().unwrap();
+    let decoded = css_gpui::ir::SceneIr::from_json(&json).unwrap();
+    assert_eq!(decoded.schema_version, 9);
+    let html_css = css_gpui::emitter::emit(&decoded).css;
+    for expected in ["right: 9px", "bottom: 15px", "bottom: 18px", "left: -1px"] {
+        assert!(
+            html_css.contains(expected),
+            "{expected} missing from {html_css}"
+        );
+    }
+
+    let output = run_example("generate_gpui", &["--viewport", "400x600"], &html, &css);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output.stderr.is_empty());
+
+    let path =
+        std::env::temp_dir().join(format!("css-gpui-inset-scene-{}.json", std::process::id()));
+    fs::write(&path, json).unwrap();
+    let from_json = Command::new(env!("CARGO"))
+        .args([
+            "run",
+            "--quiet",
+            "--locked",
+            "--example",
+            "generate_gpui",
+            "--",
+            "--scene-json",
+        ])
+        .arg(&path)
+        .output()
+        .unwrap();
+    fs::remove_file(&path).unwrap();
+    assert!(
+        from_json.status.success(),
+        "{}",
+        String::from_utf8_lossy(&from_json.stderr)
+    );
+    assert_eq!(output.stdout, from_json.stdout);
+    let rust = String::from_utf8(output.stdout).unwrap();
+    assert!(rust.contains(".right(gpui::px(8.0))"));
+    assert!(rust.contains(".bottom(gpui::px(15.0))"));
+    assert!(!rust.contains("gpui::px(80.0)"));
+}
+
+#[test]
+fn strict_generation_reports_unrepresentable_physical_insets() {
+    let directory =
+        std::env::temp_dir().join(format!("css-gpui-inset-losses-{}", std::process::id()));
+    fs::create_dir_all(&directory).unwrap();
+    let html = directory.join("probe.html");
+    let css = directory.join("probe.css");
+    fs::write(
+        &html,
+        "<main><div id='percent'></div><div id='arity'></div><div id='relative'></div>
+        <div><div id='ancestor'></div></div><div id='intrinsic'></div>
+        <div id='auto-axis'></div><div id='auto-margin'></div><div id='unknown-var'></div>
+        <div id='viewport'></div><div id='near-percent'></div>
+        <div id='constrained'></div></main>",
+    )
+    .unwrap();
+    fs::write(
+        &css,
+        "\
+main { position: relative; }
+#percent { position: absolute; inset: 0 10%; }
+#arity { position: absolute; inset: 1px 2px 3px 4px 5px; }
+#relative { position: relative; bottom: 2px; }
+#ancestor { position: absolute; inset: 0; }
+#intrinsic { position: absolute; inset: 0 0 auto auto; height: 15px; }
+#auto-axis { position: absolute; right: 0; width: 20px; height: 15px; }
+#auto-margin { position: absolute; inset: 0; margin: auto; }
+#unknown-var { position: absolute; inset: var(--missing); }
+#viewport { position: absolute; inset: 0 1vw; }
+#near-percent { position: absolute; left: 5%; top: 0; right: 0; width: 5px; height: 5px; }
+#viewport::before { position: absolute; inset: 0; }
+#constrained { position: absolute; inset: 0; min-width: 10px; }
+",
+    )
+    .unwrap();
+
+    let output = run_example("generate_gpui", &[], &html, &css);
+    fs::remove_dir_all(&directory).unwrap();
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    let errors = String::from_utf8_lossy(&output.stderr);
+    for (line, reason) in [
+        (2, "supported lengths or auto"),
+        (3, "supported lengths or auto"),
+        (4, "require absolute or fixed positioning"),
+        (5, "directly positioned block or flex parent"),
+        (6, "resolved size or opposite edges"),
+        (7, "one non-auto edge on each axis"),
+        (8, "auto margins"),
+        (9, "resolved length"),
+        (10, "resolved length"),
+        (11, "resolved length"),
+        (12, "supported static element selector"),
+        (13, "unconstrained auto size"),
+    ] {
+        let location = format!("{}:{line}:", css.display());
+        assert!(
+            errors.lines().any(|line| line.starts_with(&location)
+                && line.contains("source loss")
+                && line.contains(reason)),
+            "expected {reason:?} at {location}\n{errors}"
+        );
+    }
+}

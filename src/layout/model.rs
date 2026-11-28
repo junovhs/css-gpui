@@ -15,6 +15,10 @@ pub struct Geometry {
     /// Resolved y-position for absolute or fixed elements (CSS `top`).
     /// Always `None` for in-flow and flex-item elements in v0.1.
     pub explicit_y: Option<f32>,
+    /// Resolved CSS inset from the right for an absolute or fixed element.
+    pub right: Option<f32>,
+    /// Resolved CSS inset from the bottom for an absolute or fixed element.
+    pub bottom: Option<f32>,
     /// Declared CSS `width` in pixels.
     pub width: Option<f32>,
     /// Declared CSS `height` in pixels.

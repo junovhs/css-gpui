@@ -59,6 +59,8 @@ fn node_geometry(style: &ComputedStyle) -> Geometry {
     Geometry {
         explicit_x: absolute_coord(&style.position, style.left),
         explicit_y: absolute_coord(&style.position, style.top),
+        right: absolute_coord(&style.position, style.right),
+        bottom: absolute_coord(&style.position, style.bottom),
         width: style.width,
         height: style.height,
         min_width: style.min_width,

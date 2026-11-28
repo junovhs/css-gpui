@@ -10,6 +10,7 @@ use crate::ir::{
 pub struct UsedBoxStyle {
     pub(crate) properties: BTreeMap<String, String>,
     pub(crate) font_size: Option<f32>,
+    pub(crate) inset: Option<Box<super::inset::Cascade>>,
     pub(crate) ratio_origin: Option<(usize, usize)>,
     pub(crate) ratio_loss: Option<&'static str>,
 }
@@ -36,6 +37,10 @@ pub struct ComputedStyle {
     pub box_sizing: String,
     /// CSS `top` in pixels. Present only when `position` is `"absolute"`.
     pub top: Option<f32>,
+    /// CSS `right` in pixels.
+    pub right: Option<f32>,
+    /// CSS `bottom` in pixels.
+    pub bottom: Option<f32>,
     /// CSS `left` in pixels. Present only when `position` is `"absolute"`.
     pub left: Option<f32>,
     pub width: Option<f32>,
@@ -103,6 +108,8 @@ impl Default for ComputedStyle {
             display: "block".to_owned(),
             box_sizing: "content-box".to_owned(),
             top: None,
+            right: None,
+            bottom: None,
             left: None,
             width: None,
             height: None,

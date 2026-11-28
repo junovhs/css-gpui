@@ -119,11 +119,15 @@ fn layout_decls(l: &Layout) -> Vec<String> {
     if l.box_sizing == BoxSizing::BorderBox {
         d.push("box-sizing: border-box".to_owned());
     }
-    if let Some(v) = l.top {
-        d.push(format!("top: {}", px(v)));
-    }
-    if let Some(v) = l.left {
-        d.push(format!("left: {}", px(v)));
+    for (property, value) in [
+        ("top", l.top),
+        ("left", l.left),
+        ("right", l.right),
+        ("bottom", l.bottom),
+    ] {
+        if let Some(value) = value {
+            d.push(format!("{property}: {}", px(value)));
+        }
     }
     if let Some(v) = l.width {
         d.push(format!("width: {}", px(v)));

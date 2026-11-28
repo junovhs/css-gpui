@@ -124,6 +124,11 @@ pub fn extract_ir(
     Ok(SceneIr {
         schema_version: if ir_nodes
             .iter()
+            .any(|node| node.layout.right.is_some() || node.layout.bottom.is_some())
+        {
+            9
+        } else if ir_nodes
+            .iter()
             .any(|node| node.layout.aspect_ratio.is_some())
         {
             8

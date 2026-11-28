@@ -9,6 +9,7 @@
 
 mod aspect_ratio;
 pub(crate) mod cascade;
+pub(crate) mod inset;
 pub(crate) mod interaction;
 mod model;
 mod rule_index;
@@ -479,6 +480,9 @@ fn cascade(
         });
         lengths.em = style.font_size.unwrap_or(lengths.em);
     }
+    let has_physical_inset = declarations
+        .iter()
+        .any(|(property, _, _)| inset::is_new_property(property));
     for (property, value, origin) in declarations
         .into_iter()
         .filter(|(name, _, _)| *name != "font-size")
@@ -486,9 +490,16 @@ fn cascade(
         if property == "aspect-ratio" {
             aspect_ratio::apply(&mut style, origin, value.as_deref());
         }
-        if let Some(value) = value {
-            apply_with_lengths(&mut style, property, &value, lengths);
+        let mut value = value.as_deref();
+        if has_physical_inset {
+            value = inset::track(&mut style, property, value, lengths, origin);
         }
+        if let Some(value) = value {
+            apply_with_lengths(&mut style, property, value, lengths);
+        }
+    }
+    if has_physical_inset {
+        inset::finish_cascade(&mut style, lengths);
     }
     style.used_box_style.font_size = Some(lengths.em);
     (style, variables)

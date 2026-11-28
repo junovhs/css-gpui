@@ -196,6 +196,12 @@ pub struct Layout {
     /// CSS `left`, for an absolute or fixed box.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub left: Option<f32>,
+    /// CSS `right`, for an absolute or fixed box.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub right: Option<f32>,
+    /// CSS `bottom`, for an absolute or fixed box.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bottom: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub width: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]

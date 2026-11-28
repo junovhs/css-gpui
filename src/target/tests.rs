@@ -26,6 +26,8 @@ fn base_layout() -> Layout {
         box_sizing: crate::ir::BoxSizing::BorderBox,
         top: None,
         left: None,
+        right: None,
+        bottom: None,
         width: None,
         height: None,
         aspect_ratio: None,

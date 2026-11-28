@@ -154,3 +154,18 @@ scratch=$(mktemp -d)
 VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a \
   node benchmarks/css-compat/aspect-ratio-probe.mjs /path/to/playwright-install "$scratch/aspect-ratio"
 ```
+
+### Physical inset probe
+
+The probe compares Chromium border boxes with native GPUI client pixels at
+400×600 and 500×700. It covers fixed and absolute viewport anchors, a fixed
+`inset: 0` overlay over flowing content, block and flex stretching, and
+shorthand and longhand cascade with `auto` and `!important`.
+
+Use the same Playwright, Xvfb and Vulkan setup as the native pass.
+
+```sh
+scratch=$(mktemp -d)
+VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a \
+  node benchmarks/css-compat/physical-inset-probe.mjs /path/to/playwright-install "$scratch/physical-inset"
+```

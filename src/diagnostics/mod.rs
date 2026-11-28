@@ -13,6 +13,7 @@ use crate::radio::RadioMarkup;
 use crate::resolver::{
     ResolvedScene,
     cascade::{split_important, supports_letter_spacing},
+    inset,
     interaction::{
         Interaction, StateSelector, StateValueLoss, has_element_children, is_state_color,
         supports_state_property, unsupported_focus_order,
@@ -63,7 +64,7 @@ pub fn analyze(graph: &SceneSourceGraph) -> Vec<Diagnostic> {
     if graph.css_rules.iter().any(|rule| {
         rule.declarations
             .iter()
-            .any(|decl| decl.property == "aspect-ratio")
+            .any(|decl| decl.property == "aspect-ratio" || inset::is_new_property(&decl.property))
     }) && let Ok(resolved) = crate::resolver::resolve_scene(graph)
     {
         return analyze_resolved(graph, &resolved);
@@ -75,12 +76,12 @@ pub fn analyze(graph: &SceneSourceGraph) -> Vec<Diagnostic> {
 pub fn analyze_resolved(graph: &SceneSourceGraph, resolved: &ResolvedScene) -> Vec<Diagnostic> {
     let mut out = analyze_rules(graph);
     let mut reported = std::collections::BTreeSet::new();
-    for node in &resolved.nodes {
+    let ratios = resolved.nodes.iter().filter_map(|node| {
         let style = &node.style.used_box_style;
-        let (Some((rule_id, decl_id)), Some(reason)) = (style.ratio_origin, style.ratio_loss)
-        else {
-            continue;
-        };
+        Some((style.ratio_origin?, style.ratio_loss?))
+    });
+    let insets = inset::losses(resolved, &graph.html_nodes);
+    for ((rule_id, decl_id), reason) in ratios.chain(insets) {
         let rule = &graph.css_rules[rule_id];
         let declaration = &rule.declarations[decl_id];
         if unsupported_value_message(&declaration.property, &declaration.value).is_some()
@@ -90,7 +91,7 @@ pub fn analyze_resolved(graph: &SceneSourceGraph, resolved: &ResolvedScene) -> V
         }
         out.push(Diagnostic {
             kind: DiagnosticKind::UnsupportedValue,
-            message: format!("aspect-ratio: {reason}"),
+            message: format!("{}: {reason}", declaration.property),
             rule_id,
             selector: rule.selectors.first().cloned(),
             property: Some(declaration.property.clone()),
@@ -270,8 +271,14 @@ fn analyze_rule(
             });
         } else if let Some(msg) =
             unsupported_value_message(&decl.property, &decl.value).or_else(|| {
-                (decl.property == "aspect-ratio" && !has_static_selector)
-                    .then(|| "aspect-ratio requires a supported static element selector".to_owned())
+                (!has_static_selector
+                    && (decl.property == "aspect-ratio" || inset::is_new_property(&decl.property)))
+                .then(|| {
+                    format!(
+                        "{} requires a supported static element selector",
+                        decl.property
+                    )
+                })
             })
         {
             out.push(Diagnostic {
@@ -363,7 +370,10 @@ const KNOWN_PROPERTIES: &[&str] = &[
     "display",
     "box-sizing",
     "top",
+    "right",
+    "bottom",
     "left",
+    "inset",
     "width",
     "height",
     "aspect-ratio",
@@ -417,6 +427,13 @@ fn unsupported_value_message(property: &str, value: &str) -> Option<String> {
         "aspect-ratio" if !value.contains("var(") && parse_aspect_ratio(value).is_none() => Some(
             format!("aspect-ratio: '{value}' is outside the positive numeric ratio subset"),
         ),
+        property
+            if inset::is_new_property(property) && !inset::supports_syntax(property, value) =>
+        {
+            Some(format!(
+                "{property}: '{value}' requires one to four supported lengths or auto"
+            ))
+        }
         "position" => match value {
             "static" | "relative" | "absolute" | "fixed" | "inherit" => None,
             _ => Some(format!(
