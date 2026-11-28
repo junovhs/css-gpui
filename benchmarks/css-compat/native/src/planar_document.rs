@@ -3,19 +3,27 @@ use std::{
     error::Error,
     fs,
     path::Path,
+    sync::Arc,
 };
 
 use css_gpui::{HtmlNode, SceneSourceGraph, planar, resolver};
 
-use super::{CheckedState, Label, SceneFrame};
+use super::{CheckedState, Label};
 use crate::upload_frame;
+use gpui::RenderImage;
 
 pub(super) struct Document {
-    graph: SceneSourceGraph,
+    graph: Arc<SceneSourceGraph>,
     viewport: [u32; 2],
     root: usize,
     scope: usize,
     ids: BTreeMap<String, usize>,
+}
+
+pub(super) struct State {
+    pub preview: planar::Preview,
+    pub controls: CheckedState,
+    pub labels: Vec<Label>,
 }
 
 // A radio retains only its group's last activation. Each checkbox records
@@ -53,7 +61,7 @@ impl Document {
             .filter_map(|node| element_id(node).map(|id| (id.to_owned(), node.id)))
             .collect();
         Ok(Self {
-            graph,
+            graph: Arc::new(graph),
             viewport,
             root,
             scope,
@@ -73,7 +81,7 @@ impl Document {
         }
     }
 
-    pub(super) fn render(&self, activations: &Activations) -> Result<SceneFrame, String> {
+    pub(super) fn resolve(&self, activations: &Activations) -> Result<State, String> {
         let activations: Vec<_> = activations
             .radios
             .values()
@@ -91,31 +99,45 @@ impl Document {
         let controls =
             resolver::checked_snapshot_controls(&self.graph, &scene, self.scope, &activations)
                 .map_err(|error| error.to_string())?;
-        let frame = planar::preview(&self.graph, &scene, self.root, self.viewport)?;
-        let [width, height] = self.viewport;
-        let image = upload_frame(width, height, frame.rgba)?;
-        Ok(SceneFrame {
-            image,
-            controls: CheckedState {
-                selection: controls
-                    .selection
-                    .into_iter()
-                    .map(|(group, id)| (group.to_owned(), id.to_owned()))
-                    .collect(),
-                checked: controls.checked.into_iter().map(str::to_owned).collect(),
-            },
-            labels: controls
-                .labels
+        let labels = controls
+            .labels
+            .into_iter()
+            .map(|label| Label {
+                caption: caption(&label),
+                group: label.group.to_owned(),
+                target: label.target.to_owned(),
+                class_name: label.class_name.to_owned(),
+                checkbox: label.checkbox,
+            })
+            .collect();
+        let controls = CheckedState {
+            selection: controls
+                .selection
                 .into_iter()
-                .map(|label| Label {
-                    caption: caption(&label),
-                    group: label.group.to_owned(),
-                    target: label.target.to_owned(),
-                    class_name: label.class_name.to_owned(),
-                    checkbox: label.checkbox,
-                })
+                .map(|(group, id)| (group.to_owned(), id.to_owned()))
                 .collect(),
+            checked: controls.checked.into_iter().map(str::to_owned).collect(),
+        };
+        Ok(State {
+            preview: planar::Preview::new(self.graph.clone(), scene, self.root, self.viewport),
+            controls,
+            labels,
         })
+    }
+
+    pub(super) fn image(
+        &self,
+        state: &State,
+        pose: Option<&planar::Pose>,
+    ) -> Result<Arc<RenderImage>, String> {
+        let raster = if pose.is_some() && self.viewport[0] > 720 {
+            self.viewport
+                .map(|length| (length * 640 / self.viewport[0]).max(1))
+        } else {
+            self.viewport
+        };
+        let frame = state.preview.render(raster, pose)?;
+        Ok(upload_frame(raster[0], raster[1], frame.rgba)?)
     }
 }
 

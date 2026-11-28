@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::{HtmlNode, HtmlNodeKind};
 
@@ -32,11 +32,20 @@ enum SelectorMode {
     Relative,
 }
 
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+pub(super) enum Subject<'a> {
+    Id(&'a str),
+    Class(&'a str),
+    Tag(&'a str),
+    NthOfType(&'a str, usize),
+}
+
 pub(super) struct CheckedSnapshot {
     checked: HashSet<usize>,
     subtree_ends: Vec<usize>,
     previous_sibling: Vec<Option<usize>>,
     next_sibling: Vec<Option<usize>>,
+    nth_of_type: Vec<usize>,
 }
 
 impl CheckedSnapshot {
@@ -52,10 +61,17 @@ impl CheckedSnapshot {
         let mut previous_sibling = vec![None; nodes.len()];
         let mut next_sibling = vec![None; nodes.len()];
         let mut last_child = vec![None; nodes.len()];
+        let mut nth_of_type = vec![0; nodes.len()];
+        let mut type_counts = HashMap::new();
         for node in nodes
             .iter()
             .filter(|node| node.kind == HtmlNodeKind::Element)
         {
+            let count = type_counts
+                .entry((node.parent_id, node.name.as_deref()))
+                .or_insert(0);
+            *count += 1;
+            nth_of_type[node.id] = *count;
             if let Some(parent) = node.parent_id
                 && let Some(previous) = last_child[parent].replace(node.id)
             {
@@ -69,7 +85,12 @@ impl CheckedSnapshot {
             subtree_ends,
             previous_sibling,
             next_sibling,
+            nth_of_type,
         }
+    }
+
+    pub(super) fn nth_of_type(&self, node: &HtmlNode) -> usize {
+        self.nth_of_type[node.id]
     }
 }
 
@@ -122,6 +143,31 @@ impl<'a> Selector<'a> {
             tail,
             specificity,
         })
+    }
+
+    /// A necessary match on the rightmost compound. Functional selectors
+    /// and attribute conditions still run through the ordinary matcher.
+    pub(super) fn subject(&self, snapshot: bool) -> Option<Subject<'a>> {
+        let compound = self
+            .tail
+            .last()
+            .map_or(&self.head, |(_, compound)| compound);
+        let mut class = None;
+        let mut nth = None;
+        for condition in &compound.conditions {
+            match *condition {
+                Condition::Id(id) => return Some(Subject::Id(id)),
+                Condition::Class(name) => class = Some(name),
+                Condition::NthOfType(index) if snapshot => nth = Some(index),
+                _ => {}
+            }
+        }
+        match (compound.tag, nth, class) {
+            (Some(tag), Some(index), _) => Some(Subject::NthOfType(tag, index)),
+            (_, _, Some(name)) => Some(Subject::Class(name)),
+            (Some(tag), _, _) => Some(Subject::Tag(tag)),
+            _ => None,
+        }
     }
 
     pub(super) fn is_compound(&self) -> bool {
@@ -371,12 +417,15 @@ impl Condition<'_> {
                     difference % stride == 0 && difference / stride >= 0
                 }
             }
-            Self::NthOfType(index) => index.checked_sub(1).is_some_and(|index| {
-                siblings()
-                    .filter(|other| other.name == node.name)
-                    .nth(index)
-                    .is_some_and(|other| other.id == node.id)
-            }),
+            Self::NthOfType(index) => match snapshot {
+                Some(snapshot) => snapshot.nth_of_type(node) == *index,
+                None => index.checked_sub(1).is_some_and(|index| {
+                    siblings()
+                        .filter(|other| other.name == node.name)
+                        .nth(index)
+                        .is_some_and(|other| other.id == node.id)
+                }),
+            },
             Self::Checked => snapshot.is_some_and(|snapshot| snapshot.checked.contains(&node.id)),
             Self::Has(selectors) => snapshot.is_some_and(|snapshot| {
                 selectors.iter().any(|(combinator, selector)| {

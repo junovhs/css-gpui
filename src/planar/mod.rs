@@ -1,4 +1,4 @@
-//! Render the settled paint of one authored, continuous CSS 3D context.
+//! Render one authored, continuous CSS 3D context.
 //!
 //! This preview uses the bounded CSS box layout and source cascade. The caller
 //! supplies a context root and the resolved checked state. Diagnostics describe
@@ -8,8 +8,14 @@
 mod material;
 mod overlay;
 mod raster;
+mod transition;
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+pub use transition::{Pose, Transition};
+
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    sync::Arc,
+};
 
 use serde::Serialize;
 
@@ -20,7 +26,7 @@ use crate::{
     resolver::{ResolvedNode, ResolvedScene, values::LengthContext},
 };
 
-use material::Material;
+use material::{ConfiguredFacePaint, FacePaint, Material, PaintCache};
 use raster::Face;
 
 #[derive(Debug, Serialize)]
@@ -37,10 +43,60 @@ pub struct Plane {
 }
 
 pub struct Frame {
-    /// Opaque row-major RGBA pixels at one sample per CSS pixel.
+    /// Opaque row-major RGBA pixels at the requested raster dimensions.
     pub rgba: Vec<u8>,
     pub planes: Vec<Plane>,
     pub losses: Vec<Loss>,
+}
+
+/// Reuse plane paint while rendering one resolved scene at multiple poses.
+pub struct Preview {
+    graph: Arc<SceneSourceGraph>,
+    scene: ResolvedScene,
+    root: usize,
+    viewport: [u32; 2],
+    paint: PaintCache,
+}
+
+impl Preview {
+    pub fn new(
+        graph: Arc<SceneSourceGraph>,
+        scene: ResolvedScene,
+        root: usize,
+        viewport: [u32; 2],
+    ) -> Self {
+        Self {
+            graph,
+            scene,
+            root,
+            viewport,
+            paint: PaintCache::default(),
+        }
+    }
+
+    /// Derive a supported transition between two cascades of this document.
+    pub fn transition_from(&self, before: &Self, pose: Option<&Pose>) -> Option<Transition> {
+        if !Arc::ptr_eq(&self.graph, &before.graph)
+            || self.root != before.root
+            || self.viewport != before.viewport
+        {
+            return None;
+        }
+        Transition::between(&before.scene, &self.scene, self.root, pose)
+    }
+
+    /// Render with layout still measured in CSS pixels when the raster is smaller.
+    pub fn render(&self, raster: [u32; 2], pose: Option<&Pose>) -> Result<Frame, String> {
+        compile(
+            &self.graph,
+            &self.scene,
+            self.root,
+            self.viewport,
+            raster,
+            pose,
+            &self.paint,
+        )
+    }
 }
 
 /// Preview the subtree of a 3D context in document coordinates at scroll zero.
@@ -53,8 +109,35 @@ pub fn preview(
     root: usize,
     viewport: [u32; 2],
 ) -> Result<Frame, String> {
+    compile(
+        graph,
+        scene,
+        root,
+        viewport,
+        viewport,
+        None,
+        &PaintCache::default(),
+    )
+}
+
+fn compile(
+    graph: &SceneSourceGraph,
+    scene: &ResolvedScene,
+    root: usize,
+    viewport: [u32; 2],
+    raster: [u32; 2],
+    pose: Option<&Pose>,
+    paint: &PaintCache,
+) -> Result<Frame, String> {
     if viewport.iter().any(|&length| !(1..=4096).contains(&length)) {
         return Err("planar preview requires each viewport dimension in 1..=4096".into());
+    }
+    if raster
+        .into_iter()
+        .zip(viewport)
+        .any(|(raster, css)| raster == 0 || raster > css)
+    {
+        return Err("planar raster dimensions must be positive and fit the CSS viewport".into());
     }
     let viewport_css = viewport.map(f64::from);
     let mut children: HashMap<_, Vec<_>> = HashMap::new();
@@ -82,6 +165,18 @@ pub fn preview(
         }
     }
     let root = *nodes.get(&root).ok_or("unknown planar context root")?;
+    let overrides = pose
+        .into_iter()
+        .flat_map(|pose| {
+            scene.nodes.iter().filter_map(|node| {
+                let id = node.node.id;
+                let transform = pose.transform(id)?;
+                let mut css = node.style.projection_properties.clone();
+                css.insert("transform".to_owned(), transform.to_owned());
+                Some((id, css))
+            })
+        })
+        .collect();
     let layout = UsedBoxLayout::new(scene, viewport_css);
     let mut compiler = Compiler {
         root_font_size: layout.root_font_size(),
@@ -89,6 +184,8 @@ pub fn preview(
         layout,
         children,
         text,
+        overrides,
+        paint,
         faces: Vec::new(),
         planes: Vec::new(),
         losses: Vec::new(),
@@ -153,7 +250,7 @@ pub fn preview(
         visibility.unwrap_or("visible"),
     );
     Ok(Frame {
-        rgba: raster::render(&compiler.faces, &overlays, background, viewport),
+        rgba: raster::render(&compiler.faces, &overlays, background, viewport, raster),
         planes: compiler.planes,
         losses: compiler.losses,
     })
@@ -165,6 +262,8 @@ struct Compiler<'a> {
     layout: UsedBoxLayout<'a>,
     children: HashMap<usize, Vec<&'a ResolvedNode>>,
     text: HashSet<usize>,
+    overrides: HashMap<usize, BTreeMap<String, String>>,
+    paint: &'a PaintCache,
     faces: Vec<Face>,
     planes: Vec<Plane>,
     losses: Vec<Loss>,
@@ -359,18 +458,24 @@ impl<'a> Compiler<'a> {
         text_color: Option<[u8; 4]>,
         text: bool,
     ) {
-        let mut material_losses = Vec::new();
-        let mut loss = |property: &str, value: &str| {
-            material_losses.push((property.to_owned(), value.to_owned()))
-        };
-        let mut material = Material::from_css(css, effects, text_color, &mut loss);
-        if text && text_color.is_none_or(|color| color[3] > 0) {
-            loss("content", "visible text on a 3D plane");
-        }
-        if material.is_empty() && material_losses.is_empty() {
+        let node = nodes.last().unwrap();
+        let paint = self.paint.face(node.node.id, pseudo, || {
+            let mut losses = Vec::new();
+            let mut loss =
+                |property: &str, value: &str| losses.push((property.to_owned(), value.to_owned()));
+            let material = Material::from_css(css, effects, text_color, &mut loss);
+            if text && text_color.is_none_or(|color| color[3] > 0) {
+                loss("content", "visible text on a 3D plane");
+            }
+            FacePaint {
+                material,
+                losses,
+                configured: Default::default(),
+            }
+        });
+        if paint.material.is_empty() && paint.losses.is_empty() {
             return;
         }
-        let node = nodes.last().unwrap();
         let mut path = node.node.dom_path.clone();
         if let Some(pseudo) = pseudo {
             path.push_str("::");
@@ -399,7 +504,9 @@ impl<'a> Compiler<'a> {
                 if !add(
                     node,
                     None,
-                    &node.style.projection_properties,
+                    self.overrides
+                        .get(&node.node.id)
+                        .unwrap_or(&node.style.projection_properties),
                     node.style.used_box_style.font_size(),
                 )? {
                     return Ok(false);
@@ -445,24 +552,36 @@ impl<'a> Compiler<'a> {
         if polygon.len() < 3 {
             return;
         }
-        material.configure_background(
-            css,
-            effects,
-            size.map(|value| value as f32),
-            LengthContext {
-                em: layers.last().unwrap().font_size,
-                rem: self.root_font_size,
-                viewport: Some((self.viewport[0] as f32, self.viewport[1] as f32)),
-                percent: None,
-            },
-            &mut |property, value| material_losses.push((property.to_owned(), value.to_owned())),
-        );
-        for (property, value) in material_losses {
-            record_loss(&mut self.losses, &path, &property, &value);
+        let configured = paint.configured.get_or_init(|| {
+            let mut material = paint.material.clone();
+            let mut losses = Vec::new();
+            material.configure_background(
+                css,
+                effects,
+                size.map(|value| value as f32),
+                LengthContext {
+                    em: layers.last().unwrap().font_size,
+                    rem: self.root_font_size,
+                    viewport: Some((self.viewport[0] as f32, self.viewport[1] as f32)),
+                    percent: None,
+                },
+                &mut |property, value| losses.push((property.to_owned(), value.to_owned())),
+            );
+            ConfiguredFacePaint {
+                material: Arc::new(material),
+                losses,
+            }
+        });
+        for (property, value) in paint.losses.iter().chain(&configured.losses) {
+            record_loss(&mut self.losses, &path, property, value);
         }
-        if !material.is_empty() {
-            self.faces
-                .push(Face::new(sampling, material, size, &polygon));
+        if !configured.material.is_empty() {
+            self.faces.push(Face::new(
+                sampling,
+                configured.material.clone(),
+                size,
+                &polygon,
+            ));
             self.planes.push(Plane { path, polygon });
         }
     }

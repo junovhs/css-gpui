@@ -3,8 +3,10 @@ use std::{
     error::Error,
     path::Path,
     sync::Arc,
+    time::{Duration, Instant},
 };
 
+use css_gpui::planar::{Pose, Transition};
 use gpui::{
     App, AppContext, Application, Bounds, Context, FocusHandle, InteractiveElement, IntoElement,
     KeyBinding, ParentElement, Render, RenderImage, StatefulInteractiveElement, Styled, Window,
@@ -17,7 +19,7 @@ use super::read_frame;
 #[path = "planar_document.rs"]
 mod document;
 
-use document::{Activations, Document};
+use document::{Activations, Document, State as DocumentState};
 
 const STRIP_HEIGHT: u32 = 48;
 actions!(planar_route, [TabNext, TabPrevious]);
@@ -90,10 +92,29 @@ struct SceneFrame {
 
 enum Source {
     Route(Vec<Arc<SceneFrame>>),
-    Document {
-        document: Arc<Document>,
-        activations: Activations,
-    },
+    Document(Box<DocumentSource>),
+}
+
+struct DocumentSource {
+    document: Arc<Document>,
+    activations: Activations,
+    state: Arc<DocumentState>,
+    settled: SettledDocument,
+}
+
+struct SettledDocument {
+    activations: Activations,
+    state: Arc<DocumentState>,
+    frame: Arc<SceneFrame>,
+}
+
+struct MotionFrame {
+    index: usize,
+    image: Arc<RenderImage>,
+    pose: Pose,
+    elapsed: Duration,
+    generated: Duration,
+    started: Instant,
 }
 
 struct Viewer {
@@ -102,6 +123,9 @@ struct Viewer {
     current: usize,
     height: u32,
     pending: bool,
+    motion: Option<MotionFrame>,
+    motion_start: Option<Pose>,
+    trace_motion: bool,
     report: bool,
     focus: FocusHandle,
 }
@@ -111,7 +135,7 @@ impl Viewer {
         let controls = self.frame.controls.after(label)?;
         match &self.source {
             Source::Route(frames) => frames.iter().position(|frame| frame.controls == controls),
-            Source::Document { .. } => Some(self.current + 1),
+            Source::Document(_) => Some(self.current + 1),
         }
     }
 
@@ -138,31 +162,129 @@ impl Viewer {
             Source::Route(frames) => {
                 self.commit(next, &label.target, frames[next].clone());
             }
-            Source::Document {
-                document,
-                activations,
-            } => {
-                let document = Arc::clone(document);
-                let mut activations = activations.clone();
+            Source::Document(source) => {
+                let document = source.document.clone();
+                let mut activations = source.activations.clone();
                 document.activate(&mut activations, &label);
-                let render = cx.background_spawn(async move {
-                    let result = document.render(&activations);
-                    (result, activations)
+                let started = Instant::now();
+                let resolve_document = document.clone();
+                let resolve = cx.background_spawn(async move {
+                    resolve_document
+                        .resolve(&activations)
+                        .map(|state| (activations, Arc::new(state)))
                 });
                 self.pending = true;
                 cx.spawn_in(window, async move |view, cx| {
-                    let (result, next_activations) = render.await;
-                    let _ = view.update_in(cx, |view, window, cx| {
-                        view.pending = false;
-                        match result {
-                            Ok(frame) => {
-                                if let Source::Document { activations, .. } = &mut view.source {
-                                    *activations = next_activations;
-                                }
-                                let _ = window.drop_image(view.frame.image.clone());
-                                view.commit(next, &label.target, Arc::new(frame));
+                    let (activations, state) = match resolve.await {
+                        Ok(state) => state,
+                        Err(error) => {
+                            let _ = view.update_in(cx, |view, _, cx| {
+                                view.pending = false;
+                                eprintln!("could not activate {}: {error}", label.target);
+                                cx.notify();
+                            });
+                            return;
+                        }
+                    };
+                    let Some((transition, render)) = view
+                        .update_in(cx, |view, _, cx| {
+                            let Source::Document(source) = &mut view.source else {
+                                return None;
+                            };
+                            let transition = state.preview.transition_from(
+                                &source.state.preview,
+                                view.motion
+                                    .as_ref()
+                                    .map(|motion| &motion.pose)
+                                    .or(view.motion_start.as_ref()),
+                            );
+                            let final_document = document.clone();
+                            let final_state = state.clone();
+                            let render = cx.background_spawn(async move {
+                                final_document.image(&final_state, None)
+                            });
+                            if let Some(transition) = &transition {
+                                view.motion_start = Some(transition.sample(Duration::ZERO));
+                                source.state = state.clone();
+                                source.activations = activations.clone();
+                                view.commit(
+                                    next,
+                                    &label.target,
+                                    state.frame(view.frame.image.clone()),
+                                );
+                                view.report = false;
+                                view.pending = false;
+                                cx.notify();
                             }
-                            Err(error) => eprintln!("could not activate {}: {error}", label.target),
+                            Some((transition, render))
+                        })
+                        .ok()
+                        .flatten()
+                    else {
+                        return;
+                    };
+
+                    let moving = transition.is_some();
+                    if let Some(transition) = transition {
+                        let animation = Animation {
+                            next,
+                            started,
+                            transition: Arc::new(transition),
+                            document,
+                            state: state.clone(),
+                        };
+                        if !animation.present(&view, cx).await {
+                            return;
+                        }
+                    }
+
+                    let result = render.await;
+                    let _ = view.update_in(cx, |view, window, cx| {
+                        // An interrupted move's background raster must never
+                        // overwrite the successor. Its state is already stale.
+                        if moving && view.current != next {
+                            return;
+                        }
+                        match result {
+                            Ok(image) => {
+                                view.motion_start = None;
+                                let _ = window.drop_image(view.frame.image.clone());
+                                let frame = state.frame(image);
+                                if !moving {
+                                    view.commit(next, &label.target, frame.clone());
+                                    view.pending = false;
+                                } else {
+                                    view.frame = frame.clone();
+                                    view.report = true;
+                                }
+                                if let Source::Document(source) = &mut view.source {
+                                    source.settled = SettledDocument {
+                                        activations: activations.clone(),
+                                        state: state.clone(),
+                                        frame,
+                                    };
+                                    source.activations = activations;
+                                    source.state = state;
+                                }
+                                if let Some(old) = view.motion.take() {
+                                    let _ = window.drop_image(old.image);
+                                }
+                            }
+                            Err(error) => {
+                                eprintln!("could not activate {}: {error}", label.target);
+                                if moving && let Source::Document(source) = &mut view.source {
+                                    source.activations = source.settled.activations.clone();
+                                    source.state = source.settled.state.clone();
+                                    view.frame = source.settled.frame.clone();
+                                    view.motion_start = None;
+                                    if let Some(old) = view.motion.take() {
+                                        let _ = window.drop_image(old.image);
+                                    }
+                                    view.report = true;
+                                } else {
+                                    view.pending = false;
+                                }
+                            }
                         }
                         cx.notify();
                     });
@@ -174,16 +296,112 @@ impl Viewer {
     }
 }
 
+impl DocumentState {
+    fn frame(&self, image: Arc<RenderImage>) -> Arc<SceneFrame> {
+        Arc::new(SceneFrame {
+            controls: self.controls.clone(),
+            labels: self.labels.clone(),
+            image,
+        })
+    }
+}
+
+struct Animation {
+    next: usize,
+    started: Instant,
+    transition: Arc<Transition>,
+    document: Arc<Document>,
+    state: Arc<DocumentState>,
+}
+
+impl Animation {
+    async fn present(
+        &self,
+        view: &gpui::WeakEntity<Viewer>,
+        cx: &mut gpui::AsyncWindowContext,
+    ) -> bool {
+        const INTERVAL: Duration = Duration::from_millis(32);
+        let executor = cx.background_executor().clone();
+        loop {
+            let elapsed = self.started.elapsed();
+            let deadline = self.transition.duration();
+            if elapsed >= deadline {
+                return true;
+            }
+            let document = self.document.clone();
+            let state = self.state.clone();
+            let transition = self.transition.clone();
+            let started = self.started;
+            let index = self.next;
+            let render = executor.spawn(async move {
+                let rendering = Instant::now();
+                let pose = transition.sample(elapsed);
+                let image = document.image(&state, Some(&pose))?;
+                Ok::<_, String>(MotionFrame {
+                    index,
+                    image,
+                    pose,
+                    elapsed,
+                    generated: rendering.elapsed(),
+                    started,
+                })
+            });
+            let result = render.await;
+            let remaining = deadline.saturating_sub(self.started.elapsed());
+            let current = view
+                .update_in(cx, |view, window, cx| {
+                    if view.current != self.next {
+                        return false;
+                    }
+                    if !remaining.is_zero() {
+                        match result {
+                            Ok(frame) => {
+                                if let Some(old) = view.motion.replace(frame) {
+                                    let _ = window.drop_image(old.image);
+                                }
+                                cx.notify();
+                            }
+                            Err(error) => eprintln!("could not sample planar motion: {error}"),
+                        }
+                    }
+                    true
+                })
+                .unwrap_or(false);
+            if !current {
+                return false;
+            }
+            let pause = (elapsed + INTERVAL).saturating_sub(self.started.elapsed());
+            executor.timer(pause.min(remaining)).await;
+        }
+    }
+}
+
 impl Render for Viewer {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let current = self.current;
-        let image = self.frame.image.clone();
+        let image = self
+            .motion
+            .as_ref()
+            .map_or(&self.frame.image, |motion| &motion.image)
+            .clone();
+        let motion_report = self
+            .trace_motion
+            .then(|| {
+                self.motion.as_ref().map(|motion| {
+                    serde_json::json!({
+                        "motion": motion.index, "sample_ms": motion.elapsed.as_secs_f64() * 1000.0,
+                        "generated_ms": motion.generated.as_secs_f64() * 1000.0,
+                        "submitted_ms": motion.started.elapsed().as_secs_f64() * 1000.0,
+                        "transforms": motion.pose,
+                    })
+                })
+            })
+            .flatten();
         let report = self.report.then(|| {
             serde_json::to_string(&Frame {
                 frame: current,
                 controls: &self.frame.controls,
-                labels: matches!(self.source, Source::Document { .. })
-                    .then_some(&self.frame.labels),
+                labels: matches!(self.source, Source::Document(_)).then_some(&self.frame.labels),
             })
             .expect("serialize planar readback")
         });
@@ -239,6 +457,9 @@ impl Render for Viewer {
                         window
                             .paint_image(bounds, Default::default(), image, 0, false)
                             .expect("paint the route frame");
+                        if let Some(record) = motion_report {
+                            println!("{record}");
+                        }
                         if let Some(record) = report {
                             println!("{record}");
                         }
@@ -298,16 +519,19 @@ pub(super) fn run_document(
     let [width, height] = [width.parse()?, height.parse()?];
     let document = Arc::new(Document::new([width, height], html, css, root, scope)?);
     let activations = Activations::default();
-    let initial = Arc::new(document.render(&activations)?);
-    open(
-        width,
-        height,
-        Source::Document {
-            document,
+    let state = Arc::new(document.resolve(&activations)?);
+    let initial = state.frame(document.image(&state, None)?);
+    let source = Source::Document(Box::new(DocumentSource {
+        document,
+        activations: activations.clone(),
+        state: state.clone(),
+        settled: SettledDocument {
             activations,
+            state,
+            frame: initial.clone(),
         },
-        initial,
-    );
+    }));
+    open(width, height, source, initial);
     Ok(())
 }
 
@@ -338,6 +562,9 @@ fn open(width: u32, height: u32, source: Source, frame: Arc<SceneFrame>) {
                         frame,
                         current: 0,
                         pending: false,
+                        motion: None,
+                        motion_start: None,
+                        trace_motion: std::env::var_os("CSS_GPUI_TRACE_MOTION").is_some(),
                         height,
                         report: true,
                         focus,

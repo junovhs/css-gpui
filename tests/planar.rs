@@ -167,3 +167,65 @@ fn a_brightness_filtered_tile_interpolates_its_local_raster_when_magnified() {
         assert!(frame.losses.is_empty(), "{:?}", frame.losses);
     }
 }
+
+#[test]
+fn a_checked_translation_projects_intermediate_geometry_and_can_reverse() {
+    use std::{sync::Arc, time::Duration};
+
+    use css_gpui::{planar::Preview, resolver::resolve_scene_with_checked_activations};
+
+    let html = r#"<html><body>
+        <input type="radio" id="rest" name="move" checked>
+        <input type="radio" id="move" name="move">
+        <main><i></i></main>
+    </body></html>"#;
+    let css = r#"
+        body, main { position: absolute; inset: 0; }
+        main { transform-style: preserve-3d; }
+        i {
+            position: absolute; left: 8px; top: 8px;
+            width: 16px; height: 16px; background: #f00;
+            transition: transform 800ms linear;
+        }
+        #move:checked ~ main > i { transform: translateX(48px); }
+    "#;
+    let graph = Arc::new(SceneSourceGraph::from_strings("motion", html, css).unwrap());
+    let root = graph
+        .html_nodes
+        .iter()
+        .find(|node| node.name.as_deref() == Some("main"))
+        .unwrap()
+        .id;
+    let checked = graph
+        .html_nodes
+        .iter()
+        .find(|node| {
+            node.attributes
+                .iter()
+                .any(|(name, value)| name == "id" && value == "move")
+        })
+        .unwrap()
+        .id;
+    let viewport = [96, 48];
+    let make = |activations: &[usize]| {
+        let scene =
+            resolve_scene_with_checked_activations(&graph, 96.0, 48.0, activations).unwrap();
+        Preview::new(graph.clone(), scene, root, viewport)
+    };
+    let rest = make(&[]);
+    let target = make(&[checked]);
+    let forward = target.transition_from(&rest, None).unwrap();
+    assert_eq!(forward.duration(), Duration::from_millis(800));
+    let pose = forward.sample(Duration::from_millis(400));
+    let sample = target.render([48, 24], Some(&pose)).unwrap();
+    let pixel = |css_x: usize| &sample.rgba[(5 * 48 + css_x / 2) * 4..][..4];
+    assert_eq!(pixel(10), [255, 255, 255, 255]);
+    assert_eq!(pixel(40), [255, 0, 0, 255]);
+    assert_eq!(pixel(64), [255, 255, 255, 255]);
+
+    let reverse = rest.transition_from(&target, Some(&pose)).unwrap();
+    let resumed = rest
+        .render([48, 24], Some(&reverse.sample(Duration::ZERO)))
+        .unwrap();
+    assert_eq!(resumed.rgba, sample.rgba);
+}

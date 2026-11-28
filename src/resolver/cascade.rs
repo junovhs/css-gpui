@@ -57,6 +57,16 @@ pub(super) fn apply_with_lengths(
         record_inset(&mut style.paint_placement, value, lengths);
     }
 
+    // The planar sampler uses a supported transition shorthand only when
+    // no winning longhand overrides it.
+    if property == "transition" {
+        style
+            .projection_properties
+            .retain(|key, _| !key.starts_with("transition-"));
+    }
+    if property == "animation" {
+        style.projection_properties.remove("animation-name");
+    }
     if matches!(
         property,
         "margin"
@@ -93,6 +103,13 @@ pub(super) fn apply_with_lengths(
             | "scale"
             | "z-index"
             | "transition"
+            | "transition-delay"
+            | "transition-duration"
+            | "transition-property"
+            | "transition-timing-function"
+            | "transition-behavior"
+            | "animation"
+            | "animation-name"
     ) {
         style
             .projection_properties

@@ -403,13 +403,13 @@ element tag or a `#id`.
   /tmp/backrooms/input.html /tmp/backrooms/linked.css content body
 ```
 
-The viewer reads and parses the two files at startup. Each activation resolves
-the settled cascade and rasterizes the next scene from the in-memory source
-graph. The window keeps displaying the current scene during the background
-render and activates the next controls when the new scene is ready. The
-control strip accepts one activation at a time. The checked state, controls
-and scene change together after a successful render. Native execution uses
-local source and GPUI. The settled preview omits scripts, audio and motion.
+The viewer parses the two files at startup and resolves each activation
+against the in-memory source graph. While it resolves the next cascade, the
+window keeps displaying the current scene. For supported transform
+transitions, the new controls become available during movement. Another
+activation starts from the latest submitted camera pose. Unsupported motion
+uses the full-resolution settled preview. Native execution uses the local
+source and GPUI.
 
 The strip exposes scoped radio labels and direct checkboxes supported by the
 resolver. It applies cascade visibility and pointer eligibility. The
@@ -442,3 +442,58 @@ With `--live`, the start-to-finish probe uses the same direct-source viewer.
 At each viewport it reaches Finish in 45 Chromium clicks and 45 GPUI
 activations. All 46 native scene readbacks match the independent Rust rasters
 byte for byte. The compiled `--route` command opens retained route bundles.
+
+
+## Native camera transitions
+
+The live document preview uses authored transform durations, delays, and
+cubic Bézier easing for the supported single-function rotations and
+translations. Each frame reprojects the geometry and resamples the scene
+from a local transform. The preview reuses plane paint within a resolved
+cascade and presents an exact full-resolution raster at the endpoint.
+Portrait motion uses the 390 × 844 raster. Desktop motion uses a 640 × 400
+raster drawn at 1440 × 900 while layout and projection stay in CSS pixels.
+
+The motion probe uses Chromium and an isolated X11 window. It clicks the
+authored forward and right labels in Chromium, pauses each CSS transition,
+and reads its transform at the native sample times. Chromium moves the
+walk from −408 to −360 CSS px in 800 ms with `ease-out`. The right turn
+uses `cubic-bezier(0, 0.3, 0.6, 1.4)` over 800 ms, passes 90°, and settles
+back to 90°. The probe disables Chromium keyframes for this comparison and
+sends real pointer input to the native control strip and polls X11 window
+pixels for visible changes. It captures the settled window at full size and
+checks every RGBA byte against an independent Rust raster. It then turns
+300 ms into the walk, verifies both moves begin, and checks the final
+checked state and raster.
+
+| Viewport | Move | Visible changes including endpoint | First / final change | Median / longest gap |
+| --- | --- | ---: | ---: | ---: |
+| 390 × 844 | Walk | 19 | 186 / 841 ms | 34.0 / 51.5 ms |
+| 390 × 844 | Right turn | 19 | 172 / 859 ms | 33.7 / 72.6 ms |
+| 1440 × 900 | Walk | 22 | 175 / 859 ms | 33.0 / 46.7 ms |
+| 1440 × 900 | Right turn | 22 | 174 / 846 ms | 33.3 / 46.0 ms |
+
+Xvfb with Mesa lavapipe, a Ryzen 9 3900X, and the native Cargo development
+profile produced these timings. X11 polling averaged 6.2–11.4 ms. All four
+endpoints matched exactly. The largest differences from Chromium at the
+logged sample times were 0.00050 CSS px for walking and 0.00003° for turning.
+An independent rerun showed 18–22 visible changes, median gaps of 34–35 ms,
+and first updates after 169–209 ms. The timings reflect this X11 setup.
+
+Run with the same native binary and Playwright setup as above, plus a C
+compiler, X11 and XTest development libraries and `pkg-config`.
+
+```sh
+xvfb-run -a -s '-screen 0 1600x1000x24' \
+  node benchmarks/backrooms/motion.mjs /path/to/playwright-install \
+  "$target_dir/debug/css-gpui-planar-preview"
+```
+
+The preview uses settled frames for perspective changes and unsupported
+transition syntax. CSS keyframes, the authored Enter sequence, the
+wraparound-turn keyframes, the animated ending, audio, and the authored HUD
+remain outside this motion check. Interruption starts each supported track
+from the last submitted pose with its authored duration. Chromium's
+transition reversal and continued timelines for unchanged targets remain
+unmeasured. Strict generation remains separate and stops at 5,102 source
+losses and zero Rust bytes per viewport.

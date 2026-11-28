@@ -10,6 +10,7 @@
 pub(crate) mod cascade;
 pub(crate) mod interaction;
 mod model;
+mod rule_index;
 pub(crate) mod selector;
 pub(crate) mod values;
 
@@ -23,7 +24,8 @@ use interaction::{
     Interaction, StateSelector, StateValueLoss, has_element_children, paint_difference,
     state_value_loss, supports_state_property,
 };
-use selector::{CheckedSnapshot, Selector, Specificity};
+use rule_index::RuleIndex;
+use selector::{CheckedSnapshot, Specificity};
 use std::collections::{BTreeMap, BTreeSet};
 use values::{LengthContext, Variables, cascade_variables, substitute_variables};
 
@@ -212,7 +214,7 @@ fn resolve(
         })
         .transpose()?;
     let snapshot = snapshot.as_ref();
-    let rules = parse_rules(graph, None, snapshot.is_some());
+    let rules = RuleIndex::parse(graph, None, snapshot.is_some());
     let state_rules: Vec<_> = graph
         .css_rules
         .iter()
@@ -233,11 +235,11 @@ fn resolve(
     let decoration_rules = [
         (
             "before",
-            parse_rules(graph, Some("before"), snapshot.is_some()),
+            RuleIndex::parse(graph, Some("before"), snapshot.is_some()),
         ),
         (
             "after",
-            parse_rules(graph, Some("after"), snapshot.is_some()),
+            RuleIndex::parse(graph, Some("after"), snapshot.is_some()),
         ),
     ];
 
@@ -256,7 +258,7 @@ fn resolve(
             percent: None,
         };
         let inherited = parent.map_or(&initial_variables, |(_, variables)| variables);
-        let matches = matching_rules(node, &graph.html_nodes, &rules, snapshot);
+        let matches = rules.matches(node, &graph.html_nodes, snapshot);
         let radio = radios.radios.contains_key(&node.id);
         let (mut style, variables) =
             cascade(matches.clone(), inherited, lengths, radio, |_, _, _| true);
@@ -328,7 +330,7 @@ fn resolve(
             }
         }
         for (name, rules) in &decoration_rules {
-            let matches = matching_rules(node, &graph.html_nodes, rules, snapshot);
+            let matches = rules.matches(node, &graph.html_nodes, snapshot);
             if matches.is_empty() {
                 continue;
             }
@@ -397,60 +399,7 @@ fn resolve(
     })
 }
 
-fn parse_rules<'a>(
-    graph: &'a SceneSourceGraph,
-    pseudo_element: Option<&str>,
-    snapshot: bool,
-) -> Vec<(&'a crate::CssRule, Vec<Selector<'a>>)> {
-    graph
-        .css_rules
-        .iter()
-        .filter_map(|rule| {
-            let selectors: Vec<_> = rule
-                .selectors
-                .iter()
-                .filter_map(|text| {
-                    let origin = match pseudo_element {
-                        Some(pseudo_element) => {
-                            let origin = text.strip_suffix(pseudo_element)?;
-                            origin
-                                .strip_suffix("::")
-                                .or_else(|| snapshot.then(|| origin.strip_suffix(":")).flatten())?
-                        }
-                        None => text,
-                    };
-                    if snapshot {
-                        Selector::parse_snapshot(origin)
-                    } else {
-                        Selector::parse(origin)
-                    }
-                })
-                .collect();
-            (!selectors.is_empty()).then_some((rule, selectors))
-        })
-        .collect()
-}
-
 type MatchedRule<'a> = (Specificity, &'a CssRule, Option<usize>);
-
-fn matching_rules<'a>(
-    node: &HtmlNode,
-    nodes: &[HtmlNode],
-    rules: &[(&'a CssRule, Vec<Selector<'_>>)],
-    snapshot: Option<&CheckedSnapshot>,
-) -> Vec<MatchedRule<'a>> {
-    rules
-        .iter()
-        .filter_map(|(rule, selectors)| {
-            let specificity = selectors
-                .iter()
-                .filter(|selector| selector.matches_in(node, nodes, snapshot))
-                .map(Selector::specificity)
-                .max()?;
-            Some((specificity, *rule, None))
-        })
-        .collect()
-}
 
 /// Apply matched rules in cascade order and return the style before inheritance.
 fn cascade(

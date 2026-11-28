@@ -1,4 +1,7 @@
-use std::collections::BTreeMap;
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::{Arc, Mutex, OnceLock},
+};
 
 use crate::{
     paint::{Gradient, layers, rgba},
@@ -7,10 +10,58 @@ use crate::{
 
 use super::{css_value, raster::over};
 
+#[derive(Default)]
+pub(super) struct PaintCache {
+    // Each cache belongs to one immutable cascade and CSS viewport. A camera
+    // transform changes how a border box projects and leaves its paint intact.
+    faces: Mutex<HashMap<(usize, FaceKind), Arc<FacePaint>>>,
+}
+
+#[derive(PartialEq, Eq, Hash)]
+enum FaceKind {
+    Element,
+    Before,
+    After,
+}
+
+impl PaintCache {
+    pub fn face(
+        &self,
+        node: usize,
+        pseudo: Option<&str>,
+        compile: impl FnOnce() -> FacePaint,
+    ) -> Arc<FacePaint> {
+        let kind = match pseudo {
+            None => FaceKind::Element,
+            Some("before") => FaceKind::Before,
+            Some("after") => FaceKind::After,
+            Some(_) => unreachable!("only before and after are projected"),
+        };
+        self.faces
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .entry((node, kind))
+            .or_insert_with(|| Arc::new(compile()))
+            .clone()
+    }
+}
+
+pub(super) struct FacePaint {
+    pub material: Material,
+    pub losses: Vec<(String, String)>,
+    pub configured: OnceLock<ConfiguredFacePaint>,
+}
+
+pub(super) struct ConfiguredFacePaint {
+    pub material: Arc<Material>,
+    pub losses: Vec<(String, String)>,
+}
+
+#[derive(Clone)]
 pub(super) struct Material {
     pub color: [f32; 4],
     gradients: Vec<BackgroundLayer>,
-    texture: Option<Texture>,
+    texture: Option<Arc<Texture>>,
     brightness: Option<f32>,
     opacity: f32,
 }
@@ -192,7 +243,7 @@ impl Material {
         // A CSS filter makes the element an intermediate surface, including
         // a no-op brightness filter. Magnification interpolates its texels.
         if self.brightness.is_some() && self.gradients.iter().any(|layer| layer.tile.is_some()) {
-            self.texture = Texture::rasterize(area, |point| self.paint(point, area));
+            self.texture = Texture::rasterize(area, |point| self.paint(point, area)).map(Arc::new);
             if self.texture.is_none() {
                 loss(
                     "filter",
@@ -295,12 +346,14 @@ impl Texture {
     }
 }
 
+#[derive(Clone)]
 struct BackgroundLayer {
     index: usize,
     gradient: Gradient,
     tile: Option<Tile>,
 }
 
+#[derive(Clone)]
 struct Tile {
     size: [f32; 2],
     origin: [f32; 2],
