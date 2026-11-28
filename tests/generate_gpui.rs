@@ -13,6 +13,97 @@ fn run_example(example: &str, options: &[&str], html: &Path, css: &Path) -> Outp
 }
 
 #[test]
+fn strict_generation_resolves_viewport_media() {
+    let directory =
+        std::env::temp_dir().join(format!("css-gpui-viewport-media-{}", std::process::id()));
+    fs::create_dir_all(&directory).unwrap();
+    let html = directory.join("media.html");
+    let css = directory.join("media.css");
+    fs::write(&html, "<main class='probe'></main>").unwrap();
+    let supported = ".probe { width: 111px; height: 121px; }
+@media only screen and (min-width: 1300px) { .probe { width: 131px; } }
+@media (orientation: landscape) and (max-height: 520px) {
+    .probe { height: 151px; }
+}
+@media SCREEN and (orientation: portrait) and
+       (min-height: 500px) { .probe { height: 181px; } }
+";
+    fs::write(&css, supported).unwrap();
+
+    let snapshots = [
+        ("390x499", 111, 121),
+        ("390x844", 111, 181),
+        ("520x520", 111, 181),
+        ("1299x520", 111, 151),
+        ("1300x520", 131, 151),
+        ("1300x521", 131, 121),
+    ]
+    .map(|(viewport, width, height)| {
+        (
+            viewport,
+            width,
+            height,
+            run_example("generate_gpui", &["--viewport", viewport], &html, &css),
+        )
+    });
+    let unspecified = run_example("generate_gpui", &[], &html, &css);
+    fs::write(
+        &css,
+        "\
+@media (min-width: 2000px) and (prefers-reduced-motion: reduce) { .probe { height: 191px; } }
+@media (max-width: 480px), (max-height: 520px) { .probe { height: 192px; } }
+",
+    )
+    .unwrap();
+    let unsupported = run_example("generate_gpui", &["--viewport", "1300x520"], &html, &css);
+    fs::remove_dir_all(&directory).unwrap();
+
+    for (viewport, width, height, output) in snapshots {
+        assert!(
+            output.status.success(),
+            "{viewport}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(output.stderr.is_empty());
+        let rust = String::from_utf8(output.stdout).unwrap();
+        assert!(rust.contains(&format!(".w(gpui::px({width}.0))")), "{rust}");
+        assert!(
+            rust.contains(&format!(".h(gpui::px({height}.0))")),
+            "{rust}"
+        );
+    }
+    for (output, conditions) in [
+        (
+            unspecified,
+            &[
+                (2, "only screen and (min-width: 1300px)"),
+                (3, "(orientation: landscape) and (max-height: 520px)"),
+            ][..],
+        ),
+        (
+            unsupported,
+            &[
+                (1, "prefers-reduced-motion"),
+                (2, "(max-width: 480px), (max-height: 520px)"),
+            ][..],
+        ),
+    ] {
+        assert!(!output.status.success());
+        assert!(output.stdout.is_empty());
+        let errors = String::from_utf8_lossy(&output.stderr);
+        for &(line, condition) in conditions {
+            let location = format!("{}:{line}:1:", css.display());
+            assert!(
+                errors.lines().any(|line| line.starts_with(&location)
+                    && line.contains("source loss")
+                    && line.contains(condition)),
+                "{errors}"
+            );
+        }
+    }
+}
+
+#[test]
 fn unsupported_input_behavior_is_a_source_loss() {
     let directory =
         std::env::temp_dir().join(format!("css-gpui-unsupported-input-{}", std::process::id()));

@@ -43,8 +43,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let html = fs::read_to_string(html_path)?;
     let css = fs::read_to_string(css_path)?;
-    let graph = if let Some((width, _)) = viewport {
-        SceneSourceGraph::from_strings_at_viewport("component", &html, &css, width)
+    let graph = if let Some((width, height)) = viewport {
+        SceneSourceGraph::from_strings_at_viewport_size("component", &html, &css, width, height)
     } else {
         SceneSourceGraph::from_strings("component", &html, &css)
     }

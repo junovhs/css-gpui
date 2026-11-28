@@ -1,5 +1,27 @@
 # Backrooms strict conversion benchmark
 
+## Viewport media support
+
+With both dimensions from `--viewport`, strict generation evaluates the
+portrait queries at `input.html:33:1` and `input.html:8939:1` and the
+`only screen and (min-width: 1300px)` query at `input.html:9101:1`.
+The `prefers-color-scheme` query at `input.html:8944:1` still produces
+a source loss. The hash-verified rerun at ISS-53 stopped at source
+diagnostics with 5,099 losses at 390 × 844 and 5,101 at 1440 × 900.
+Both viewports produced zero bytes of Rust. Matching media blocks expose
+their declarations to the source analyzer, so the loss counts differ.
+
+The same matcher sets the native title scene's perspective. At a height of
+900 px, Chromium and the Rust projection agree on 545.06 px at 1,299 px
+wide and 528 px at 1,300 and 1,440 px wide. The 14 sampled projected
+vertices agreed within 0.001 CSS px. The live branch replay passed eight
+actions at each benchmark viewport with all 18 native captures matching
+independent Rust rasters. Only the desktop title raster changed from the
+previous build. Its isolated-scene RGB error against Chromium fell from
+6.39 to 5.76.
+
+## November 27 baseline
+
 On November 27, 2026, `generate_gpui` at `8e2c52bea8bc6d1a3ec04ca49d4554c8dfeb1d74` parsed the full browser-served HTML and inline CSS for Ben Evans’s Backrooms Pen. Both strict runs stopped during source diagnostics with **5,102 source losses** and exit code `1`. The first reported loss was the unevaluated `@charset "UTF-8"` at `input.html:19:1`. The first responsive loss was the portrait media query at `input.html:33:1`. [Original Pen](https://codepen.io/ivorjetski/pen/NPqLLoz) · [Browser-served HTML](https://cdpn.io/pen/debug/NPqLLoz)
 
 Evans published the compiled CSS because the full Sass source exceeded
@@ -13,7 +35,7 @@ repository contains the benchmark code. [Author’s write-up](https://dev.to/ivo
 | 390 × 844 | Source diagnostics | 5,102 | Stage blocked | 0 bytes |
 | 1440 × 900 | Source diagnostics | 5,102 | Stage blocked | 0 bytes |
 
-These viewports cover portrait and landscape and fall on opposite sides of the Pen’s 1,300 px breakpoint. The compiler reports `@media only screen and (min-width: 1300px)` at `input.html:9101:1` as unevaluated at both widths. The two stderr streams are byte-identical with SHA-256 `7d8febc13844b28b1e300aaf48f51dba0c770b7f761998d4e3e719be36d131bf`. Every source location below refers to the pinned HTML response, including its inline stylesheet. [Browser-served HTML](https://cdpn.io/pen/debug/NPqLLoz)
+These viewports cover portrait and landscape and fall on opposite sides of the Pen’s 1,300 px breakpoint. The baseline compiler reported `@media only screen and (min-width: 1300px)` at `input.html:9101:1` as unevaluated at both widths. The two stderr streams were byte-identical with SHA-256 `7d8febc13844b28b1e300aaf48f51dba0c770b7f761998d4e3e719be36d131bf`. Every source location below refers to the pinned HTML response, including its inline stylesheet. [Browser-served HTML](https://cdpn.io/pen/debug/NPqLLoz)
 
 | Capability | Diagnostics per viewport | Reported examples in the source |
 | --- | ---: | --- |
@@ -56,8 +78,8 @@ clicks against their rounded shapes. Door hit testing in the 3D scene, the
 rest of the HUD, the title treatment, audio, and the Enter, wraparound-turn
 and ending keyframes still lack native support.
 Intermediate motion is capped at a 640 × 360 raster at the default viewport.
-The viewer settles at full resolution. The strict compiler still reports
-5,102 source losses and emits zero Rust bytes at either benchmark viewport.
+The viewer settles at full resolution. See [the strict benchmark results](#viewport-media-support)
+for the standalone compiler.
 
 ## Reproduce the strict benchmark
 
@@ -144,9 +166,9 @@ the exact clipped outline of an independent wall crossing the eye.
 The bounded layout covers unbordered absolute boxes with explicit insets and
 sized flex items with row wrapping and start or end line packing. It uses a
 settled viewport and the authored cascade. The preview and replay below use
-those boxes for drawing and input verification. At both viewports, ordinary
-strict GPUI conversion exits at the source diagnostic stage with 5,102
-losses and emits zero bytes of Rust.
+those boxes for drawing and input verification. At that revision, strict
+GPUI conversion exited at the source diagnostic stage with 5,102
+losses and emitted zero bytes of Rust.
 
 ## Settled GPUI corner preview
 
@@ -200,7 +222,7 @@ viewport layer, so that layer remains a paint loss in the start state.
 Differences in grouped compositing, occlusion, and edge sampling remain visible
 in the coverage and paint comparisons. The HUD, motion interpolation, and
 audio remain outside the scene preview.
-Ordinary strict GPUI generation still reports 5,102 losses and emits
+At that revision, strict GPUI generation reported 5,102 losses and emitted
 zero bytes of Rust for each viewport.
 
 ## Native corner replay
@@ -422,8 +444,8 @@ input traces. The GPUI control strip uses the route's compiled destinations.
 The rest of the authored HUD, debug text inside the maze, grouped depth compositing and
 animated ending remain open on ISS-22. Top view still reports unsupported
 gradient variants, grouped opacity, outlines, generated content, and layout
-for bordered or aspect-ratio decorations. Strict GPUI conversion reports 5,102
-source losses and emits zero bytes of Rust at either viewport.
+for bordered or aspect-ratio decorations. At that revision, strict GPUI
+conversion reported 5,102 source losses and emitted zero bytes at either viewport.
 
 ## Live native document preview
 
@@ -548,5 +570,5 @@ wraparound-turn keyframes, the animated ending, audio, and the viewport
 controls remain outside this motion check. Interruption starts each supported track
 from the last submitted pose with its authored duration. Chromium's
 transition reversal and continued timelines for unchanged targets remain
-unmeasured. Strict generation remains separate and stops at 5,102 source
-losses and zero Rust bytes per viewport.
+unmeasured. At that revision, strict generation stopped at 5,102 source
+losses and emitted zero Rust bytes per viewport.

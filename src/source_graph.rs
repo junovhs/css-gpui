@@ -47,8 +47,9 @@ impl SceneSourceGraph {
         )
     }
 
-    /// Build a graph for a fixed CSS viewport width. Linked stylesheet contents
-    /// are supplied as CSS in cascade order before the document's inline styles.
+    /// Build a graph for a fixed CSS viewport width. Media conditions that need
+    /// a height remain unevaluated. Linked stylesheet contents are supplied as
+    /// CSS in cascade order before the document's inline styles.
     pub fn from_strings_at_viewport(
         scene_id: &str,
         html_str: &str,
@@ -64,7 +65,8 @@ impl SceneSourceGraph {
         )
     }
 
-    /// Build a fixed-size snapshot, including supported orientation media queries.
+    /// Build a fixed-size screen snapshot. This evaluates supported pixel
+    /// width and height bounds, orientation, and conjunctions of those features.
     pub fn from_strings_at_viewport_size(
         scene_id: &str,
         html_str: &str,

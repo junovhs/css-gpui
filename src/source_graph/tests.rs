@@ -90,18 +90,28 @@ fn returns_error_for_unknown_scene() {
 }
 
 #[test]
-fn matches_media_width_and_keeps_unsupported_at_rule_location() {
-    let css = "@media (max-width: 480px) { .card { width: 100px; } }\n@keyframes fade { to { opacity: 0; } }";
+fn matches_media_width_and_keeps_unevaluated_at_rule_locations() {
+    let css = "@media (max-width: 480px) { .card { width: 100px; } }
+@keyframes fade { to { opacity: 0; } }
+@media (min-width: 500px) and (max-height: 480px) { .card { height: 100px; } }";
     let small =
         SceneSourceGraph::from_strings_at_viewport("media", "<div></div>", css, 390.0).unwrap();
     let large =
         SceneSourceGraph::from_strings_at_viewport("media", "<div></div>", css, 1100.0).unwrap();
 
     assert_eq!(small.css_rules[0].selectors, [".card"]);
-    assert_eq!(large.css_rules.len(), 1);
+    assert_eq!(large.css_rules.len(), 2);
     let unsupported = &large.css_rules[0];
     assert_eq!(unsupported.selectors, ["@keyframes fade"]);
     assert_eq!((unsupported.span.line, unsupported.span.column), (2, 1));
+    for graph in [&small, &large] {
+        let height_query = graph.css_rules.last().unwrap();
+        assert_eq!(
+            height_query.selectors,
+            ["@media (min-width: 500px) and (max-height: 480px)"]
+        );
+        assert_eq!((height_query.span.line, height_query.span.column), (3, 1));
+    }
 }
 
 #[test]

@@ -77,7 +77,7 @@ impl Parser<'_> {
                     }
                     let inner = prelude_end + 1..close - 1;
                     if at_rule {
-                        match self.media_matches(prelude.trim()) {
+                        match self.media_matches(&self.masked[index..prelude_end]) {
                             Some(true) => self.parse_block(inner, parent)?,
                             Some(false) => {}
                             None => self.push_rule(
@@ -151,22 +151,33 @@ impl Parser<'_> {
 
     fn media_matches(&self, prelude: &str) -> Option<bool> {
         let (width, height) = self.viewport?;
-        let condition = prelude.strip_prefix("@media ")?.trim();
-        let condition = condition.strip_prefix("screen and ").unwrap_or(condition);
-        let (property, value) = condition
-            .strip_prefix('(')?
-            .strip_suffix(')')?
-            .split_once(':')?;
-        let value = value.trim();
-        match property.trim() {
-            "orientation" => match value {
-                "portrait" => Some(width <= height?),
-                "landscape" => Some(width > height?),
-                _ => None,
-            },
-            "min-width" => Some(width >= value.strip_suffix("px")?.parse().ok()?),
-            "max-width" => Some(width <= value.strip_suffix("px")?.parse().ok()?),
-            _ => None,
+        let (at_rule, condition) = prelude.split_at_checked("@media".len())?;
+        if !at_rule.eq_ignore_ascii_case("@media")
+            || !condition.starts_with(|ch: char| ch.is_ascii_whitespace() || ch == '(')
+        {
+            return None;
+        }
+        let condition = condition.trim_ascii().to_ascii_lowercase();
+        let mut condition = condition.as_str();
+        if !condition.starts_with('(') {
+            let media_type = strip_media_keyword(condition, "only").unwrap_or(condition);
+            condition = strip_media_keyword(media_type, "screen")?;
+            if condition.is_empty() {
+                return Some(true);
+            }
+            condition = strip_media_keyword(condition, "and")?;
+        }
+
+        let mut matched = true;
+        loop {
+            let (feature, remaining) = condition.strip_prefix('(')?.split_once(')')?;
+            // An unsupported feature must stay diagnosable even after a false term.
+            matched &= media_feature_matches(feature, width, height)?;
+            condition = remaining.trim_ascii_start();
+            if condition.is_empty() {
+                return Some(matched);
+            }
+            condition = strip_media_keyword(condition, "and")?;
         }
     }
 
@@ -176,6 +187,41 @@ impl Parser<'_> {
             offset: self.offset + index,
         }
     }
+}
+
+fn strip_media_keyword<'a>(condition: &'a str, keyword: &str) -> Option<&'a str> {
+    let remaining = condition.strip_prefix(keyword)?;
+    (remaining.is_empty() || remaining.starts_with(|ch: char| ch.is_ascii_whitespace()))
+        .then(|| remaining.trim_ascii_start())
+}
+
+fn media_feature_matches(feature: &str, width: f32, height: Option<f32>) -> Option<bool> {
+    let (property, value) = feature.split_once(':')?;
+    let value = value.trim_ascii();
+    match property.trim_ascii() {
+        "orientation" => match value {
+            "portrait" => Some(width <= height?),
+            "landscape" => Some(width > height?),
+            _ => None,
+        },
+        "min-width" => Some(width >= media_length(value)?),
+        "max-width" => Some(width <= media_length(value)?),
+        "min-height" => Some(height? >= media_length(value)?),
+        "max-height" => Some(height? <= media_length(value)?),
+        _ => None,
+    }
+}
+
+fn media_length(value: &str) -> Option<f32> {
+    let number = value.strip_suffix("px")?;
+    let mantissa = number
+        .split_once('e')
+        .map_or(number, |(mantissa, _)| mantissa);
+    if mantissa.ends_with('.') {
+        return None;
+    }
+    let length: f32 = number.parse().ok()?;
+    (length.is_finite() && length >= 0.0).then_some(length)
 }
 
 fn expand_nested(parents: &[String], selectors: &[String]) -> Vec<String> {
