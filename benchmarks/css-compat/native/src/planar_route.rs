@@ -320,7 +320,7 @@ impl Animation {
         view: &gpui::WeakEntity<Viewer>,
         cx: &mut gpui::AsyncWindowContext,
     ) -> bool {
-        const INTERVAL: Duration = Duration::from_millis(32);
+        const FRAME_INTERVAL: Duration = Duration::from_micros(16_667);
         let executor = cx.background_executor().clone();
         loop {
             let elapsed = self.started.elapsed();
@@ -370,7 +370,7 @@ impl Animation {
             if !current {
                 return false;
             }
-            let pause = (elapsed + INTERVAL).saturating_sub(self.started.elapsed());
+            let pause = (elapsed + FRAME_INTERVAL).saturating_sub(self.started.elapsed());
             executor.timer(pause.min(remaining)).await;
         }
     }
