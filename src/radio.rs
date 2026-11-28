@@ -1,6 +1,6 @@
 //! Bounded radio and label associations in the parsed HTML document.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::extractor::{INVISIBLE_TAGS, input_attribute, input_type};
 use crate::resolver::interaction::unsupported_focus_order;
@@ -10,6 +10,7 @@ use crate::{HtmlNode, HtmlNodeKind};
 pub(crate) struct RadioMarkup<'a> {
     pub radios: HashMap<usize, &'a str>,
     pub labels: HashMap<usize, usize>,
+    snapshot_labels: HashMap<usize, usize>,
     pub initial: HashMap<&'a str, usize>,
     pub losses: HashMap<usize, &'static str>,
 }
@@ -97,13 +98,15 @@ impl<'a> RadioMarkup<'a> {
                 && !unavailable(label, nodes)
                 && unsupported_focus_order(label, nodes).is_none()
                 && input_attribute(label, "tabindex").is_none()
-                && !has_event_handler(label)
                 && !ancestors(label, nodes).any(|ancestor| is_tag(ancestor, "label"))
                 && !nodes.iter().any(|child| {
                     interactive_label_child(child, matches[0].id)
                         && ancestors(child, nodes).any(|ancestor| ancestor.id == label.id)
                 });
             if supported {
+                markup.snapshot_labels.insert(label.id, matches[0].id);
+            }
+            if supported && !has_event_handler(label) {
                 markup.labels.insert(label.id, matches[0].id);
             } else {
                 markup
@@ -113,6 +116,122 @@ impl<'a> RadioMarkup<'a> {
         }
         markup
     }
+
+    pub fn selection(&self, overrides: &[usize]) -> Result<HashMap<&'a str, usize>, usize> {
+        let mut selection = self.initial.clone();
+        for &id in overrides {
+            let &name = self.radios.get(&id).ok_or(id)?;
+            selection.insert(name, id);
+        }
+        Ok(selection)
+    }
+}
+
+/// A scoped explicit label as resolved in a resting radio snapshot.
+#[derive(Debug, serde::Serialize)]
+pub struct SnapshotRadioLabel<'a> {
+    pub node_id: usize,
+    pub group: &'a str,
+    pub target: &'a str,
+    pub class_name: &'a str,
+    pub text: String,
+    pub generated_content: Option<&'a str>,
+    /// Authored handlers are outside CSS snapshot activation.
+    pub inline_handler: bool,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct SnapshotRadioControls<'a> {
+    pub selection: BTreeMap<&'a str, &'a str>,
+    pub labels: Vec<SnapshotRadioLabel<'a>>,
+}
+
+pub(crate) fn snapshot_controls<'a>(
+    graph: &'a crate::SceneSourceGraph,
+    scene: &'a crate::resolver::ResolvedScene,
+    root: usize,
+    overrides: &[usize],
+) -> Result<SnapshotRadioControls<'a>, usize> {
+    let nodes = &graph.html_nodes;
+    let markup = RadioMarkup::new(nodes);
+    let selection = markup
+        .selection(overrides)?
+        .into_iter()
+        .filter_map(|(group, id)| Some((group, input_attribute(&nodes[id], "id")?)))
+        .collect();
+    let styles: HashMap<_, _> = scene
+        .nodes
+        .iter()
+        .map(|node| (node.node.id, &node.style))
+        .collect();
+    let labels = nodes
+        .iter()
+        .filter_map(|label| {
+            let &radio = markup.snapshot_labels.get(&label.id)?;
+            let branch: Vec<_> = std::iter::once(label)
+                .chain(ancestors(label, nodes))
+                .collect();
+            if !branch.iter().any(|node| node.id == root)
+                || branch.iter().any(|node| {
+                    styles
+                        .get(&node.id)
+                        .is_some_and(|style| style.display == "none")
+                })
+            {
+                return None;
+            }
+            let inherited = |property| {
+                branch.iter().find_map(|node| {
+                    styles
+                        .get(&node.id)?
+                        .projection_properties
+                        .get(property)
+                        .map(String::as_str)
+                        .filter(|value| !matches!(*value, "inherit" | "unset"))
+                })
+            };
+            if matches!(inherited("visibility"), Some("hidden" | "collapse"))
+                || inherited("pointer-events") == Some("none")
+            {
+                return None;
+            }
+            let style = styles.get(&label.id)?;
+            let generated_content = style.decorations.iter().find_map(|decoration| {
+                (decoration.pseudo == "after" || decoration.pseudo == "before")
+                    .then(|| decoration.effects.get("content").map(String::as_str))
+                    .flatten()
+                    .filter(|content| !matches!(*content, "none" | "normal" | "\"\""))
+            });
+            let text = nodes
+                .iter()
+                .skip(label.id + 1)
+                .take_while(|child| ancestors(child, nodes).any(|node| node.id == label.id))
+                .filter_map(|child| {
+                    let text = child.text.as_deref()?;
+                    ancestors(child, nodes)
+                        .take_while(|node| node.id != label.id)
+                        .all(|node| {
+                            styles
+                                .get(&node.id)
+                                .is_none_or(|style| style.display != "none")
+                        })
+                        .then_some(text.trim())
+                })
+                .filter(|text| !text.is_empty())
+                .collect::<Vec<_>>()
+                .join(" ");
+            Some(SnapshotRadioLabel {
+                node_id: label.id,
+                group: markup.radios[&radio],
+                target: input_attribute(&nodes[radio], "id")?,
+                class_name: input_attribute(label, "class").unwrap_or_default(),
+                text,
+                generated_content,
+                inline_handler: has_event_handler(label),
+            })
+        })
+        .collect();
+    Ok(SnapshotRadioControls { selection, labels })
 }
 
 fn is_tag(node: &HtmlNode, tag: &str) -> bool {

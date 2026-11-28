@@ -14,17 +14,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     if let [mode, viewport, html, css, selection @ ..] = paths.as_slice() {
         match mode.to_str() {
             Some("--radio-snapshot") => {
-                let (scene, _, _) = resolve_snapshot(viewport, html, css, selection, false)?;
-                return inspect_radio_snapshot(&scene);
+                let snapshot = resolve_snapshot(viewport, html, css, selection, false)?;
+                return inspect_radio_snapshot(&snapshot.scene);
             }
             Some("--planar-preview") => {
-                let (scene, viewport, graph) =
-                    resolve_snapshot(viewport, html, css, selection, true)?;
-                return inspect_planar_preview(&scene, viewport, &graph);
+                let snapshot = resolve_snapshot(viewport, html, css, selection, true)?;
+                return inspect_planar_preview(&snapshot);
             }
             Some("--projection-snapshot") => {
-                let (scene, viewport, _) = resolve_snapshot(viewport, html, css, selection, true)?;
-                return inspect_projection_snapshot(&scene, viewport);
+                let snapshot = resolve_snapshot(viewport, html, css, selection, true)?;
+                return inspect_projection_snapshot(&snapshot.scene, snapshot.viewport);
             }
             _ => {}
         }
@@ -52,13 +51,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+struct Snapshot {
+    scene: resolver::ResolvedScene,
+    viewport: [f64; 2],
+    graph: SceneSourceGraph,
+    overrides: Vec<usize>,
+}
+
 fn resolve_snapshot(
     viewport: &Path,
     html: &Path,
     css: &Path,
     selection: &[PathBuf],
     include_orientation: bool,
-) -> Result<(resolver::ResolvedScene, [f64; 2], SceneSourceGraph), Box<dyn Error>> {
+) -> Result<Snapshot, Box<dyn Error>> {
     let (width, height) = viewport
         .to_str()
         .and_then(|size| size.split_once('x'))
@@ -102,49 +108,71 @@ fn resolve_snapshot(
         height as f32,
         &overrides,
     )?;
-    Ok((scene, [f64::from(width), f64::from(height)], graph))
+    Ok(Snapshot {
+        scene,
+        viewport: [f64::from(width), f64::from(height)],
+        graph,
+        overrides,
+    })
 }
 
 #[derive(serde::Deserialize)]
 struct PlanarInput {
     root: String,
     rgba: PathBuf,
+    label_scope: Option<String>,
 }
 
-fn inspect_planar_preview(
-    scene: &resolver::ResolvedScene,
-    viewport: [f64; 2],
-    graph: &SceneSourceGraph,
-) -> Result<(), Box<dyn Error>> {
-    let input: PlanarInput = serde_json::from_reader(io::stdin().lock())?;
+fn unique_node(scene: &resolver::ResolvedScene, selector: &str) -> Result<usize, Box<dyn Error>> {
     let mut matches = scene.nodes.iter().filter(|resolved| {
-        if let Some(id) = input.root.strip_prefix('#') {
+        if let Some(id) = selector.strip_prefix('#') {
             resolved
                 .node
                 .attributes
                 .iter()
                 .any(|(name, value)| name == "id" && value == id)
         } else {
-            resolved.node.name.as_deref() == Some(input.root.as_str())
+            resolved.node.name.as_deref() == Some(selector)
         }
     });
     let root = matches
         .next()
-        .ok_or("planar context root does not match an element")?;
+        .ok_or_else(|| format!("{selector:?} does not match an element"))?;
     if matches.next().is_some() {
-        return Err("planar context root must match exactly one element".into());
+        return Err(format!("{selector:?} must match exactly one element").into());
     }
+    Ok(root.node.id)
+}
+
+fn inspect_planar_preview(snapshot: &Snapshot) -> Result<(), Box<dyn Error>> {
+    let input: PlanarInput = serde_json::from_reader(io::stdin().lock())?;
+    let Snapshot {
+        scene,
+        viewport,
+        graph,
+        overrides,
+    } = snapshot;
+    let controls = input
+        .label_scope
+        .as_deref()
+        .map(|scope| -> Result<_, Box<dyn Error>> {
+            let root = unique_node(scene, scope)?;
+            Ok(resolver::radio_snapshot_controls(
+                graph, scene, root, overrides,
+            )?)
+        })
+        .transpose()?;
     let frame = planar::preview(
         graph,
         scene,
-        root.node.id,
+        unique_node(scene, &input.root)?,
         viewport.map(|length| length as u32),
     )?;
     fs::write(input.rgba, frame.rgba)?;
     serde_json::to_writer(
         io::stdout().lock(),
         &json!({
-            "planes": frame.planes, "losses": frame.losses,
+            "planes": frame.planes, "losses": frame.losses, "controls": controls,
         }),
     )?;
     println!();

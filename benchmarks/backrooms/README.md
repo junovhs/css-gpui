@@ -2,6 +2,12 @@
 
 On November 27, 2026, `generate_gpui` at `8e2c52bea8bc6d1a3ec04ca49d4554c8dfeb1d74` parsed the full browser-served HTML and inline CSS for Ben Evans’s Backrooms Pen. Both strict runs stopped during source diagnostics with **5,102 source losses** and exit code `1`. The first reported loss was the unevaluated `@charset "UTF-8"` at `input.html:19:1`. The first responsive loss was the portrait media query at `input.html:33:1`. [Original Pen](https://codepen.io/ivorjetski/pen/NPqLLoz) · [Browser-served HTML](https://cdpn.io/pen/debug/NPqLLoz)
 
+Evans published the compiled CSS because the full Sass source exceeded
+CodePen’s size limit. The benchmark pins that published output. The Pen
+does not supply the complete Sass or identify the historical compiler
+version. The upstream input is fetched for local verification, and the
+repository contains the benchmark code. [Author’s write-up](https://dev.to/ivorjetski/front-end-backrooms-css-1fkf)
+
 | Viewport | Earliest fatal stage | Source losses | GPUI target losses | Rust emitted |
 | --- | --- | ---: | --- | --- |
 | 390 × 844 | Source diagnostics | 5,102 | Stage blocked | 0 bytes |
@@ -103,10 +109,9 @@ the exact clipped outline of an independent wall crossing the eye.
 
 The bounded layout covers unbordered absolute boxes with explicit insets and
 sized flex items with row wrapping and start or end line packing. It uses a
-settled viewport and the authored cascade. Rendering still needs backface
-culling, depth ordering, authored paints, and motion. Live navigation and
-browser/native frame comparison remain open. At both viewports, ordinary
-strict GPUI conversion still exits at the source diagnostic stage with 5,102
+settled viewport and the authored cascade. The preview and replay below use
+those boxes for drawing and input verification. At both viewports, ordinary
+strict GPUI conversion exits at the source diagnostic stage with 5,102
 losses and emits zero bytes of Rust.
 
 ## Settled GPUI corner preview
@@ -154,11 +159,36 @@ layers, unsupported gradient stops, outlines, shadows, blur, bounded layout
 failures and group overflow. The supported samples retain their base colors,
 leaf opacity and brightness. Differences in grouped compositing, occlusion,
 and edge sampling remain visible in the coverage and paint comparisons. The
-HUD, overlay, motion interpolation, keyboard and mouse activation, and audio
-are outside this snapshot. The verifier sets original radio checkedness
-directly in Chromium and passes the corresponding selections to Rust.
-Ordinary strict GPUI generation still reports 5,102 losses and emits zero
-bytes of Rust for each viewport.
+HUD, overlay, motion interpolation, and audio remain outside the scene
+preview. Ordinary strict GPUI generation still reports 5,102 losses and emits
+zero bytes of Rust for each viewport.
+
+## Native corner replay
+
+The local route builds four resting frames from the pinned HTML and CSS at
+each viewport. The compiler reads the checked groups, available explicit
+radio labels, and the captions from their authored text or generated content.
+The route selects a bounded set of poses using the Enter label, the forward
+label after entry, and the right-turn label after walking.
+
+The GPUI window places the controls in a separate strip below the scene. A
+mouse or keyboard click uses the label’s current target to replace one
+checked radio group and select a compiled frame. Controls with no destination
+in the bundle are disabled. The supported path enters, walks forward to
+`z-8`, can walk back to `z-9` and forward again, and turns right to
+`right1`. The original Enter label’s inline audio handler is recorded in
+the bundle as metadata. The browser and native replay both exercise the CSS
+radio association with scripts and audio omitted.
+
+The replay clicks the original labels in Chromium and sends X11 input to one
+GPUI window per viewport. The portrait replay uses the keyboard for the turn.
+It compares
+the scoped available labels against Chromium, checks the selected radio
+groups after each activation, and compares the GPUI scene pixels to the
+selected Rust frame. It also checks that walking back restores the entry
+frame, and that reclicking the old forward slot leaves the scene unchanged
+once the newly bound target is outside the compiled route. Chromium and
+native scene comparisons use the same paint and coverage thresholds above.
 
 From the repository root on Linux with the Rust toolchain, the GPUI X11 and
 Vulkan build dependencies, Xvfb, xdotool, ImageMagick, and the Playwright setup
@@ -173,7 +203,16 @@ node benchmarks/backrooms/planar.mjs /path/to/playwright-install \
   "$target_dir/debug/css-gpui-planar-preview"
 ```
 
-The last command accepts an optional output directory for local PNG captures,
-RGBA frames, and per-plane metadata. Rust uses the downloaded source and a
-viewport to generate each frame. The GPUI viewer receives only those Rust
-pixels. Chromium geometry and screenshots are used solely in the comparison.
+The last command accepts an optional output directory for local PNG
+captures, the route bundle, RGBA frames, input traces, and per-plane
+metadata. The scene crops exclude the separate native strip. Chromium
+geometry and screenshots are used solely in the comparison.
+
+To build and open the local route without Playwright, use the same native
+binary and run:
+
+```sh
+route_dir=$(mktemp -d)
+node benchmarks/backrooms/route.mjs "$route_dir"
+"$target_dir/debug/css-gpui-planar-preview" --route "$route_dir/390x844-route.json"
+```

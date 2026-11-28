@@ -13,6 +13,7 @@ mod model;
 pub(crate) mod selector;
 pub(crate) mod values;
 
+pub use crate::radio::{SnapshotRadioControls, SnapshotRadioLabel};
 pub use model::{ComputedStyle, UsedBoxStyle};
 
 use crate::ir::paint::InteractionPaint;
@@ -105,6 +106,20 @@ pub fn resolve_scene_with_radio_selection(
     )
 }
 
+/// Read explicit radio labels within an authored subtree in a resting snapshot.
+/// The caller supplies the scene resolved with the same radio overrides. This
+/// reports cascade visibility and pointer eligibility, without viewport
+/// hit-testing, CSS motion, or running authored event handlers.
+pub fn radio_snapshot_controls<'a>(
+    graph: &'a SceneSourceGraph,
+    scene: &'a ResolvedScene,
+    root: usize,
+    overrides: &[usize],
+) -> Result<SnapshotRadioControls<'a>, ResolverError> {
+    crate::radio::snapshot_controls(graph, scene, root, overrides)
+        .map_err(ResolverError::UnsupportedRadio)
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct StateDeclaration {
     pub rule: usize,
@@ -139,14 +154,9 @@ fn resolve(
 
     let radios = RadioMarkup::new(&graph.html_nodes);
     let snapshot = if let Some(overrides) = selected_radios {
-        let mut selection = radios.initial.clone();
-        for &id in overrides {
-            let &name = radios
-                .radios
-                .get(&id)
-                .ok_or(ResolverError::UnsupportedRadio(id))?;
-            selection.insert(name, id);
-        }
+        let selection = radios
+            .selection(overrides)
+            .map_err(ResolverError::UnsupportedRadio)?;
         Some(CheckedSnapshot::new(
             &graph.html_nodes,
             selection.into_values().collect(),

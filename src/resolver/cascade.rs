@@ -67,6 +67,7 @@ pub(super) fn apply_with_lengths(
             | "overflow-x"
             | "overflow-y"
             | "visibility"
+            | "pointer-events"
             | "outline"
             | "outline-color"
             | "outline-style"

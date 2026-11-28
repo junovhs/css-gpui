@@ -16,12 +16,7 @@ const run = (program, args, input) => execFileSync(program, args, {
     cwd: repository, timeout: 120_000, maxBuffer: 8 * 1024 * 1024, input,
 });
 
-export async function withBackrooms(probe) {
-    const playwright = process.argv[2];
-    assert(playwright, 'Pass the directory containing the Playwright 1.60.0 installation');
-    const require = createRequire(join(resolve(playwright), 'package.json'));
-    assert.equal(require('playwright/package.json').version, '1.60.0');
-    const { chromium } = require('playwright');
+export async function withBackroomsSource(probe) {
     const html = run('curl', ['--fail', '--silent', '--show-error', '--location', '--max-time', '60', source]);
     assert.equal(createHash('sha256').update(html).digest('hex'), sourceHash, 'Pinned HTML has changed');
 
@@ -36,6 +31,21 @@ export async function withBackrooms(probe) {
         const cssPath = join(directory, 'linked.css');
         await writeFile(htmlPath, html);
         await writeFile(cssPath, '');
+        const snapshot = (mode, width, height, selection, input, linkedCss = cssPath) => JSON.parse(run(inspect,
+            [mode, `${width}x${height}`, htmlPath, linkedCss, ...selection], input));
+        await probe({ html, directory, snapshot });
+    } finally {
+        await rm(directory, { recursive: true, force: true });
+    }
+}
+
+export async function withBackrooms(probe) {
+    const playwright = process.argv[2];
+    assert(playwright, 'Pass the directory containing the Playwright 1.60.0 installation');
+    const require = createRequire(join(resolve(playwright), 'package.json'));
+    assert.equal(require('playwright/package.json').version, '1.60.0');
+    const { chromium } = require('playwright');
+    await withBackroomsSource(async ({ html, directory, snapshot }) => {
         const browser = await chromium.launch();
         try {
             const page = await browser.newPage();
@@ -48,13 +58,9 @@ export async function withBackrooms(probe) {
                 await page.goto(url, { waitUntil: 'domcontentloaded' });
                 await page.addStyleTag({ content: '* { transition: none !important; animation: none !important; }' });
             };
-            const snapshot = (mode, width, height, selection, input, linkedCss = cssPath) => JSON.parse(run(inspect,
-                [mode, `${width}x${height}`, htmlPath, linkedCss, ...selection], input));
             await probe({ page, snapshot, reset, directory });
         } finally {
             await browser.close();
         }
-    } finally {
-        await rm(directory, { recursive: true, force: true });
-    }
+    });
 }
