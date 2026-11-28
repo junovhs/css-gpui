@@ -1,6 +1,9 @@
-use css_gpui::carousel::{CarouselScene, Panel};
+use std::collections::BTreeMap;
 
-pub(crate) type Point = [f32; 2];
+use css_gpui::{
+    carousel::{CarouselScene, Panel},
+    projection::{Layer, ProjectedPlane, project_plane},
+};
 
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) struct Pose {
@@ -10,74 +13,76 @@ pub(crate) struct Pose {
 
 pub(crate) struct Plane<'a> {
     pub panel: &'a Panel,
-    pub center: [f32; 3],
-    pub slope: Point,
-    pub quad: [Point; 4],
+    pub projected: ProjectedPlane,
 }
 
-pub(crate) struct Projection<'a> {
-    pub scene_origin: Point,
-    pub eye: Point,
-    pub distance: f32,
-    pub planes: Vec<Plane<'a>>,
-}
-
-pub(crate) fn project(scene: &CarouselScene, width: f32, pose: Pose) -> Projection<'_> {
+pub(crate) fn scene_origin(scene: &CarouselScene, width: f32) -> [f32; 2] {
     // The body margin and first block margin collapse in the standards-mode shell.
-    let scene_origin = [(width - scene.scene[0]) * 0.5, scene.margins_y[0].max(8.0)];
-    let eye = [
-        scene_origin[0] + scene.scene[0] * 0.5,
-        scene_origin[1] + scene.scene[1] * 0.5,
-    ];
-    let distance = scene.perspective;
-    let carousel_left = scene_origin[0] + scene.scene_border.width;
-    let carousel_top = scene_origin[1] + scene.scene_border.width;
-    let parent_origin_x = scene.carousel[0] * 0.5;
-    let (parent_sin, parent_cos) = pose.angle.to_radians().sin_cos();
-    let planes = scene
+    [(width - scene.scene[0]) * 0.5, scene.margins_y[0].max(8.0)]
+}
+
+pub(crate) fn project(
+    scene: &CarouselScene,
+    scene_origin: [f32; 2],
+    viewport: [f32; 2],
+    pose: Pose,
+) -> Vec<Plane<'_>> {
+    let scene_origin = scene_origin.map(f64::from);
+    let carousel_origin = scene_origin.map(|point| point + f64::from(scene.scene_border.width));
+    // This layer starts the projected context. Perspective applies to its
+    // child, which preserves 3D for the rotating ring.
+    let camera = BTreeMap::from([
+        ("perspective".into(), format!("{}px", scene.perspective)),
+        ("transform-style".into(), "preserve-3d".into()),
+    ]);
+    let carousel = BTreeMap::from([
+        (
+            "transform".into(),
+            format!("translateZ({}px) rotateY({}deg)", pose.z, pose.angle),
+        ),
+        ("transform-style".into(), "preserve-3d".into()),
+    ]);
+    let camera = Layer {
+        origin: scene_origin,
+        size: scene.scene.map(f64::from),
+        font_size: 16.0,
+        css: &camera,
+    };
+    let carousel = Layer {
+        origin: carousel_origin,
+        size: scene.carousel.map(f64::from),
+        font_size: 16.0,
+        css: &carousel,
+    };
+    let viewport = viewport.map(f64::from);
+
+    scene
         .panels
         .iter()
         .map(|panel| {
-            let [half_width, half_height] = panel.size.map(|v| v * 0.5);
-            let (child_sin, child_cos) = panel.rotation_degrees.to_radians().sin_cos();
-            let child_center_x = panel.origin[0] + half_width + child_sin * panel.translate_z;
-            let child_center_z = child_cos * panel.translate_z;
-            let center_x = child_center_x - parent_origin_x;
-            let center = [
-                carousel_left
-                    + parent_origin_x
-                    + parent_cos * center_x
-                    + parent_sin * child_center_z,
-                carousel_top + panel.origin[1] + half_height,
-                -parent_sin * center_x + parent_cos * child_center_z + pose.z,
+            let css = BTreeMap::from([(
+                "transform".into(),
+                format!(
+                    "rotateY({}deg) translateZ({}px)",
+                    panel.rotation_degrees, panel.translate_z
+                ),
+            )]);
+            let layers = [
+                Layer { ..camera },
+                Layer { ..carousel },
+                Layer {
+                    origin: std::array::from_fn(|axis| {
+                        carousel_origin[axis] + f64::from(panel.origin[axis])
+                    }),
+                    size: panel.size.map(f64::from),
+                    font_size: panel.font_size,
+                    css: &css,
+                },
             ];
-            let (slope_z, slope_x) = (panel.rotation_degrees + pose.angle).to_radians().sin_cos();
-            let slope = [slope_x, -slope_z];
-            let quad = [
-                [-half_width, -half_height],
-                [half_width, -half_height],
-                [half_width, half_height],
-                [-half_width, half_height],
-            ]
-            .map(|[x, y]| {
-                let scale = distance / (distance - (center[2] + x * slope[1]));
-                [
-                    eye[0] + (center[0] + x * slope[0] - eye[0]) * scale,
-                    eye[1] + (center[1] + y - eye[1]) * scale,
-                ]
-            });
-            Plane {
-                panel,
-                center,
-                slope,
-                quad,
-            }
+            let projected = project_plane(&layers, viewport, 16.0)
+                .expect("project compiled carousel transforms")
+                .expect("carousel chain has a panel");
+            Plane { panel, projected }
         })
-        .collect();
-    Projection {
-        scene_origin,
-        eye,
-        distance,
-        planes,
-    }
+        .collect()
 }

@@ -10,7 +10,7 @@ use gpui::{
 };
 use image::Frame;
 use paint::Label;
-use projection::{Pose, project};
+use projection::{Pose, project, scene_origin};
 use serde_json::json;
 
 const SOURCE_SCRIPT: &str = include_str!("../../source.js");
@@ -242,15 +242,19 @@ impl Render for Carousel {
             (height * scale).round() as u32,
             scale,
         );
-        let projection = project(&self.scene, width, pose);
-        if self
+        let scene_origin = scene_origin(&self.scene, width);
+        let needs_frame = self
             .frame
             .as_ref()
-            .is_none_or(|frame| frame.pose != pose || frame.dimensions != dimensions)
-        {
+            .is_none_or(|frame| frame.pose != pose || frame.dimensions != dimensions);
+        let trace_settled = self.trace && self.report_settled && settled;
+        let planes = (needs_frame || trace_settled)
+            .then(|| project(&self.scene, scene_origin, [width, height], pose));
+        if needs_frame {
             let texture = paint::texture(
                 &self.scene,
-                &projection,
+                scene_origin,
+                planes.as_deref().unwrap(),
                 &self.labels,
                 dimensions.0,
                 dimensions.1,
@@ -268,14 +272,22 @@ impl Render for Carousel {
             }
         }
         let image = self.frame.as_ref().unwrap().image.clone();
-        let row_top =
-            projection.scene_origin[1] + self.scene.scene[1] + self.scene.margins_y[1].max(16.0); // The following paragraph's UA block margin.
-        let record = if self.trace && self.report_settled && settled {
+        let row_top = scene_origin[1] + self.scene.scene[1] + self.scene.margins_y[1].max(16.0); // The following paragraph's UA block margin.
+        let record = if trace_settled {
             self.report_settled = false;
-            let cells: Vec<Vec<f32>> = projection
-                .planes
+            let cells: Vec<Vec<Option<f64>>> = planes
+                .as_deref()
+                .unwrap()
                 .iter()
-                .map(|plane| plane.quad.into_iter().flatten().collect())
+                .map(|plane| {
+                    plane
+                        .projected
+                        .geometry
+                        .corners
+                        .into_iter()
+                        .flat_map(|corner| corner.map_or([None; 2], |point| point.map(Some)))
+                        .collect()
+                })
                 .collect();
             Some(json!({
                 "width": width, "height": height, "index": self.script.index, "angle": pose.angle,

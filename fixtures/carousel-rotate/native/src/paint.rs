@@ -4,7 +4,7 @@ use css_gpui::carousel::{CarouselScene, Panel};
 use fontdue::{Font, FontSettings};
 use image::RgbaImage;
 
-use crate::projection::{Plane, Point, Projection};
+use crate::projection::Plane;
 
 struct Glyph {
     left: f32,
@@ -124,12 +124,17 @@ impl Surface {
         }
     }
 
-    fn blend(&mut self, quad: [Point; 4], mut color: impl FnMut(Point, &mut Pixel)) {
+    fn blend(&mut self, polygon: &[[f64; 2]], mut color: impl FnMut([f64; 2], &mut Pixel)) {
+        if polygon.len() < 3 {
+            return;
+        }
+        let scale = f64::from(self.scale);
+        let inverse_scale = scale.recip();
         let axis = |index, limit| {
-            let (min, max) = quad
+            let (min, max) = polygon
                 .iter()
-                .map(|point| point[index] * self.scale)
-                .fold((f32::INFINITY, f32::NEG_INFINITY), |(min, max), value| {
+                .map(|point| point[index] * scale)
+                .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), value| {
                     (min.min(value), max.max(value))
                 });
             min.floor().max(0.0) as u32..(max.ceil() as u32).min(limit)
@@ -144,7 +149,10 @@ impl Surface {
                         .zip([[0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]])
                 {
                     color(
-                        [(x as f32 + dx) / self.scale, (y as f32 + dy) / self.scale],
+                        [
+                            (f64::from(x) + dx) * inverse_scale,
+                            (f64::from(y) + dy) * inverse_scale,
+                        ],
                         sample,
                     );
                 }
@@ -165,38 +173,26 @@ impl Surface {
     }
 }
 
-fn paint_plane(
-    surface: &mut Surface,
-    projection: &Projection<'_>,
-    plane: &Plane<'_>,
-    label: &Label,
-) {
+fn paint_plane(surface: &mut Surface, plane: &Plane<'_>, label: &Label) {
     let panel = plane.panel;
-    let [half_width, half_height] = panel.size.map(|v| v / 2.0);
-    let [x, y, z] = plane.center;
-    let [slope_x, slope_z] = plane.slope;
-    let [eye_x, eye_y] = projection.eye;
-    let center_denominator = 1.0 - z / projection.distance;
-    let z_over_distance = slope_z / projection.distance;
-    // The frozen scene stays wholly in front of the perspective plane.
-    if center_denominator <= half_width * z_over_distance.abs() {
+    let Some(sampling) = &plane.projected.sampling else {
         return;
-    }
-    surface.blend(plane.quad, |[screen_x, screen_y], pixel| {
-        // Invert CSS perspective for this sample, then shade in untransformed
-        // panel coordinates. Both faces carry the same projected paint.
-        let dx = screen_x - eye_x;
-        let u = (dx * center_denominator - (x - eye_x)) / (slope_x + dx * z_over_distance);
-        let v = (screen_y - eye_y) * (center_denominator - u * z_over_distance) + eye_y - y;
-        if !(u.abs() < half_width && v.abs() < half_height) {
+    };
+    let [width, height] = panel.size.map(f64::from);
+    let stroke = f64::from(panel.border.width);
+    let polygon = &plane.projected.geometry.viewport_polygon;
+    surface.blend(polygon, |[screen_x, screen_y], pixel| {
+        let Some(([x, y], _)) = sampling.sample(screen_x, screen_y) else {
+            return;
+        };
+        if !(x > 0.0 && x < width && y > 0.0 && y < height) {
             return;
         }
-        let stroke = panel.border.width;
-        if u.abs() >= half_width - stroke || v.abs() >= half_height - stroke {
+        if x <= stroke || y <= stroke || x >= width - stroke || y >= height - stroke {
             pixel.over(panel.border.color, 1.0);
         } else {
             pixel.over(panel.fill, 1.0);
-            let coverage = label.coverage(u + half_width, v + half_height);
+            let coverage = label.coverage(x as f32, y as f32);
             pixel.over(panel.text_color, coverage);
         }
     });
@@ -204,18 +200,19 @@ fn paint_plane(
 
 pub(crate) fn texture(
     scene: &CarouselScene,
-    projection: &Projection<'_>,
+    scene_origin: [f32; 2],
+    planes: &[Plane<'_>],
     labels: &[Label],
     width: u32,
     height: u32,
     scale: f32,
 ) -> RgbaImage {
     let mut surface = Surface::new(width, height, scale);
-    let [left, top] = projection.scene_origin;
-    let [width, height] = scene.scene;
-    let stroke = scene.scene_border.width;
+    let [left, top] = scene_origin.map(f64::from);
+    let [width, height] = scene.scene.map(f64::from);
+    let stroke = f64::from(scene.scene_border.width);
     surface.blend(
-        [
+        &[
             [left, top],
             [left + width, top],
             [left + width, top + height],
@@ -235,10 +232,14 @@ pub(crate) fn texture(
 
     // The panels form a ring of disjoint vertical planes. Composite rear
     // panels first so every translucent fill reveals the planes behind it.
-    let mut order: Vec<_> = projection.planes.iter().zip(labels).collect();
-    order.sort_by(|(a, _), (b, _)| a.center[2].total_cmp(&b.center[2]));
+    let mut order: Vec<_> = planes.iter().zip(labels).collect();
+    order.sort_by(|(a, _), (b, _)| {
+        a.projected
+            .center_depth
+            .total_cmp(&b.projected.center_depth)
+    });
     for (plane, label) in order {
-        paint_plane(&mut surface, projection, plane, label);
+        paint_plane(&mut surface, plane, label);
     }
     surface.into_image()
 }

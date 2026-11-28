@@ -52,7 +52,7 @@ exe="$scratch/build/debug/css-gpui-carousel"
 
 The build reads the unchanged HTML and CSS through the compiler's source graph and cascade. A fixture-specific typed projection carries the scene dimensions, ordered panels, positions, transforms, perspective, timing, colors, label text and typography into the executable. It embeds that data at build time. The GPUI application runs without Chromium, source files or captured geometry. The native button handlers bind the frozen script's signed click steps and extract its turn formula and inline depth.
 
-The viewport projects each panel around its CSS origin and samples it back into its local coordinates. It composites panel fills, borders and glyphs rear-to-front in a CPU rasterizer and presents the result as a GPUI texture. The host uses GPUI controls with mouse activation and Tab, Enter and Space support. The signed angle animates using the CSS duration and default ease curve.
+The viewport uses the same CSS transform-chain projection and inverse plane sampling as the Backrooms renderer. Each panel projects around its CSS origin, clips to the viewport, and is sampled in its local border-box coordinates. It composites panel fills, borders and glyphs rear-to-front in a CPU rasterizer and presents the result as a GPUI texture. The host uses GPUI controls with mouse activation and Tab, Enter and Space support. The signed angle animates using the CSS duration and default ease curve.
 
 To replay both widths, install Xvfb, xdotool, ImageMagick, NumPy and Pillow. Use the Chromium replay instructions above to populate `$out`, or use the checked-in reference directory. Set the Vulkan ICD path to the lavapipe file on your machine for headless capture.
 

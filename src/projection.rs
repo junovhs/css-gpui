@@ -61,6 +61,36 @@ pub fn project_box(
     Ok(Some(matrix.project_box(last.size, viewport)))
 }
 
+/// Geometry and a prepared inverse for rasterizing the last box in a chain.
+pub struct ProjectedPlane {
+    pub geometry: ProjectedBox,
+    /// Absent when the border plane has no stable screen inverse.
+    pub sampling: Option<SamplingPlane>,
+    /// The box center's homogeneous Z before perspective division. With one
+    /// CSS perspective camera, this is the center's Z after the model
+    /// transforms. Face ordering remains a paint decision.
+    pub center_depth: f64,
+}
+
+/// Project the last box and prepare its viewport-to-border-plane mapping.
+/// Uses the same layer and clipping rules as [`project_box`].
+pub fn project_plane(
+    layers: &[Layer<'_>],
+    viewport: Point,
+    root_font_size: f32,
+) -> Result<Option<ProjectedPlane>, ProjectionError> {
+    let Some(last) = layers.last() else {
+        return Ok(None);
+    };
+    let matrix = accumulated_matrix(layers, viewport, root_font_size)?;
+    let [width, height] = last.size;
+    Ok(Some(ProjectedPlane {
+        geometry: matrix.project_box(last.size, viewport),
+        sampling: matrix.sampling_plane(),
+        center_depth: matrix.apply([width * 0.5, height * 0.5, 0.0, 1.0])[2],
+    }))
+}
+
 pub(crate) fn accumulated_matrix(
     layers: &[Layer<'_>],
     viewport: Point,
@@ -261,15 +291,19 @@ impl Matrix {
     }
 }
 
-pub(crate) struct SamplingPlane {
+/// The inverse screen mapping of a projected border plane.
+pub struct SamplingPlane {
     inverse: [[f64; 3]; 3],
     depth: [f64; 3],
-    pub back_facing: bool,
+    pub(crate) back_facing: bool,
 }
 
 impl SamplingPlane {
-    /// Coordinates in the border plane and depth after perspective division.
-    pub(crate) fn sample(&self, x: f64, y: f64) -> Option<(Point, f64)> {
+    /// Map a viewport point to local border coordinates and depth (Z/W).
+    /// Samples on or behind the eye plane are absent. The caller checks
+    /// whether a returned point is inside the border box or viewport.
+    #[inline]
+    pub fn sample(&self, x: f64, y: f64) -> Option<(Point, f64)> {
         let [u, v, w] = self.inverse.map(|[a, b, c]| a * x + b * y + c);
         (w > 0.0).then(|| {
             (
