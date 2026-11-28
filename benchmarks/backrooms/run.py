@@ -41,6 +41,18 @@ def output(command, cwd=REPOSITORY):
     return subprocess.check_output(command, cwd=cwd, timeout=120)
 
 
+def verify_source(document):
+    source = {"url": URL, "document": identify(document, DOCUMENT_SHA256, "HTML")}
+    stylesheet, = re.findall(rb"<style\b[^>]*>(.*?)</style\s*>", document, re.I | re.S)
+    source["inline_css"] = identify(stylesheet, CSS_SHA256, "Inline CSS")
+    return source
+
+
+def download_source():
+    return output(["curl", "--fail", "--silent", "--show-error", "--location",
+                   "--max-time", "60", URL])
+
+
 def compiler():
     messages = output([
         "cargo", "build", "--quiet", "--locked", "--example", "generate_gpui",
@@ -114,11 +126,8 @@ def main():
     parser.add_argument("--logs", type=Path, help="Keep compiler stderr in this local directory")
     args = parser.parse_args()
 
-    document = output(["curl", "--fail", "--silent", "--show-error", "--location",
-                       "--max-time", "60", URL])
-    source = {"url": URL, "document": identify(document, DOCUMENT_SHA256, "HTML")}
-    stylesheet, = re.findall(rb"<style\b[^>]*>(.*?)</style\s*>", document, re.I | re.S)
-    source["inline_css"] = identify(stylesheet, CSS_SHA256, "Inline CSS")
+    document = download_source()
+    source = verify_source(document)
     revision = output(["git", "rev-parse", "HEAD"]).decode().strip()
     executable = compiler()
     if args.logs:

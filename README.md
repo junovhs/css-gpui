@@ -23,6 +23,10 @@ On Linux with X11 or XWayland, edit [the toolbar CSS](fixtures/toolbar/source.cs
 
 On Linux with X11 or XWayland, edit the CSS in [the Neon Glass Pen](fixtures/neon-glass/source.html) and run `python3 fixtures/neon-glass/build.py "$browser"`. See the [Neon Glass build instructions](fixtures/neon-glass/README.md#build-the-local-menu-on-linux) to set up the pinned browser tools and find the generated Rust and executable.
 
+## Play the Backrooms source preview
+
+On Linux with X11 or XWayland, run `python3 benchmarks/backrooms/play.py` from the repository root. The first run fetches the pinned source and builds the optimized GPUI preview. See the [local preview instructions](benchmarks/backrooms/README.md#play-the-local-source-preview) for dependencies, offline launch, and the current fidelity limits.
+
 ## Project notes
 
 - [Founding brief](docs/founding.md) — the authoring workflow and what makes the output worth keeping.

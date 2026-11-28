@@ -25,7 +25,39 @@ These viewports cover portrait and landscape and fall on opposite sides of the P
 
 Counts are emitted diagnostic records, including repeated occurrences. The locations are the first reported for each example. The source analyzer measures its CSS and form-control subset and skips the bodies of unevaluated at-rules. The strict exit blocks GPUI target analysis, native build, pixel and layout comparison, and interaction replay. The compiler’s static input check leaves JavaScript and media behavior unmeasured.
 
-## Reproduce
+## Play the local source preview
+
+On Linux with X11 or XWayland, install curl and the
+[Linux native build and Vulkan dependencies](../../docs/first-milestone.md#build-and-run-the-toolbar),
+including Python 3 and Rust 1.95.0 through rustup. From the repository root,
+run:
+
+```sh
+python3 benchmarks/backrooms/play.py
+```
+
+The first run downloads the pinned original HTML, checks the HTML and inline
+CSS fingerprints, and builds the GPUI viewer in release mode. The local
+source and binary are stored in `target/backrooms`. Click Enter and use the
+control strip below the scene to move and turn. Click Show workings out to
+reveal Top view. The default scene is 1152 × 648 plus the 48 px strip. Pass
+`--viewport 1440x900` to sample the larger authored layout on a display with
+room for the strip.
+
+Add `--prepare-only` to fetch and build without opening a window. On later
+runs, `python3 benchmarks/backrooms/play.py --offline` verifies the cached
+source and opens the prepared app directly. Offline launch needs Python and
+the native runtime dependencies. The preview runs with the browser closed
+and no network access.
+
+The native strip exposes actions from the authored source, including the path
+to Finish. In-scene controls and HUD hit testing, the title treatment, audio,
+and the Enter, wraparound-turn and ending keyframes still lack native support.
+Intermediate motion is capped at a 640 × 360 raster at the default viewport.
+The viewer settles at full resolution. The strict compiler still reports
+5,102 source losses and emits zero Rust bytes at either benchmark viewport.
+
+## Reproduce the strict benchmark
 
 From the repository root with Python 3, curl and the project Rust toolchain installed, run the following command. It prints both complete diagnostic groupings as JSON. The optional `--logs /tmp/backrooms-diagnostics` retains the compiler's raw stderr for each viewport locally.
 
@@ -479,6 +511,13 @@ endpoints matched exactly. The largest differences from Chromium at the
 logged sample times were 0.00050 CSS px for walking and 0.00003° for turning.
 An independent rerun showed 18–22 visible changes, median gaps of 34–35 ms,
 and first updates after 169–209 ms. The timings reflect this X11 setup.
+
+With the optimized local-play build on the same Xvfb and lavapipe setup,
+the first visible updates came after 102–165 ms and median frame gaps were
+31.8–33.9 ms across the same four movements. The probe found 22–24 visible
+changes per movement and exact full-resolution endpoints. The earlier
+response leaves more of each 800 ms transition visible, with cadence still
+around 30 distinct updates per second.
 
 Run with the same native binary and Playwright setup as above, plus a C
 compiler, X11 and XTest development libraries and `pkg-config`.
