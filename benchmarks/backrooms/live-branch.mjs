@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { compare, readPixels } from './pixels.mjs';
-import { isolateContext, viewports, withBackrooms } from './probe.mjs';
+import { isolateContext, viewports, withBackrooms, withoutViewportLighting } from './probe.mjs';
 import { replayDocument } from './route.mjs';
 
 const executable = process.argv[3] && resolve(process.argv[3]);
@@ -24,6 +24,8 @@ const steps = [
 await withBackrooms(async ({ page, snapshot, reset, htmlPath, cssPath, directory }) => {
     const out = captures ?? directory;
     await mkdir(out, { recursive: true });
+    const unlitFile = join(directory, 'without-viewport-lighting.css');
+    await writeFile(unlitFile, withoutViewportLighting);
 
     for (const [width, height] of viewports) {
         await reset(width, height);
@@ -59,6 +61,8 @@ await withBackrooms(async ({ page, snapshot, reset, htmlPath, cssPath, directory
                     .map(input => input.id).sort(),
             }));
             const prefix = join(out, `${width}x${height}-live-${name}`);
+            const authored = `${prefix}-authored-chromium.png`;
+            await page.screenshot({ path: authored });
             const isolated = `${prefix}-chromium.png`;
             const isolation = await isolateContext(page);
             await page.screenshot({ path: isolated });
@@ -66,9 +70,12 @@ await withBackrooms(async ({ page, snapshot, reset, htmlPath, cssPath, directory
             const rgba = `${prefix}.rgba`;
             const { controls } = snapshot('--planar-preview', width, height, activations,
                 JSON.stringify({ root: 'content', label_scope: 'body', rgba }));
+            const unlitRgba = `${prefix}-isolated.rgba`;
+            snapshot('--planar-preview', width, height, activations,
+                JSON.stringify({ root: 'content', rgba: unlitRgba }), unlitFile);
             assert.deepEqual(controls.selection, browser.selection, `${name}: Chromium and Rust selection`);
             assert.deepEqual(controls.checked ?? [], browser.checked, `${name}: Chromium and Rust checked IDs`);
-            states.push({ name, rgba, isolated, ...controls });
+            states.push({ name, rgba, authored, isolated, unlitRgba, ...controls });
         }
 
         // The authored corner bundle contains z-9 and z-8 but no z-7 pose.
@@ -86,12 +93,14 @@ await withBackrooms(async ({ page, snapshot, reset, htmlPath, cssPath, directory
             assert(at('workings').equals(at('restore')), `${name}: toggling Top view off restores the scene`);
         }
 
-        const isolatedRgbError = Object.fromEntries(states.map(({ name }, index) =>
-            [name, compare(native[index], chromium[index]).meanAbsoluteRgbError]));
+        const isolatedRgbError = Object.fromEntries(await Promise.all(states.map(async ({ name, unlitRgba }, index) =>
+            [name, compare(await readFile(unlitRgba), chromium[index]).meanAbsoluteRgbError])));
+        const fullPageRgbError = Object.fromEntries(states.map(({ name, authored }, index) =>
+            [name, compare(native[index], readPixels(authored, width, height)).meanAbsoluteRgbError]));
         assert(isolatedRgbError.branch <= 13, `${width}x${height}: isolated branch scene exceeds the corner error cap`);
         console.log(JSON.stringify({
             width, height, browserClicks: states.length - 1, nativeActivations: states.length - 1,
-            gpuiExactRgbaFrames: states.length, isolatedRgbError,
+            gpuiExactRgbaFrames: states.length, fullPageRgbError, isolatedRgbError,
         }));
     }
 });

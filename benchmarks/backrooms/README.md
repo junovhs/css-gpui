@@ -121,30 +121,36 @@ walk and right-turn radio selections. Rust resolves its styles and box layout,
 projects element and generated faces through CSS perspective, and clips to the
 eye plane and viewport. It samples authored solid colors and supported gradient
 layers in local plane coordinates. It culls hidden backfaces and composites
-overlapping fragments by depth at each pixel. GPUI uploads the Rust raster as a
-texture. The capture reads the actual X11 window and checks every RGBA byte
-against the upload.
+overlapping fragments by depth at each pixel. The renderer then samples
+viewport-covering ancestor pseudo-elements that stack above the scene and
+applies `mix-blend-mode: overlay` to the opaque canvas. It supports flat,
+unisolated ancestor chains and centered farthest-corner elliptical gradients.
+The Backrooms stylesheet supplies the high-graphics layer on
+`body > div::before`. GPUI uploads the Rust raster as a texture, and the probe
+checks every RGBA byte in the actual X11 window against the upload.
 
-The first Chromium reference keeps the full page. It includes the high-graphics
-radial overlay on `body > div::before`, which uses `mix-blend-mode: overlay`,
-plus the surrounding HUD and labels. The second reference hides paint outside
-the context and keeps the original materials, filters, and shadows inside it.
-A third reference recolors the sampled corner's tile pseudo-elements red and
-green in the authored cascade without changing their transforms, then measures
-screen coverage by color. Native and Chromium both render the same coverage
-stylesheet. The projection probe above checks box and vertex coordinates
-separately.
+The probe captures the authored Chromium page and GPUI scene at the same pose.
+It captures both again with only the viewport gradient hidden in the authored
+cascade. The isolated reference also hides paint outside the context while
+preserving scene materials, filters, shadows and the backing. The coverage
+reference recolors tile pseudo-elements red and green without changing their
+transforms. Native and Chromium both render the same coverage stylesheet.
 
-| Viewport and state | Full-page RGB error | Isolated RGB error | Red coverage IoU | Green coverage IoU |
-| --- | ---: | ---: | ---: | ---: |
-| 390 × 844 enter | 42.13 | 12.31 | 0.527 | 0.925 |
-| 390 × 844 walk | 44.07 | 9.10 | empty in both | 1.000 |
-| 390 × 844 turn | 44.26 | 9.35 | 0.857 | 0.999 |
-| 1440 × 900 enter | 44.71 | 6.96 | 0.640 | 0.865 |
-| 1440 × 900 walk | 44.67 | 5.37 | 1.000 | 1.000 |
-| 1440 × 900 turn | 45.12 | 5.51 | 0.686 | 0.935 |
+| Viewport and state | Full-page RGB error before | Full-page RGB error after | Isolated RGB error | Red coverage IoU | Green coverage IoU |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 390 × 844 enter | 42.13 | 10.72 | 12.31 | 0.527 | 0.925 |
+| 390 × 844 walk | 44.07 | 7.59 | 9.10 | empty in both | 1.000 |
+| 390 × 844 turn | 44.26 | 7.98 | 9.35 | 0.857 | 0.999 |
+| 1440 × 900 enter | 44.71 | 5.41 | 6.96 | 0.640 | 0.865 |
+| 1440 × 900 walk | 44.67 | 4.33 | 5.37 | 1.000 | 1.000 |
+| 1440 × 900 turn | 45.12 | 3.77 | 5.51 | 0.686 | 0.935 |
 
-RGB error is the mean absolute channel difference on a 0–255 scale. Coverage
+RGB error is the mean absolute channel difference on a 0–255 scale. The two
+full-page columns use the authored Chromium page as the reference. Hiding the
+gradient in current GPUI reproduces the six earlier native readbacks byte for
+byte. The probe checks that the layer reduces full-page error by at least 25.
+It also compares the signed RGB change from enabling the layer in the upper
+left, center, and lower right of the viewport. Coverage
 IoU is pixel intersection divided by union, with a threshold of 128 on the
 corresponding channel. Red is `::before` and green is `::after` for the corner
 sample. The six main frames contain 79–155 projected painted planes, including
@@ -156,11 +162,12 @@ successive states by at least 20% of pixels at an 8-level channel threshold.
 
 The preview records per-plane losses for tiled radial and repeating wallpaper
 layers, unsupported gradient stops, outlines, shadows, blur, bounded layout
-failures and group overflow. The supported samples retain their base colors,
-leaf opacity and brightness. Differences in grouped compositing, occlusion,
-and edge sampling remain visible in the coverage and paint comparisons. The
-HUD, overlay, motion interpolation, and audio remain outside the scene
-preview. Ordinary strict GPUI generation still reports 5,102 losses and emits
+failures and group overflow. The start screen adds inset shadows to the
+viewport layer, so that layer remains a paint loss in the start state.
+Differences in grouped compositing, occlusion, and edge sampling remain visible
+in the coverage and paint comparisons. The HUD, motion interpolation, and
+audio remain outside the scene preview.
+Ordinary strict GPUI generation still reports 5,102 losses and emits
 zero bytes of Rust for each viewport.
 
 ## Native corner replay
@@ -203,10 +210,11 @@ node benchmarks/backrooms/planar.mjs /path/to/playwright-install \
   "$target_dir/debug/css-gpui-planar-preview"
 ```
 
-The last command accepts an optional output directory for local PNG
-captures, the route bundle, RGBA frames, input traces, and per-plane
-metadata. The scene crops exclude the separate native strip. Chromium
-geometry and screenshots are used solely in the comparison.
+The last command accepts an optional output directory for PNG captures,
+including the overlay-disabled counterfactual, the route bundle, RGBA frames,
+input traces, and per-plane metadata. The scene crops exclude the separate
+native strip. Chromium geometry and screenshots are used solely in the
+comparison.
 
 To build and open the local route without Playwright, use the same native
 binary and run:
@@ -255,13 +263,17 @@ The probe also edits the wall faces' background at the pose reached by
 click 17 and rebuilds the Rust scene with the changed stylesheet. Each
 edited X11 readback matched the new Rust raster byte for byte.
 
-| Viewport | Full-page RGB error range | Pixels changed by edit in Chromium | Pixels changed by edit in GPUI |
-| --- | ---: | ---: | ---: |
-| 390 × 844 | 39.30–52.34 | 43.5% | 43.6% |
-| 1440 × 900 | 37.29–53.29 | 70.7% | 77.4% |
+| Viewport | Post-Enter RGB error before lighting | Post-Enter RGB error with lighting | Start RGB error | Settled Finish RGB error |
+| --- | ---: | ---: | ---: | ---: |
+| 390 × 844 | 39.30–52.34 | 2.24–10.72 | 48.91 | 5.32 |
+| 1440 × 900 | 37.29–53.29 | 0.83–5.41 | 50.96 | 3.21 |
 
-The RGB column gives the range of per-frame mean absolute channel error on
-a 0–255 scale. The edit counts pixels with a channel change of at least 8.
+Post-Enter ranges include the 45 resting frames after each activation. RGB
+error is the mean absolute channel difference against the full Chromium page
+on a 0–255 scale. The high start error includes the authored title and the
+viewport layer's extra inset shadows. At the 8-level channel threshold, the
+wall edit changes 43.5% of Chromium pixels and 43.6% of GPUI pixels in
+portrait. On desktop it changes 70.7% and 77.4%, respectively.
 
 The optional final argument retains local browser and GPUI captures, compiled
 RGBA frames, the GPUI bundle and comparison data. To open the compiled route,
@@ -296,14 +308,14 @@ Top view off restores the previous view byte for byte in Chromium and GPUI.
 Rust resolves the overhead camera, floor boxes and generated wall geometry
 from the authored cascade. The 672 painted planes at each size include the
 maze walls and floor. The preview paints the authored viewport-covering white
-body backing and reports the high-graphics blend overlay as a paint loss.
-CDP supplies comparison geometry. The isolated reference preserves scene
-materials and the backing while hiding the surrounding controls and overlays.
+body backing and composites the high-graphics viewport layer. CDP supplies
+comparison geometry. The isolated reference preserves scene materials and the
+backing while hiding the surrounding controls and the viewport layer.
 
 | Viewport | Used boxes | Projected vertices (wall vertices) | Maximum box / vertex error (CSS px) | Full-page / isolated RGB error |
 | --- | ---: | ---: | ---: | ---: |
-| 390 × 844 | 65 | 236 (92) | 0.000031 / 0.000048 | 24.33 / 3.73 |
-| 1440 × 900 | 65 | 236 (92) | 0 / 0.000034 | 11.51 / 3.97 |
+| 390 × 844 | 65 | 236 (92) | 0.000031 / 0.000048 | 21.83 / 3.73 |
+| 1440 × 900 | 65 | 236 (92) | 0 / 0.000034 | 9.03 / 3.97 |
 
 The overhead comparison allows up to 1/64 CSS px of used-box error,
 0.035 CSS px of vertex error, and 30/6 RGB error in the full-page/isolated
@@ -311,8 +323,8 @@ images. The output includes per-frame paint and layout losses. The optional
 last argument keeps the screenshots, RGBA files, route bundles, and native
 input traces. The GPUI control strip uses the route's compiled destinations.
 
-The authored HUD, debug text inside the maze, lighting and depth compositing,
-and animated ending remain open on ISS-22. Top view still reports unsupported
+The authored HUD, debug text inside the maze, grouped depth compositing and
+animated ending remain open on ISS-22. Top view still reports unsupported
 tiled materials, grouped opacity, outlines, generated content, and layout for
 bordered or aspect-ratio decorations. Strict GPUI conversion reports 5,102
 source losses and emits zero bytes of Rust at either viewport.
@@ -359,14 +371,12 @@ the reference control state and targets. Returning to `z-8` and switching
 Top view off restore the preceding scene pixel for pixel within each
 renderer.
 
-| Viewport | GPUI exact scene readbacks | Isolated RGB error at `z-7` |
+| Viewport | GPUI exact scene readbacks | Authored / isolated RGB error at `z-7` |
 | --- | ---: | ---: |
-| 390 × 844 | 9 | 6.15 |
-| 1440 × 900 | 9 | 6.91 |
+| 390 × 844 | 9 | 7.33 / 6.15 |
+| 1440 × 900 | 9 | 4.93 / 6.91 |
 
 With `--live`, the start-to-finish probe uses the same direct-source viewer.
 At each viewport it reaches Finish in 45 Chromium clicks and 45 GPUI
 activations. All 46 native scene readbacks match the independent Rust rasters
-byte for byte. The full-page RGB error ranges from 39.30 to 52.34 at
-390 × 844 and from 37.29 to 53.29 at 1440 × 900. The compiled `--route`
-command opens retained route bundles.
+byte for byte. The compiled `--route` command opens retained route bundles.

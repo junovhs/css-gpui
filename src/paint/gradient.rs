@@ -92,10 +92,11 @@ pub fn rgba(value: &str) -> Option<[u8; 4]> {
 enum Shape {
     Linear(f32),
     Conic(f32),
+    Radial,
 }
 
-/// A resolved CSS linear or conic gradient. Angles use CSS's clockwise
-/// convention with zero pointing toward the top of the box.
+/// A resolved CSS linear, conic, or centered farthest-corner elliptical
+/// gradient. Angles use CSS's clockwise convention.
 #[derive(Clone, Debug)]
 pub struct Gradient {
     shape: Shape,
@@ -105,13 +106,16 @@ pub struct Gradient {
 
 impl Gradient {
     pub fn parse(input: &str) -> Option<Self> {
-        let (value, conic) = if let Some(value) = input.strip_prefix("linear-gradient(") {
-            (value, false)
-        } else {
-            (input.strip_prefix("conic-gradient(")?, true)
+        let (kind, value) = input.split_once('(')?;
+        let shape = match kind {
+            "linear-gradient" => Shape::Linear(180.0),
+            "conic-gradient" => Shape::Conic(0.0),
+            "radial-gradient" => Shape::Radial,
+            _ => return None,
         };
         let mut parts: Vec<_> = layers(&value[..value.rfind(')')?]).collect();
-        let mut angle = if conic { 0.0 } else { 180.0 };
+        let conic = matches!(shape, Shape::Conic(_));
+        let mut shape = shape;
         let mut oklab = false;
         if let Some(first) = parts.first().copied()
             && split_stop(first, conic).is_none()
@@ -119,21 +123,39 @@ impl Gradient {
             let (direction, interpolation) = first.rsplit_once(" in ").unwrap_or((first, "srgb"));
             let direction = direction.trim();
             oklab = matches!(interpolation.trim(), "oklab" | "oklch");
-            if conic {
-                let direction = direction.strip_prefix("from ").unwrap_or(direction);
-                let direction = direction.strip_suffix(" at center").unwrap_or(direction);
-                if !direction.is_empty() && direction != "at center" {
-                    angle = degrees(direction)?;
-                }
-            } else {
-                angle = match direction {
+            shape = match shape {
+                Shape::Linear(_) => Shape::Linear(match direction {
                     "to top" => 0.0,
                     "to right" => 90.0,
                     "to bottom" => 180.0,
                     "to left" => 270.0,
                     _ => degrees(direction)?,
-                };
-            }
+                }),
+                Shape::Conic(angle) => {
+                    let direction = direction.strip_prefix("from ").unwrap_or(direction);
+                    let direction = direction.strip_suffix(" at center").unwrap_or(direction);
+                    Shape::Conic(if direction.is_empty() || direction == "at center" {
+                        angle
+                    } else {
+                        degrees(direction)?
+                    })
+                }
+                Shape::Radial => {
+                    let ending = direction.strip_suffix(" at center").unwrap_or(direction);
+                    if !matches!(
+                        ending,
+                        "at center"
+                            | "ellipse"
+                            | "farthest-corner"
+                            | "ellipse farthest-corner"
+                            | "farthest-corner ellipse"
+                    ) || !matches!(interpolation, "srgb" | "oklab")
+                    {
+                        return None;
+                    }
+                    Shape::Radial
+                }
+            };
             parts.remove(0);
         }
         let mut parsed: Vec<_> = parts
@@ -168,10 +190,10 @@ impl Gradient {
             })
             .collect();
         Some(Self {
-            shape: if conic {
-                Shape::Conic(angle.to_radians())
-            } else {
-                Shape::Linear(angle.to_radians())
+            shape: match shape {
+                Shape::Linear(angle) => Shape::Linear(angle.to_radians()),
+                Shape::Conic(angle) => Shape::Conic(angle.to_radians()),
+                Shape::Radial => Shape::Radial,
             },
             oklab,
             stops,
@@ -194,6 +216,10 @@ impl Gradient {
             }
             Shape::Conic(angle) => {
                 (dx.atan2(-dy) - angle).rem_euclid(std::f32::consts::TAU) / std::f32::consts::TAU
+            }
+            Shape::Radial => {
+                // The corner is one radius away in the ellipse's coordinates.
+                (dx / width).hypot(dy / height) * std::f32::consts::SQRT_2
             }
         };
         let upper = self

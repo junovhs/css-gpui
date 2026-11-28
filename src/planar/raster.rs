@@ -1,4 +1,7 @@
-use crate::projection::{Point, SamplingPlane};
+use crate::{
+    layout::BorderBox,
+    projection::{Point, SamplingPlane},
+};
 
 use super::Material;
 
@@ -34,7 +37,37 @@ struct Fragment {
     color: [f32; 4],
 }
 
-pub(super) fn render(faces: &[Face], background: [u8; 4], [width, height]: [u32; 2]) -> Vec<u8> {
+pub(super) struct Overlay {
+    pub bounds: BorderBox,
+    pub paint: Material,
+}
+
+impl Overlay {
+    fn composite(&self, [x, y]: Point, backdrop: [f32; 4]) -> [f32; 4] {
+        let [left, top] = self.bounds.origin;
+        let mut source = self.paint.sample(
+            [(x - left) as f32, (y - top) as f32],
+            self.bounds.size.map(|v| v as f32),
+        );
+        // The planar canvas is opaque. Apply the separable overlay blend to
+        // the unpremultiplied channels, then composite the layer's alpha.
+        for (source, backdrop) in source[..3].iter_mut().zip(backdrop) {
+            *source = if backdrop <= 0.5 {
+                2.0 * backdrop * *source
+            } else {
+                1.0 - 2.0 * (1.0 - backdrop) * (1.0 - *source)
+            };
+        }
+        over(source, backdrop)
+    }
+}
+
+pub(super) fn render(
+    faces: &[Face],
+    overlays: &[Overlay],
+    background: [u8; 4],
+    [width, height]: [u32; 2],
+) -> Vec<u8> {
     let mut output = Vec::with_capacity(width as usize * height as usize * 4);
     let mut scanline: Vec<Vec<Fragment>> = (0..width).map(|_| Vec::new()).collect();
     let background = background.map(|value| f32::from(value) / 255.0);
@@ -68,7 +101,7 @@ pub(super) fn render(faces: &[Face], background: [u8; 4], [width, height]: [u32;
                 }
             }
         }
-        for fragments in &mut scanline {
+        for (column, fragments) in scanline.iter_mut().enumerate() {
             fragments.sort_by(|a, b| a.depth.total_cmp(&b.depth));
             let first = fragments
                 .iter()
@@ -77,7 +110,10 @@ pub(super) fn render(faces: &[Face], background: [u8; 4], [width, height]: [u32;
             let pixel = fragments[first..]
                 .iter()
                 .fold(background, |color, fragment| over(fragment.color, color));
-            output.extend(pixel.map(byte));
+            let composed = overlays.iter().fold(pixel, |backdrop, overlay| {
+                overlay.composite([column as f64 + 0.5, y], backdrop)
+            });
+            output.extend(composed.map(byte));
             fragments.clear();
         }
     }

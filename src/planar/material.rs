@@ -140,7 +140,7 @@ impl Material {
     }
 }
 
-fn number(value: &str) -> Option<f32> {
+pub(super) fn number(value: &str) -> Option<f32> {
     let number = if let Some(percent) = value.strip_suffix('%') {
         percent.parse::<f32>().ok()? / 100.0
     } else {

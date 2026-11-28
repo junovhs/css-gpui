@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isolateContext, viewports, withBackrooms } from './probe.mjs';
+import { isolateContext, viewports, withBackrooms, withoutViewportLighting } from './probe.mjs';
 import { prepareCorner } from './route.mjs';
 import { compare, readPixels } from './pixels.mjs';
 
@@ -16,6 +16,7 @@ const replay = fileURLToPath(new URL('./replay-route.sh', import.meta.url));
 const cornerTiles = [6, 7, 8, 9].flatMap(column =>
     [6, 7, 8, 9, 10].map(row => `body content floor > tile.col-${column}.row-${row}`));
 const coverageCss = `
+    ${withoutViewportLighting}
     html { background-color: #000 !important; }
     body content, body content *, body content *::before, body content *::after {
         color: transparent !important;
@@ -36,7 +37,9 @@ await withBackrooms(async ({ page, snapshot, reset, directory }) => {
     const out = captures ?? directory;
     await mkdir(out, { recursive: true });
     const coverageFile = join(directory, 'coverage.css');
+    const unlitFile = join(directory, 'without-viewport-lighting.css');
     await writeFile(coverageFile, coverageCss);
+    await writeFile(unlitFile, withoutViewportLighting);
     for (const [width, height] of viewports) {
         const { states, bundle } = await prepareCorner(snapshot, out, width, height);
         const nativeCaptures = await replayNative(bundle, states, out, width, height);
@@ -65,14 +68,35 @@ await withBackrooms(async ({ page, snapshot, reset, directory }) => {
                 const actual = nativeCaptures[index];
                 if (captures) await writeFile(`${prefix}-planes.json`, JSON.stringify({ planes, losses }, null, 2));
                 const authored = `${prefix}-authored.png`;
+                const browserUnlit = `${prefix}-without-overlay-chromium.png`;
+                const nativeUnlit = `${prefix}-without-overlay-native.png`;
+                const unlitRgba = `${prefix}-without-overlay.rgba`;
                 const isolated = `${prefix}-isolated.png`;
                 await page.screenshot({ path: authored });
+                const unlitStyle = await page.addStyleTag({ content: withoutViewportLighting });
+                await page.screenshot({ path: browserUnlit });
+                await unlitStyle.evaluate(node => node.remove());
+                snapshot('--planar-preview', width, height, overrides,
+                    JSON.stringify({ root: 'content', rgba: unlitRgba }), unlitFile);
+                const unlit = await readNative(unlitRgba, nativeUnlit, width, height);
                 const isolation = await isolateContext(page);
                 await page.screenshot({ path: isolated });
 
                 const reference = readPixels(isolated, width, height);
-                const fullPage = compare(actual, readPixels(authored, width, height));
-                const context = compare(actual, reference);
+                const authoredPixels = readPixels(authored, width, height);
+                const unlitPixels = readPixels(browserUnlit, width, height);
+                const fullPage = compare(actual, authoredPixels);
+                const fullPageBefore = compare(unlit, authoredPixels);
+                const fullPageWithoutOverlay = compare(unlit, unlitPixels);
+                const context = compare(unlit, reference);
+                const lighting = lightingRegions(width, height, actual, unlit, authoredPixels, unlitPixels);
+                assert(fullPageBefore.meanAbsoluteRgbError - fullPage.meanAbsoluteRgbError >= 25,
+                    `${prefix}: viewport overlay did not improve RGB error by at least 25`);
+                assert(lighting.every(({ signedChangeError, chromiumChange }) =>
+                    signedChangeError <= 15 && chromiumChange >= 15),
+                `${prefix}: viewport overlay differs across the viewport ${JSON.stringify(lighting)}`);
+                assert(!losses.some(({ property, value }) => property === 'mix-blend-mode' && value === 'overlay'),
+                    `${prefix}: authored viewport overlay was reported as a loss`);
                 assert(planes.length >= 20, `${name} ${width}: projected too few painted faces`);
                 assert(planes.every(({ polygon }) => polygon.every(([x, y]) =>
                     x >= -1e-6 && y >= -1e-6 && x <= width + 1e-6 && y <= height + 1e-6)),
@@ -99,19 +123,20 @@ await withBackrooms(async ({ page, snapshot, reset, directory }) => {
                     assert(coverage.before.iou >= 0.50, `${name} ${width}: ::before coverage diverged`);
                 }
                 const motion = previous && {
-                    native: compare(actual, previous.actual).changedFraction,
+                    native: compare(unlit, previous.unlit).changedFraction,
                     chromium: compare(reference, previous.reference).changedFraction,
                 };
                 if (motion) assert(motion.native >= 0.2 && motion.chromium >= 0.2,
                     `${name} ${width}: pose did not change`);
-                previous = { actual, reference };
+                previous = { unlit, reference };
 
                 const lossesByProperty = Object.create(null);
                 for (const { property } of losses) {
                     lossesByProperty[property] = (lossesByProperty[property] ?? 0) + 1;
                 }
                 console.log(JSON.stringify({ width, height, name, selection, gpuiExactRgba: true,
-                    paintedPlanes: planes.length, fullPage, context, coverage, motion, lossesByProperty }));
+                    paintedPlanes: planes.length, fullPage, fullPageBefore, fullPageWithoutOverlay,
+                    lighting, context, coverage, motion, lossesByProperty }));
             }
             if (activation) {
                 const clicked = await clickBrowserLabel(page, scope, activation);
@@ -228,4 +253,28 @@ function compareCoverage(native, chromium) {
         index === 0 ? 'before' : 'after',
         { native, chromium, iou: native || chromium ? intersection / (native + chromium - intersection) : null },
     ]));
+}
+
+function lightingRegions(width, height, native, nativeUnlit, chromium, chromiumUnlit) {
+    const regions = [
+        ['upper left', 0.08, 0.08, 0.29, 0.25],
+        ['center', 0.35, 0.35, 0.65, 0.65],
+        ['lower right', 0.71, 0.70, 0.92, 0.86],
+    ];
+    return regions.map(([region, x0, y0, x1, y1]) => {
+        const [left, top, right, bottom] = [x0 * width, y0 * height, x1 * width, y1 * height].map(Math.floor);
+        let error = 0;
+        let change = 0;
+        for (let y = top; y < bottom; y++) {
+            for (let x = left; x < right; x++) {
+                for (let index = (y * width + x) * 4, end = index + 3; index < end; index++) {
+                    const browserDelta = chromium[index] - chromiumUnlit[index];
+                    error += Math.abs(native[index] - nativeUnlit[index] - browserDelta);
+                    change += Math.abs(browserDelta);
+                }
+            }
+        }
+        const channels = (right - left) * (bottom - top) * 3;
+        return { region, signedChangeError: error / channels, chromiumChange: change / channels };
+    });
 }

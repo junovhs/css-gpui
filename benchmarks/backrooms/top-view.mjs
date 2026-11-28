@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { measure, measureUsedBoxes } from './geometry.mjs';
 import { compare, readPixels } from './pixels.mjs';
-import { isolateContext, viewports, withBackrooms } from './probe.mjs';
+import { isolateContext, viewports, withBackrooms, withoutViewportLighting } from './probe.mjs';
 import { routeLabels, writeRouteBundle } from './route.mjs';
 
 const executable = process.argv[3] && resolve(process.argv[3]);
@@ -23,6 +23,8 @@ const steps = [
 await withBackrooms(async ({ page, snapshot, reset, directory }) => {
     const out = captures ?? directory;
     await mkdir(out, { recursive: true });
+    const unlitFile = join(directory, 'without-viewport-lighting.css');
+    await writeFile(unlitFile, withoutViewportLighting);
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('DOM.enable');
     for (const [width, height] of viewports) {
@@ -67,6 +69,9 @@ await withBackrooms(async ({ page, snapshot, reset, directory }) => {
                 } finally {
                     await isolation.evaluate(style => style.remove());
                 }
+                check.isolatedRgba = join(out, `${screen}-top-view-isolated.rgba`);
+                snapshot('--planar-preview', width, height, activations,
+                    JSON.stringify({ root: 'content', rgba: check.isolatedRgba }), unlitFile);
             }
             // The second Top view click must select the existing workings frame.
             const frame = name === 'restore' ? 2 : states.length;
@@ -176,12 +181,12 @@ async function replayNative(bundle, states, checkpoints, out, width, height) {
 
     const frames = [];
     const pixels = [];
-    for (const [index, { name, frame, png, planes, losses, camera, geometry, isolated }] of checkpoints.entries()) {
+    for (const [index, { name, frame, png, planes, losses, camera, geometry, isolated, isolatedRgba }] of checkpoints.entries()) {
         const native = readPixels(`${prefix}-${index}.png`, width, height);
         const chromium = readPixels(png, width, height);
         assert(native.equals(await readFile(join(out, states[frame].rgba))), `${name}: exact native readback`);
         const fullPage = compare(native, chromium);
-        const context = isolated && compare(native, readPixels(isolated, width, height));
+        const context = isolated && compare(await readFile(isolatedRgba), readPixels(isolated, width, height));
         if (context) {
             assert(fullPage.meanAbsoluteRgbError <= 30,
                 `${width}x${height}: top view full-page RGB error ${fullPage.meanAbsoluteRgbError}`);

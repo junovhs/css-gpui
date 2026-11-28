@@ -6,6 +6,7 @@
 //! omit. The standard strict GPUI emitter is independent of this preview.
 
 mod material;
+mod overlay;
 mod raster;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -44,7 +45,8 @@ pub struct Frame {
 
 /// Preview the subtree of a 3D context in document coordinates at scroll zero.
 /// The viewport clips the entire context. Pixels outside its planes show the
-/// document canvas and the solid backing of a viewport-covering body.
+/// document canvas and the solid backing of a viewport-covering body. Flat
+/// viewport overlays stack over the settled 3D context and its backing.
 pub fn preview(
     graph: &SceneSourceGraph,
     scene: &ResolvedScene,
@@ -117,20 +119,13 @@ pub fn preview(
     }
     let mut color = None;
     let mut visibility = None;
+    let mut ancestors = Vec::new();
     let mut parent = root.node.parent_id.and_then(|id| nodes.get(&id));
     while let Some(node) = parent {
+        ancestors.push(*node);
         let css = &node.style.projection_properties;
         if node.node.name.as_deref() == Some("body") {
             background = compiler.body_backdrop(node, background);
-        }
-        for decoration in &node.style.decorations {
-            if css_value(&decoration.effects, "opacity", "1") != "0"
-                && let Some(blend) = decoration.effects.get("mix-blend-mode")
-                && blend != "normal"
-            {
-                let path = format!("{}::{}", node.node.dom_path, decoration.pseudo);
-                record_loss(&mut compiler.losses, &path, "mix-blend-mode", blend);
-            }
         }
         color = color.or_else(|| css.get("color").and_then(|value| crate::paint::rgba(value)));
         visibility = visibility.or_else(|| css.get("visibility").map(String::as_str));
@@ -144,6 +139,13 @@ pub fn preview(
         }
         parent = node.node.parent_id.and_then(|id| nodes.get(&id));
     }
+    let overlays = overlay::compile(
+        root,
+        &ancestors,
+        &mut compiler.layout,
+        viewport_css,
+        &mut compiler.losses,
+    );
     compiler.visit(
         root,
         &mut Vec::new(),
@@ -151,7 +153,7 @@ pub fn preview(
         visibility.unwrap_or("visible"),
     );
     Ok(Frame {
-        rgba: raster::render(&compiler.faces, background, viewport),
+        rgba: raster::render(&compiler.faces, &overlays, background, viewport),
         planes: compiler.planes,
         losses: compiler.losses,
     })
@@ -193,20 +195,12 @@ impl<'a> Compiler<'a> {
             && css_value(effects, "opacity", "1") == "1"
             && css_value(effects, "mix-blend-mode", "normal") == "normal"
             && style.border_radius == 0.0;
-        // Viewport-relative CSS lengths are computed as f32 in the layout pass.
-        let layout_tolerance = 1.0 / 64.0;
         let covers_viewport = self
             .layout
             .border_box(node.node.id, None)
             .ok()
             .flatten()
-            .is_some_and(|bounds| {
-                (0..2).all(|axis| {
-                    bounds.origin[axis] <= layout_tolerance
-                        && bounds.origin[axis] + bounds.size[axis]
-                            >= self.viewport[axis] - layout_tolerance
-                })
-            });
+            .is_some_and(|bounds| overlay::covers_viewport(bounds, self.viewport));
         if !simple || !covers_viewport {
             record_loss(
                 &mut self.losses,

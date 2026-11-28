@@ -37,3 +37,65 @@ fn crossing_faces_use_pixel_depth_and_preserve_reflected_front_faces() {
     assert_eq!(frame.losses.len(), 1);
     assert_eq!(frame.losses[0].property, "box-shadow");
 }
+
+#[test]
+fn viewport_gradient_blends_only_above_the_3d_context() {
+    let html = "<html><body><section><main><i></i></main></section></body></html>";
+    let css = r#"
+        html { background: #204060; }
+        body, section, main { position: absolute; inset: 0; }
+        body, section { overflow: hidden; }
+        main { perspective: 100px; transform-style: preserve-3d; }
+        i {
+            position: absolute; inset: 0 auto 0 0; width: 5px;
+            background: #c04020; transform: translateZ(1px);
+        }
+        section::before {
+            content: ""; position: absolute; inset: 0; z-index: 2;
+            background: radial-gradient(rgba(255, 0, 128, 0.5) 20%, #000 75%);
+            mix-blend-mode: overlay;
+        }
+    "#;
+    for (edit, expected, unsupported) in [
+        ("", [[224, 32, 32, 255], [0, 0, 0, 255]], false),
+        (
+            "section::before { visibility: hidden; }",
+            [[192, 64, 32, 255], [32, 64, 96, 255]],
+            false,
+        ),
+        (
+            "main { z-index: 3; }",
+            [[192, 64, 32, 255], [32, 64, 96, 255]],
+            true,
+        ),
+        (
+            "body { isolation: isolate; }",
+            [[192, 64, 32, 255], [32, 64, 96, 255]],
+            true,
+        ),
+    ] {
+        let graph =
+            SceneSourceGraph::from_strings("overlay", html, &format!("{css}{edit}")).unwrap();
+        let scene = resolve_scene_with_radio_selection(&graph, 9.0, 5.0, &[]).unwrap();
+        let root = scene
+            .nodes
+            .iter()
+            .find(|node| node.node.name.as_deref() == Some("main"))
+            .unwrap();
+        let frame = preview(&graph, &scene, root.node.id, [9, 5]).unwrap();
+        let pixel = |x: usize, y: usize| {
+            let index = (y * 9 + x) * 4;
+            &frame.rgba[index..index + 4]
+        };
+        assert_eq!(pixel(4, 2), expected[0], "{edit}");
+        assert_eq!(pixel(8, 4), expected[1], "{edit}");
+        assert_eq!(
+            frame
+                .losses
+                .iter()
+                .any(|loss| loss.property == "mix-blend-mode"),
+            unsupported,
+            "{edit}"
+        );
+    }
+}

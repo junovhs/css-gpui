@@ -8,6 +8,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const viewports = [[390, 844], [1440, 900]];
+export const withoutViewportLighting = 'body > div::before { visibility: hidden !important; }';
 const repository = fileURLToPath(new URL('../../', import.meta.url));
 const source = 'https://cdpn.io/pen/debug/NPqLLoz';
 const sourceHash = '373084e9cf19f2a62b072eed146a687d2879eac74fa1374b0b3ef865836e1c49';
