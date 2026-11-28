@@ -1,7 +1,9 @@
 use std::{env, error::Error};
 
 use css_gpui_neon_reference::menu::{MenuView, register_fonts, scene_assets};
-use gpui::{App, AppContext, Application, Bounds, WindowBounds, WindowOptions, px, size};
+use gpui::{
+    App, AppContext, Application, Bounds, TitlebarOptions, WindowBounds, WindowOptions, px, size,
+};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = env::args().skip(1);
@@ -23,6 +25,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             cx.open_window(
                 WindowOptions {
                     window_bounds: Some(WindowBounds::Windowed(bounds)),
+                    titlebar: Some(TitlebarOptions {
+                        title: Some("Neon Glass Context Menu by Simey (@simeydotme)".into()),
+                        ..Default::default()
+                    }),
                     ..Default::default()
                 },
                 |_, cx| cx.new(|_| view),

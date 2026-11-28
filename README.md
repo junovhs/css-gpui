@@ -2,6 +2,10 @@
 
 Design a component in HTML and CSS with an AI assistant, approve it in the browser, and turn it into readable Rust for [GPUI](https://www.gpui.rs/). The goal is native UI code a developer can build on. HTML supplies the element tree and text. CSS describes how that tree should look and respond to the space available.
 
+## Try the Linux release candidate
+
+Follow the [Linux setup and Build guide](release/README.md) to compile [Neon Glass Context Menu by Simey (@simeydotme)](https://codepen.io/simeydotme/pen/PwwYZOe) and the strict toolbar sample. [Simey’s CodePen profile](https://codepen.io/simeydotme).
+
 ## What works today
 
 This repository starts with the Rust frontend from SEMUI's original Scene IR compiler. It parses a bounded HTML/CSS subset, resolves styles, extracts a typed scene, and can emit reference HTML/CSS. Eleven fixture inputs exercise layouts, typography, controls, and unsupported declarations or selectors. GPUI code generation is the first implementation milestone.

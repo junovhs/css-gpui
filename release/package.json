@@ -1,0 +1,8 @@
+{
+  "name": "css-gpui-release-browser",
+  "private": true,
+  "devDependencies": {
+    "playwright": "1.60.0",
+    "wawoff2": "2.0.1"
+  }
+}

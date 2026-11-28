@@ -1,6 +1,6 @@
 # Neon Glass browser reference
 
-Simey ([@simeydotme](https://codepen.io/simeydotme)) published [Neon Glass Context Menu](https://codepen.io/simeydotme/pen/PwwYZOe). On 2026-11-27 this fixture extracted the inner document from the [CodePen full-page renderer](https://cdpn.io/simeydotme/fullpage/PwwYZOe), with CodePen chrome references and trailing whitespace removed. The remaining markup, compiled CSS and script came from that renderer. The source hash uses LF line endings.
+[Neon Glass Context Menu by Simey (@simeydotme)](https://codepen.io/simeydotme/pen/PwwYZOe) is available from [Simey’s CodePen profile](https://codepen.io/simeydotme). On 2026-11-27 this fixture extracted the inner document from the [CodePen full-page renderer](https://cdpn.io/simeydotme/fullpage/PwwYZOe), with CodePen chrome references and trailing whitespace removed. The remaining markup, compiled CSS and script came from that renderer. The source hash uses LF line endings.
 
 [CodePen licenses public Pens under MIT](https://blog.codepen.io/docs/pens/licensing/). The notice for the vendored Pen code appears below. The dependency URLs and SHA-256 hashes are in [reference.json](reference.json).
 
@@ -88,7 +88,7 @@ cargo test --locked --test backdrop -- --include-ignored --nocapture
 
 ### Build the local menu on Linux
 
-Install Python 3, Node.js 24 with npm, and the [Rust 1.95.0, X11 build libraries, and Vulkan runtime used by the toolbar](../../docs/first-milestone.md#build-and-run-the-toolbar). From the repository root, set up the pinned browser tools once. Install the Chromium system libraries for your distribution if Playwright requests them.
+Install Python 3, Node.js 24 with npm, and the [Rust 1.95.0, X11 build libraries, and Vulkan runtime](../../release/README.md#set-up-once). From the repository root, set up the pinned browser tools once. Install the Chromium system libraries for your distribution if Playwright requests them.
 
 ```sh
 browser="${TMPDIR:-/tmp}/css-gpui-neon-browser"
