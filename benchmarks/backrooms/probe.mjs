@@ -16,6 +16,17 @@ const run = (program, args, input) => execFileSync(program, args, {
     cwd: repository, timeout: 120_000, maxBuffer: 8 * 1024 * 1024, input,
 });
 
+// Keep the context and its own materials. Hide surrounding controls and
+// paint from ancestor pseudo-elements while preserving the page backing.
+export function isolateContext(page) {
+    return page.addStyleTag({
+        content: `html::before, html::after, body::before, body::after,
+            body > div::before, body > div::after,
+            body > div > div::before, body > div > div::after,
+            body :not(:has(content), content, content *) { visibility: hidden !important; }`,
+    });
+}
+
 export async function withBackroomsSource(probe) {
     const html = run('curl', ['--fail', '--silent', '--show-error', '--location', '--max-time', '60', source]);
     assert.equal(createHash('sha256').update(html).digest('hex'), sourceHash, 'Pinned HTML has changed');

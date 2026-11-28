@@ -24,7 +24,7 @@ export async function prepareCorner(snapshot, out, width, height) {
             JSON.stringify({ root: 'content', label_scope: scope, rgba: join(out, rgba) }),
         );
         const labels = routeLabels(controls.labels);
-        const state = { name, scope, prefix, rgba, selection: controls.selection, labels,
+        const state = { name, scope, prefix, rgba, selection: controls.selection, checked: controls.checked, labels,
             planes, losses, overrides: [...overrides] };
         if (choose) {
             const matches = labels.filter(choose);
@@ -40,8 +40,8 @@ export async function prepareCorner(snapshot, out, width, height) {
 
 export async function writeRouteBundle(out, width, height, states, name = 'route') {
     const bundle = join(out, `${width}x${height}-${name}.json`);
-    await writeFile(bundle, JSON.stringify({ width, height, states: states.map(({ rgba, selection, labels }) =>
-        ({ rgba, selection, labels })) }, null, 2));
+    await writeFile(bundle, JSON.stringify({ width, height, states: states.map(({ rgba, selection, checked, labels }) =>
+        ({ rgba, selection, checked, labels })) }, null, 2));
     return bundle;
 }
 

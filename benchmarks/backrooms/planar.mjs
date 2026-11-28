@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { viewports, withBackrooms } from './probe.mjs';
+import { isolateContext, viewports, withBackrooms } from './probe.mjs';
 import { prepareCorner } from './route.mjs';
 import { compare, readPixels } from './pixels.mjs';
 
@@ -67,15 +67,7 @@ await withBackrooms(async ({ page, snapshot, reset, directory }) => {
                 const authored = `${prefix}-authored.png`;
                 const isolated = `${prefix}-isolated.png`;
                 await page.screenshot({ path: authored });
-                // Hide siblings of the context and paint from its ancestor
-                // pseudo-elements. Keep the whole context, including its own
-                // backgrounds, textures, filters and shadows, in the comparison.
-                const isolation = await page.addStyleTag({
-                    content: `html::before, html::after, body::before, body::after,
-                        body > div::before, body > div::after,
-                        body > div > div::before, body > div > div::after,
-                        body :not(:has(content), content, content *) { visibility: hidden !important; }`,
-                });
+                const isolation = await isolateContext(page);
                 await page.screenshot({ path: isolated });
 
                 const reference = readPixels(isolated, width, height);

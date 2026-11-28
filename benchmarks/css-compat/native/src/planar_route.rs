@@ -1,18 +1,45 @@
-use std::{collections::BTreeMap, error::Error, path::Path, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    error::Error,
+    path::Path,
+    sync::Arc,
+};
 
 use gpui::{
     App, AppContext, Application, Bounds, Context, FocusHandle, InteractiveElement, IntoElement,
     KeyBinding, ParentElement, Render, RenderImage, StatefulInteractiveElement, Styled, Window,
     WindowBounds, WindowOptions, actions, canvas, div, px, rgb, size,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::read_frame;
 
 const STRIP_HEIGHT: u32 = 48;
 actions!(planar_route, [TabNext, TabPrevious]);
 
-type RadioSelection = BTreeMap<String, String>;
+#[derive(Clone, Deserialize, PartialEq, Eq, Serialize)]
+struct CheckedState {
+    selection: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    checked: BTreeSet<String>,
+}
+
+impl CheckedState {
+    fn activate(&mut self, label: &Label) -> bool {
+        if label.checkbox {
+            if !self.checked.remove(&label.target) {
+                self.checked.insert(label.target.clone());
+            }
+        } else {
+            if self.selection.get(&label.group) == Some(&label.target) {
+                return false;
+            }
+            self.selection
+                .insert(label.group.clone(), label.target.clone());
+        }
+        true
+    }
+}
 
 #[derive(Deserialize)]
 struct Bundle {
@@ -24,8 +51,16 @@ struct Bundle {
 #[derive(Deserialize)]
 struct State {
     rgba: String,
-    selection: RadioSelection,
+    #[serde(flatten)]
+    controls: CheckedState,
     labels: Vec<Label>,
+}
+
+#[derive(Serialize)]
+struct Frame<'a> {
+    frame: usize,
+    #[serde(flatten)]
+    controls: &'a CheckedState,
 }
 
 #[derive(Deserialize)]
@@ -33,6 +68,8 @@ struct Label {
     group: String,
     target: String,
     caption: String,
+    #[serde(default)]
+    checkbox: bool,
 }
 
 struct Route {
@@ -46,14 +83,13 @@ struct Route {
 
 impl Route {
     fn destination(&self, label: &Label) -> Option<usize> {
-        let mut selection = self.states[self.current].selection.clone();
-        if selection.get(&label.group) == Some(&label.target) {
+        let mut controls = self.states[self.current].controls.clone();
+        if !controls.activate(label) {
             return None;
         }
-        selection.insert(label.group.clone(), label.target.clone());
         self.states
             .iter()
-            .position(|state| state.selection == selection)
+            .position(|state| state.controls == controls)
     }
 
     fn activate(&mut self, from: usize, index: usize, window: &mut Window, cx: &mut Context<Self>) {
@@ -80,10 +116,11 @@ impl Render for Route {
         let state = &self.states[current];
         let image = self.images[current].clone();
         let report = self.report.then(|| {
-            serde_json::json!({
-                "frame": current,
-                "selection": state.selection,
+            serde_json::to_string(&Frame {
+                frame: current,
+                controls: &state.controls,
             })
+            .expect("serialize route readback")
         });
         self.report = false;
         let buttons = state

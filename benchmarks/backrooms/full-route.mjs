@@ -181,7 +181,7 @@ function compileRoute(snapshot, out, width, height, route, browserStates) {
             assert(activation, `${prefix}: missing Rust control for ${next.target}`);
             overrides.push(activation.target);
         }
-        return { rgba, selection: controls.selection, labels, planes: planes.length, losses, activation };
+        return { rgba, selection: controls.selection, checked: controls.checked, labels, planes: planes.length, losses, activation };
     });
 }
 

@@ -270,7 +270,49 @@ run the existing preview binary with `--route` and
 The GPUI host reads the precompiled bundle and images on startup. The probe
 serves the downloaded document to Chromium from memory and blocks external
 requests. The settled comparison disables authored scripts, audio and
-animation. The finish
-radio is checked by the original door label. The animated ending, checkbox
-top view, authored overlays and HUD layout, and full lighting and depth
-parity remain outside this bounded preview.
+animation. The finish radio is checked by the original door label.
+
+## Native Top view replay
+
+The checked-state snapshot applies activations in order from the authored
+defaults. A radio selects one group member and a checkbox independently
+toggles. The route reads explicit labels and direct, cascade-visible checkboxes
+from the source. Existing radio-only bundles can omit the checked checkbox IDs.
+
+Using the same Playwright setup and GPUI binary as the corner replay, run:
+
+```sh
+node benchmarks/backrooms/top-view.mjs /path/to/playwright-install \
+  "$target_dir/debug/css-gpui-planar-preview" /tmp/backrooms-top-view
+```
+
+The probe clicks the original Enter and Show workings out labels, then clicks
+the original Top view checkbox twice. It replays those four activations via X11
+in a single GPUI window at each size. Both runs retain the same radio groups
+through the checkbox clicks and check the authored checkbox IDs at each step.
+All five GPUI readbacks per size equal the corresponding Rust rasters. Turning
+Top view off restores the previous view byte for byte in Chromium and GPUI.
+
+Rust resolves the overhead camera, floor boxes and generated wall geometry
+from the authored cascade. The 672 painted planes at each size include the
+maze walls and floor. The preview paints the authored viewport-covering white
+body backing and reports the high-graphics blend overlay as a paint loss.
+CDP supplies comparison geometry. The isolated reference preserves scene
+materials and the backing while hiding the surrounding controls and overlays.
+
+| Viewport | Used boxes | Projected vertices (wall vertices) | Maximum box / vertex error (CSS px) | Full-page / isolated RGB error |
+| --- | ---: | ---: | ---: | ---: |
+| 390 × 844 | 65 | 236 (92) | 0.000031 / 0.000048 | 24.33 / 3.73 |
+| 1440 × 900 | 65 | 236 (92) | 0 / 0.000034 | 11.51 / 3.97 |
+
+The overhead comparison allows up to 1/64 CSS px of used-box error,
+0.035 CSS px of vertex error, and 30/6 RGB error in the full-page/isolated
+images. The output includes per-frame paint and layout losses. The optional
+last argument keeps the screenshots, RGBA files, route bundles, and native
+input traces. The GPUI control strip uses the route's compiled destinations.
+
+The authored HUD, debug text inside the maze, lighting and depth compositing,
+and animated ending remain open on ISS-22. Top view still reports unsupported
+tiled materials, grouped opacity, outlines, generated content, and layout for
+bordered or aspect-ratio decorations. Strict GPUI conversion reports 5,102
+source losses and emits zero bytes of Rust at either viewport.

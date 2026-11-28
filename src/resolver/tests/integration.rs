@@ -235,3 +235,80 @@ fn radio_snapshot_cascades_anchored_selectors_across_elements() {
             && loss.selector.as_deref() == Some("#east:checked + p")
     }));
 }
+
+#[test]
+fn checked_snapshots_toggle_authored_checkboxes_without_changing_radio_groups() {
+    use crate::resolver::{checked_snapshot_controls, resolve_scene_with_checked_activations};
+
+    let graph = crate::SceneSourceGraph::from_strings(
+        "checked-controls",
+        r#"<main id="scope">
+            <input id="north" type="radio" name="camera" checked>
+            <input id="east" type="radio" name="camera">
+            <input id="tools" type="checkbox" name="camera" checked>
+            <label for="tools">Camera tools</label>
+            <section><input id="overhead" type="checkbox" name="camera"></section>
+            <p id="scene">Geometry</p>
+        </main>"#,
+        r#"#tools { display: none; }
+            section { display: none; }
+            main:has(#tools:checked) section { display: block; }
+            main:has(#tools:checked):has(#overhead:checked):has(#east:checked) p {
+                width: 36px;
+            }"#,
+    )
+    .unwrap();
+    let id = |key| {
+        graph
+            .html_nodes
+            .iter()
+            .find(|node| crate::extractor::input_attribute(node, "id") == Some(key))
+            .unwrap()
+            .id
+    };
+
+    for (activations, radio, checked, visible, overhead) in [
+        (vec![], "north", vec!["tools"], true, false),
+        (vec![id("tools")], "north", vec![], false, false),
+        (
+            vec![id("east"), id("overhead")],
+            "east",
+            vec!["overhead", "tools"],
+            true,
+            true,
+        ),
+        (
+            vec![id("east"), id("overhead"), id("overhead")],
+            "east",
+            vec!["tools"],
+            true,
+            false,
+        ),
+    ] {
+        let scene =
+            resolve_scene_with_checked_activations(&graph, 390.0, 844.0, &activations).unwrap();
+        let controls =
+            checked_snapshot_controls(&graph, &scene, id("scope"), &activations).unwrap();
+        assert_eq!(controls.selection["camera"], radio);
+        assert_eq!(controls.checked.into_iter().collect::<Vec<_>>(), checked);
+        assert!(
+            controls
+                .labels
+                .iter()
+                .any(|label| label.target == "tools" && label.checkbox && !label.direct)
+        );
+        assert_eq!(
+            controls
+                .labels
+                .iter()
+                .any(|label| label.target == "overhead" && label.direct),
+            visible
+        );
+        let geometry = scene
+            .nodes
+            .iter()
+            .find(|node| node.node.id == id("scene"))
+            .unwrap();
+        assert_eq!(geometry.style.width, overhead.then_some(36.0));
+    }
+}

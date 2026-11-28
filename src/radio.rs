@@ -1,6 +1,6 @@
-//! Bounded radio and label associations in the parsed HTML document.
+//! Bounded checked inputs and label associations in the parsed HTML document.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::extractor::{INVISIBLE_TAGS, input_attribute, input_type};
 use crate::resolver::interaction::unsupported_focus_order;
@@ -11,6 +11,8 @@ pub(crate) struct RadioMarkup<'a> {
     pub radios: HashMap<usize, &'a str>,
     pub labels: HashMap<usize, usize>,
     snapshot_labels: HashMap<usize, usize>,
+    checkboxes: HashSet<usize>,
+    checked: HashSet<usize>,
     pub initial: HashMap<&'a str, usize>,
     pub losses: HashMap<usize, &'static str>,
 }
@@ -19,18 +21,38 @@ pub(crate) fn is_radio(node: &HtmlNode) -> bool {
     is_tag(node, "input") && input_type(node).is_some_and(|kind| kind.eq_ignore_ascii_case("radio"))
 }
 
+fn is_checkbox(node: &HtmlNode) -> bool {
+    is_tag(node, "input")
+        && input_type(node).is_some_and(|kind| kind.eq_ignore_ascii_case("checkbox"))
+}
+
 pub(crate) fn is_checkable(node: &HtmlNode) -> bool {
-    is_radio(node)
-        || (is_tag(node, "input")
-            && input_type(node).is_some_and(|kind| kind.eq_ignore_ascii_case("checkbox")))
-        || is_tag(node, "option")
+    is_radio(node) || is_checkbox(node) || is_tag(node, "option")
+}
+
+pub(crate) struct CheckedControls<'a> {
+    radios: HashMap<&'a str, usize>,
+    checkboxes: HashSet<usize>,
+}
+
+impl CheckedControls<'_> {
+    pub fn into_checked(self) -> HashSet<usize> {
+        self.radios.into_values().chain(self.checkboxes).collect()
+    }
 }
 
 impl<'a> RadioMarkup<'a> {
     pub fn new(nodes: &'a [HtmlNode]) -> Self {
+        Self::with_checkboxes(nodes, false)
+    }
+
+    pub fn with_checkboxes(nodes: &'a [HtmlNode], include_checkboxes: bool) -> Self {
         let mut markup = Self::default();
-        let mut radios = nodes.iter().filter(|node| is_radio(node)).peekable();
-        if radios.peek().is_none() {
+        let mut controls = nodes
+            .iter()
+            .filter(|node| is_radio(node) || (include_checkboxes && is_checkbox(node)))
+            .peekable();
+        if controls.peek().is_none() {
             return markup;
         }
 
@@ -41,43 +63,56 @@ impl<'a> RadioMarkup<'a> {
             }
         }
 
-        for radio in radios {
-            let name = input_attribute(radio, "name");
-            let issue = if let Some(reason) = unsupported_focus_order(radio, nodes) {
+        for control in controls {
+            let checkbox = is_checkbox(control);
+            let name = input_attribute(control, "name");
+            let issue = if let Some(reason) = unsupported_focus_order(control, nodes) {
                 Some(reason)
-            } else if name.is_none_or(|name| name.is_empty() || !literal_attribute(name)) {
+            } else if !checkbox
+                && name.is_none_or(|name| name.is_empty() || !literal_attribute(name))
+            {
                 Some("requires a nonempty literal name")
-            } else if let Some(reason) = unsupported_radio_attribute(radio) {
+            } else if let Some(reason) = unsupported_input_attribute(control) {
                 Some(reason)
-            } else if input_attribute(radio, "id").is_some_and(|id| {
+            } else if input_attribute(control, "id").is_some_and(|id| {
                 id.is_empty()
                     || id.chars().any(char::is_whitespace)
                     || !literal_attribute(id)
                     || by_id[id].len() != 1
             }) {
                 Some("requires a unique literal id when id is present")
-            } else if input_attribute(radio, "value").is_some_and(|value| !literal_attribute(value))
+            } else if input_attribute(control, "value")
+                .is_some_and(|value| !literal_attribute(value))
             {
                 Some("requires a literal value")
-            } else if ancestors(radio, nodes).any(|ancestor| is_tag(ancestor, "form")) {
+            } else if ancestors(control, nodes).any(|ancestor| is_tag(ancestor, "form")) {
                 Some("form ownership is unsupported")
-            } else if ancestors(radio, nodes).any(|ancestor| {
+            } else if ancestors(control, nodes).any(|ancestor| {
                 is_tag(ancestor, "label") && input_attribute(ancestor, "for").is_none()
             }) {
                 Some("requires explicit label for association")
-            } else if unavailable(radio, nodes) {
-                Some("hidden radio")
+            } else if unavailable(control, nodes) {
+                Some(if checkbox {
+                    "hidden checkbox"
+                } else {
+                    "hidden radio"
+                })
             } else {
                 None
             };
 
             if let Some(issue) = issue {
-                markup.losses.insert(radio.id, issue);
+                markup.losses.insert(control.id, issue);
+            } else if checkbox {
+                markup.checkboxes.insert(control.id);
+                if input_attribute(control, "checked").is_some() {
+                    markup.checked.insert(control.id);
+                }
             } else if let Some(name) = name {
-                markup.radios.insert(radio.id, name);
+                markup.radios.insert(control.id, name);
                 // HTML keeps the last authored checked option in document order.
-                if input_attribute(radio, "checked").is_some() {
-                    markup.initial.insert(name, radio.id);
+                if input_attribute(control, "checked").is_some() {
+                    markup.initial.insert(name, control.id);
                 }
             }
         }
@@ -87,14 +122,17 @@ impl<'a> RadioMarkup<'a> {
                 continue;
             };
             let matches = by_id.get(target).map(Vec::as_slice).unwrap_or_default();
-            if !matches.iter().any(|node| is_radio(node)) {
+            let radio_label = matches.iter().any(|node| is_radio(node));
+            let checkbox_label = include_checkboxes && matches.iter().any(|node| is_checkbox(node));
+            if !radio_label && !checkbox_label {
                 if matches.is_empty() {
                     markup.losses.insert(label.id, "unresolved label for");
                 }
                 continue;
             }
             let supported = matches.len() == 1
-                && markup.radios.contains_key(&matches[0].id)
+                && (markup.radios.contains_key(&matches[0].id)
+                    || markup.checkboxes.contains(&matches[0].id))
                 && !unavailable(label, nodes)
                 && unsupported_focus_order(label, nodes).is_none()
                 && input_attribute(label, "tabindex").is_none()
@@ -106,32 +144,46 @@ impl<'a> RadioMarkup<'a> {
             if supported {
                 markup.snapshot_labels.insert(label.id, matches[0].id);
             }
-            if supported && !has_event_handler(label) {
-                markup.labels.insert(label.id, matches[0].id);
-            } else {
-                markup
-                    .losses
-                    .insert(label.id, "unsupported radio label association");
+            if radio_label {
+                if supported && !has_event_handler(label) {
+                    markup.labels.insert(label.id, matches[0].id);
+                } else {
+                    markup
+                        .losses
+                        .insert(label.id, "unsupported radio label association");
+                }
             }
         }
         markup
     }
 
-    pub fn selection(&self, overrides: &[usize]) -> Result<HashMap<&'a str, usize>, usize> {
-        let mut selection = self.initial.clone();
-        for &id in overrides {
-            let &name = self.radios.get(&id).ok_or(id)?;
-            selection.insert(name, id);
+    pub fn selection(&self, activations: &[usize]) -> Result<CheckedControls<'a>, usize> {
+        let mut radios = self.initial.clone();
+        let mut checkboxes = self.checked.clone();
+        for &id in activations {
+            if let Some(&name) = self.radios.get(&id) {
+                radios.insert(name, id);
+            } else if !self.checkboxes.contains(&id) {
+                return Err(id);
+            } else if !checkboxes.remove(&id) {
+                checkboxes.insert(id);
+            }
         }
-        Ok(selection)
+        Ok(CheckedControls { radios, checkboxes })
     }
 }
 
-/// A scoped explicit label as resolved in a resting radio snapshot.
+/// A scoped control as resolved in a resting checked-state snapshot.
 #[derive(Debug, serde::Serialize)]
 pub struct SnapshotRadioLabel<'a> {
     pub node_id: usize,
+    /// The radio group name. Empty for a checkbox.
     pub group: &'a str,
+    #[serde(skip_serializing_if = "is_false")]
+    pub checkbox: bool,
+    #[serde(skip_serializing_if = "is_false")]
+    /// The checkbox itself supplies the click target.
+    pub direct: bool,
     pub target: &'a str,
     pub class_name: &'a str,
     pub text: String,
@@ -140,9 +192,16 @@ pub struct SnapshotRadioLabel<'a> {
     pub inline_handler: bool,
 }
 
+fn is_false(value: &bool) -> bool {
+    !value
+}
+
 #[derive(Debug, serde::Serialize)]
 pub struct SnapshotRadioControls<'a> {
     pub selection: BTreeMap<&'a str, &'a str>,
+    #[serde(skip_serializing_if = "BTreeSet::is_empty")]
+    /// Authored IDs of the currently checked checkboxes.
+    pub checked: BTreeSet<&'a str>,
     pub labels: Vec<SnapshotRadioLabel<'a>>,
 }
 
@@ -151,13 +210,20 @@ pub(crate) fn snapshot_controls<'a>(
     scene: &'a crate::resolver::ResolvedScene,
     root: usize,
     overrides: &[usize],
+    include_checkboxes: bool,
 ) -> Result<SnapshotRadioControls<'a>, usize> {
     let nodes = &graph.html_nodes;
-    let markup = RadioMarkup::new(nodes);
-    let selection = markup
-        .selection(overrides)?
+    let markup = RadioMarkup::with_checkboxes(nodes, include_checkboxes);
+    let state = markup.selection(overrides)?;
+    let selection = state
+        .radios
         .into_iter()
         .filter_map(|(group, id)| Some((group, input_attribute(&nodes[id], "id")?)))
+        .collect();
+    let checked = state
+        .checkboxes
+        .into_iter()
+        .filter_map(|id| input_attribute(&nodes[id], "id"))
         .collect();
     let styles: HashMap<_, _> = scene
         .nodes
@@ -167,7 +233,12 @@ pub(crate) fn snapshot_controls<'a>(
     let labels = nodes
         .iter()
         .filter_map(|label| {
-            let &radio = markup.snapshot_labels.get(&label.id)?;
+            let direct = markup.checkboxes.contains(&label.id);
+            let target = if direct {
+                label.id
+            } else {
+                *markup.snapshot_labels.get(&label.id)?
+            };
             let branch: Vec<_> = std::iter::once(label)
                 .chain(ancestors(label, nodes))
                 .collect();
@@ -222,8 +293,10 @@ pub(crate) fn snapshot_controls<'a>(
                 .join(" ");
             Some(SnapshotRadioLabel {
                 node_id: label.id,
-                group: markup.radios[&radio],
-                target: input_attribute(&nodes[radio], "id")?,
+                group: markup.radios.get(&target).copied().unwrap_or_default(),
+                checkbox: markup.checkboxes.contains(&target),
+                direct,
+                target: input_attribute(&nodes[target], "id")?,
                 class_name: input_attribute(label, "class").unwrap_or_default(),
                 text,
                 generated_content,
@@ -231,7 +304,11 @@ pub(crate) fn snapshot_controls<'a>(
             })
         })
         .collect();
-    Ok(SnapshotRadioControls { selection, labels })
+    Ok(SnapshotRadioControls {
+        selection,
+        checked,
+        labels,
+    })
 }
 
 fn is_tag(node: &HtmlNode, tag: &str) -> bool {
@@ -270,8 +347,8 @@ fn interactive_label_child(node: &HtmlNode, target: usize) -> bool {
             || input_attribute(node, "tabindex").is_some())
 }
 
-fn unsupported_radio_attribute(radio: &HtmlNode) -> Option<&'static str> {
-    if input_attribute(radio, "form").is_some() {
+fn unsupported_input_attribute(input: &HtmlNode) -> Option<&'static str> {
+    if input_attribute(input, "form").is_some() {
         return Some("form ownership is unsupported");
     }
     [
@@ -285,8 +362,8 @@ fn unsupported_radio_attribute(radio: &HtmlNode) -> Option<&'static str> {
         "aria-checked",
     ]
     .into_iter()
-    .find(|attr| input_attribute(radio, attr).is_some())
-    .or_else(|| has_event_handler(radio).then_some("inline event handler"))
+    .find(|attr| input_attribute(input, attr).is_some())
+    .or_else(|| has_event_handler(input).then_some("inline event handler"))
 }
 
 fn has_event_handler(node: &HtmlNode) -> bool {

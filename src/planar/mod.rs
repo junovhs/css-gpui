@@ -1,7 +1,7 @@
 //! Render the settled paint of one authored, continuous CSS 3D context.
 //!
 //! This preview uses the bounded CSS box layout and source cascade. The caller
-//! supplies a context root and the resolved radio state. Diagnostics describe
+//! supplies a context root and the resolved checked state. Diagnostics describe
 //! the visible planes and paint that the bounded renderer has to approximate or
 //! omit. The standard strict GPUI emitter is independent of this preview.
 
@@ -44,7 +44,7 @@ pub struct Frame {
 
 /// Preview the subtree of a 3D context in document coordinates at scroll zero.
 /// The viewport clips the entire context. Pixels outside its planes show the
-/// HTML element's solid background over an opaque white canvas.
+/// document canvas and the solid backing of a viewport-covering body.
 pub fn preview(
     graph: &SceneSourceGraph,
     scene: &ResolvedScene,
@@ -120,6 +120,18 @@ pub fn preview(
     let mut parent = root.node.parent_id.and_then(|id| nodes.get(&id));
     while let Some(node) = parent {
         let css = &node.style.projection_properties;
+        if node.node.name.as_deref() == Some("body") {
+            background = compiler.body_backdrop(node, background);
+        }
+        for decoration in &node.style.decorations {
+            if css_value(&decoration.effects, "opacity", "1") != "0"
+                && let Some(blend) = decoration.effects.get("mix-blend-mode")
+                && blend != "normal"
+            {
+                let path = format!("{}::{}", node.node.dom_path, decoration.pseudo);
+                record_loss(&mut compiler.losses, &path, "mix-blend-mode", blend);
+            }
+        }
         color = color.or_else(|| css.get("color").and_then(|value| crate::paint::rgba(value)));
         visibility = visibility.or_else(|| css.get("visibility").map(String::as_str));
         for property in ["transform", "perspective", "filter", "opacity", "clip-path"] {
@@ -157,6 +169,71 @@ struct Compiler<'a> {
 }
 
 impl<'a> Compiler<'a> {
+    fn body_backdrop(&mut self, node: &ResolvedNode, background: [u8; 4]) -> [u8; 4] {
+        let style = &node.style;
+        let css = &style.projection_properties;
+        let effects = &style.paint_effects;
+        let Some(color) = css
+            .get("background-color")
+            .and_then(|value| crate::paint::rgba(value))
+            .filter(|color| color[3] != 0)
+        else {
+            return background;
+        };
+        if style.display == "none"
+            || css_value(css, "visibility", "visible") != "visible"
+            || css_value(effects, "opacity", "1") == "0"
+        {
+            return background;
+        }
+        let simple = css_value(css, "transform", "none") == "none"
+            && css_value(css, "clip-path", "none") == "none"
+            && css_value(effects, "filter", "none") == "none"
+            && css_value(effects, "mask", "none") == "none"
+            && css_value(effects, "opacity", "1") == "1"
+            && css_value(effects, "mix-blend-mode", "normal") == "normal"
+            && style.border_radius == 0.0;
+        // Viewport-relative CSS lengths are computed as f32 in the layout pass.
+        let layout_tolerance = 1.0 / 64.0;
+        let covers_viewport = self
+            .layout
+            .border_box(node.node.id, None)
+            .ok()
+            .flatten()
+            .is_some_and(|bounds| {
+                (0..2).all(|axis| {
+                    bounds.origin[axis] <= layout_tolerance
+                        && bounds.origin[axis] + bounds.size[axis]
+                            >= self.viewport[axis] - layout_tolerance
+                })
+            });
+        if !simple || !covers_viewport {
+            record_loss(
+                &mut self.losses,
+                &node.node.dom_path,
+                "background-color",
+                "body backing requires a simple viewport-covering box",
+            );
+            return background;
+        }
+        if let Some(image) = effects
+            .get("background-image")
+            .filter(|value| *value != "none")
+        {
+            record_loss(
+                &mut self.losses,
+                &node.node.dom_path,
+                "background-image",
+                image,
+            );
+        }
+        raster::over(
+            color.map(|byte| f32::from(byte) / 255.0),
+            background.map(|byte| f32::from(byte) / 255.0),
+        )
+        .map(raster::byte)
+    }
+
     fn visit(
         &mut self,
         node: &'a ResolvedNode,

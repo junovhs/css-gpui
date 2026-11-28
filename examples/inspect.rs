@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     let [html_path, css_path] = paths.as_slice() else {
-        return Err("usage: inspect [--radio-snapshot|--projection-snapshot|--planar-preview WIDTHxHEIGHT] <component.html> <component.css> [radio ID ...]".into());
+        return Err("usage: inspect [--radio-snapshot|--projection-snapshot|--planar-preview WIDTHxHEIGHT] <component.html> <component.css> [control ID ...]".into());
     };
 
     let html = fs::read_to_string(html_path)?;
@@ -89,7 +89,7 @@ fn resolve_snapshot(
     let overrides = selection
         .iter()
         .map(|id| {
-            let id = id.to_str().ok_or("radio IDs must be UTF-8")?;
+            let id = id.to_str().ok_or("control IDs must be UTF-8")?;
             graph
                 .html_nodes
                 .iter()
@@ -99,10 +99,10 @@ fn resolve_snapshot(
                         .any(|(name, value)| name == "id" && value == id)
                 })
                 .map(|node| node.id)
-                .ok_or_else(|| format!("unknown radio ID {id:?}").into())
+                .ok_or_else(|| format!("unknown control ID {id:?}").into())
         })
         .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
-    let scene = resolver::resolve_scene_with_radio_selection(
+    let scene = resolver::resolve_scene_with_checked_activations(
         &graph,
         width as f32,
         height as f32,
@@ -157,7 +157,7 @@ fn inspect_planar_preview(snapshot: &Snapshot) -> Result<(), Box<dyn Error>> {
         .as_deref()
         .map(|scope| -> Result<_, Box<dyn Error>> {
             let root = unique_node(scene, scope)?;
-            Ok(resolver::radio_snapshot_controls(
+            Ok(resolver::checked_snapshot_controls(
                 graph, scene, root, overrides,
             )?)
         })

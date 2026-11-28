@@ -51,6 +51,8 @@ pub enum ResolverError {
     EmptyGraph,
     /// A supplied node ID does not identify a supported radio in this graph.
     UnsupportedRadio(usize),
+    /// A supplied node ID does not identify a supported radio or checkbox.
+    UnsupportedCheckedControl(usize),
 }
 
 impl std::fmt::Display for ResolverError {
@@ -58,6 +60,9 @@ impl std::fmt::Display for ResolverError {
         match self {
             Self::EmptyGraph => write!(f, "scene source graph contains no HTML nodes"),
             Self::UnsupportedRadio(id) => write!(f, "node {id} is not a supported radio"),
+            Self::UnsupportedCheckedControl(id) => {
+                write!(f, "node {id} is not a supported radio or checkbox")
+            }
         }
     }
 }
@@ -101,7 +106,7 @@ pub fn resolve_scene_with_radio_selection(
     resolve(
         graph,
         Some((width, height)),
-        Some(selected_radios),
+        Some(SnapshotRequest::RadioSelection(selected_radios)),
         &mut BTreeSet::new(),
     )
 }
@@ -116,8 +121,42 @@ pub fn radio_snapshot_controls<'a>(
     root: usize,
     overrides: &[usize],
 ) -> Result<SnapshotRadioControls<'a>, ResolverError> {
-    crate::radio::snapshot_controls(graph, scene, root, overrides)
+    crate::radio::snapshot_controls(graph, scene, root, overrides, false)
         .map_err(ResolverError::UnsupportedRadio)
+}
+
+/// Resolve a fixed snapshot by applying input activations in order. A radio
+/// selects its group member and a checkbox toggles independently. The sequence
+/// starts from the authored checked state each time.
+pub fn resolve_scene_with_checked_activations(
+    graph: &SceneSourceGraph,
+    width: f32,
+    height: f32,
+    activations: &[usize],
+) -> Result<ResolvedScene, ResolverError> {
+    resolve(
+        graph,
+        Some((width, height)),
+        Some(SnapshotRequest::CheckedActivations(activations)),
+        &mut BTreeSet::new(),
+    )
+}
+
+/// Read explicit radio and checkbox labels and visible direct checkboxes in a
+/// subtree. Pass the same activation sequence used to resolve the snapshot.
+pub fn checked_snapshot_controls<'a>(
+    graph: &'a SceneSourceGraph,
+    scene: &'a ResolvedScene,
+    root: usize,
+    activations: &[usize],
+) -> Result<SnapshotRadioControls<'a>, ResolverError> {
+    crate::radio::snapshot_controls(graph, scene, root, activations, true)
+        .map_err(ResolverError::UnsupportedCheckedControl)
+}
+
+enum SnapshotRequest<'a> {
+    RadioSelection(&'a [usize]),
+    CheckedActivations(&'a [usize]),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -138,7 +177,7 @@ pub(crate) fn state_value_losses(
 fn resolve(
     graph: &SceneSourceGraph,
     viewport: Option<(f32, f32)>,
-    selected_radios: Option<&[usize]>,
+    snapshot: Option<SnapshotRequest<'_>>,
     losses: &mut BTreeSet<(StateDeclaration, StateValueLoss)>,
 ) -> Result<ResolvedScene, ResolverError> {
     if graph.html_nodes.is_empty() {
@@ -152,18 +191,26 @@ fn resolve(
     let initial_variables = Variables::new();
     let mut root_font_size = 16.0;
 
-    let radios = RadioMarkup::new(&graph.html_nodes);
-    let snapshot = if let Some(overrides) = selected_radios {
-        let selection = radios
-            .selection(overrides)
-            .map_err(ResolverError::UnsupportedRadio)?;
-        Some(CheckedSnapshot::new(
-            &graph.html_nodes,
-            selection.into_values().collect(),
-        ))
-    } else {
-        None
-    };
+    let radios = RadioMarkup::with_checkboxes(
+        &graph.html_nodes,
+        matches!(snapshot, Some(SnapshotRequest::CheckedActivations(_))),
+    );
+    let snapshot = snapshot
+        .map(|request| {
+            let selection = match request {
+                SnapshotRequest::RadioSelection(ids) => radios
+                    .selection(ids)
+                    .map_err(ResolverError::UnsupportedRadio)?,
+                SnapshotRequest::CheckedActivations(ids) => radios
+                    .selection(ids)
+                    .map_err(ResolverError::UnsupportedCheckedControl)?,
+            };
+            Ok::<_, ResolverError>(CheckedSnapshot::new(
+                &graph.html_nodes,
+                selection.into_checked(),
+            ))
+        })
+        .transpose()?;
     let snapshot = snapshot.as_ref();
     let rules = parse_rules(graph, None, snapshot.is_some());
     let state_rules: Vec<_> = graph
