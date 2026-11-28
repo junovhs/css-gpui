@@ -9,11 +9,17 @@ The starting point is SEMUI's historical Scene IR compiler at commit `e946774eb9
 | Build a scene | `src/layout/`, `src/extractor/`, `src/ir/` | Normalize declared pixel geometry and box sizing. Carry hierarchy, text, control kind, paint, type, and supported flex properties into Scene IR. |
 | Emit a target | `src/target/`, `src/emitter/` | Give each emitter a resolved scene. Declare capabilities and losses. The existing emitter produces HTML and CSS. |
 
+## Shared compiler and GPUI backend
+
+The HTML and CSS compiler is the long-term investment. The shared core owns the meaning of CSS properties, selectors, cascade, layout, paint, and supported animation behavior. Represent that meaning in runtime-independent scene data. Keep CSS interpretation upstream of the target and GPUI types in the backend. The current Scene IR declares a static execution mode. Future CSS animation support should put timing and interpolation semantics in shared code and leave frame scheduling to the backend.
+
+`TargetEmitter` takes a resolved `SceneIr`. The current GPUI backend maps that scene to native primitives, handles native input, schedules updates and frames, and presents the result. For example, the resolver decides which background applies when a descendant radio is checked, Scene IR carries the resolved conditional color and radio identity, and GPUI supplies the live checked state. Emitters report capability gaps. The frontend reports unsupported source constructs with their source locations.
+
+GPUI is the target for current work. Generate readable Rust and compile the output against the pinned GPUI revision. Keep the scene usable by future embedded, spatial, or other runtimes as concrete CSS support is added. An additional backend calls for a concrete use case. See the [compiler and backend decision](decisions/DEC-06.md) and the [GPUI emission and pinning decision](decisions/DEC-02.md).
+
 ## Preserve the reason an element moves
 
 Scene IR already carries flex direction, gap, and some alignment. Its justification enum currently has one value, `Center`. The toolbar requires `SpaceBetween` to survive diagnostics, extraction, serialization, the reference emitter, and the eventual GPUI emitter. An explicit pixel width in the design can remain a length. Space distributed by a flex parent should remain a rule. An absent intrinsic width should reach the backend as an unconstrained dimension.
-
-The GPUI emitter should consume Scene IR through `TargetEmitter` and generate readable Rust. Pin a GPUI revision when the first emitter lands and compile output against it. Keep source-level losses distinct from target capability gaps. A dropped CSS value upstream is invisible to an emitter that only sees the scene.
 
 ## Verify what users see
 
