@@ -23,7 +23,7 @@ export async function prepareCorner(snapshot, out, width, height) {
             '--planar-preview', width, height, overrides,
             JSON.stringify({ root: 'content', label_scope: scope, rgba: join(out, rgba) }),
         );
-        const labels = controls.labels.map(label => ({ ...label, caption: caption(label) }));
+        const labels = routeLabels(controls.labels);
         const state = { name, scope, prefix, rgba, selection: controls.selection, labels,
             planes, losses, overrides: [...overrides] };
         if (choose) {
@@ -34,10 +34,19 @@ export async function prepareCorner(snapshot, out, width, height) {
         }
         states.push(state);
     }
-    const bundle = join(out, `${width}x${height}-route.json`);
+    const bundle = await writeRouteBundle(out, width, height, states);
+    return { states, bundle };
+}
+
+export async function writeRouteBundle(out, width, height, states, name = 'route') {
+    const bundle = join(out, `${width}x${height}-${name}.json`);
     await writeFile(bundle, JSON.stringify({ width, height, states: states.map(({ rgba, selection, labels }) =>
         ({ rgba, selection, labels })) }, null, 2));
-    return { states, bundle };
+    return bundle;
+}
+
+export function routeLabels(labels) {
+    return labels.map(label => ({ ...label, caption: caption(label) }));
 }
 
 function hasClass(name) {

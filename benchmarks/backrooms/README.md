@@ -216,3 +216,61 @@ route_dir=$(mktemp -d)
 node benchmarks/backrooms/route.mjs "$route_dir"
 "$target_dir/debug/css-gpui-planar-preview" --route "$route_dir/390x844-route.json"
 ```
+
+## Start-to-finish route
+
+Use the same Playwright and GPUI setup as the corner replay.
+
+```sh
+node benchmarks/backrooms/full-route.mjs /path/to/playwright-install \
+  "$target_dir/debug/css-gpui-planar-preview"
+```
+
+The probe fetches the pinned document and discovers a route shared by both
+viewports with a breadth-first search over checked radio groups. It looks at explicit labels in
+the entry overlay, movement controls and scene. Chromium checks the foremost
+pointer target at sampled points on each label and its descendants. Each
+transition requires a hit in both viewports. The probe keeps authored high
+graphics and the default debug settings throughout. The search caps the
+candidate queue at 4,000 states and can take several minutes. The pinned run
+examined 2,153 states, found 2,183 candidates, and reached Finish in 45 clicks.
+
+The replay starts with a fresh authored document at each viewport. Every
+transition sends a real mouse click to an original label and verifies all
+checked radio groups. The Rust preview starts independently with its authored
+defaults, resolves the whole input at each subsequent radio selection, and
+checks that each browser navigation label has a matching cascade-resolved Rust
+control. GPUI replays the same target sequence from its separate control strip
+and verifies the entire X11 input trace and scene readback. Each GPUI scene is
+compared with the full-page Chromium frame, including overlays and the HUD.
+The benchmark reports per-frame RGB error and Rust paint losses.
+
+The shared route enters at click 1, switches to level two at click 17
+(`x-2`, `z-10`, `right1`), and activates the Finish door at click 45
+(`x-1`, `z-6`, `left3`). Each viewport passed 45 Chromium clicks and 45
+GPUI clicks. All 46 GPUI scene readbacks per viewport matched the Rust
+rasters byte for byte.
+
+The probe also edits the wall faces' background at the pose reached by
+click 17 and rebuilds the Rust scene with the changed stylesheet. Each
+edited X11 readback matched the new Rust raster byte for byte.
+
+| Viewport | Full-page RGB error range | Pixels changed by edit in Chromium | Pixels changed by edit in GPUI |
+| --- | ---: | ---: | ---: |
+| 390 × 844 | 39.30–52.34 | 43.5% | 43.6% |
+| 1440 × 900 | 37.29–53.29 | 70.7% | 77.4% |
+
+The RGB column gives the range of per-frame mean absolute channel error on
+a 0–255 scale. The edit counts pixels with a channel change of at least 8.
+
+The optional final argument retains local browser and GPUI captures, compiled
+RGBA frames, the GPUI bundle and comparison data. To open the compiled route,
+run the existing preview binary with `--route` and
+`390x844-full-route.json` or `1440x900-full-route.json` from that directory.
+The GPUI host reads the precompiled bundle and images on startup. The probe
+serves the downloaded document to Chromium from memory and blocks external
+requests. The settled comparison disables authored scripts, audio and
+animation. The finish
+radio is checked by the original door label. The animated ending, checkbox
+top view, authored overlays and HUD layout, and full lighting and depth
+parity remain outside this bounded preview.

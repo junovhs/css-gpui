@@ -48,17 +48,21 @@ export async function withBackrooms(probe) {
     await withBackroomsSource(async ({ html, directory, snapshot }) => {
         const browser = await chromium.launch();
         try {
-            const page = await browser.newPage();
-            await page.route('**/*', route => route.request().url() === url
-                ? route.fulfill({ body: html, contentType: 'text/html',
-                    headers: { 'Content-Security-Policy': "script-src 'none'" } })
-                : route.abort());
-            const reset = async (width, height) => {
-                await page.setViewportSize({ width, height });
-                await page.goto(url, { waitUntil: 'domcontentloaded' });
-                await page.addStyleTag({ content: '* { transition: none !important; animation: none !important; }' });
+            const newPage = async () => {
+                const page = await browser.newPage();
+                await page.route('**/*', route => route.request().url() === url
+                    ? route.fulfill({ body: html, contentType: 'text/html',
+                        headers: { 'Content-Security-Policy': "script-src 'none'" } })
+                    : route.abort());
+                return page;
             };
-            await probe({ page, snapshot, reset, directory });
+            const page = await newPage();
+            const reset = async (width, height, target = page) => {
+                await target.setViewportSize({ width, height });
+                await target.goto(url, { waitUntil: 'domcontentloaded' });
+                await target.addStyleTag({ content: '* { transition: none !important; animation: none !important; }' });
+            };
+            await probe({ page, newPage, snapshot, reset, directory });
         } finally {
             await browser.close();
         }

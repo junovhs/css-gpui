@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { viewports, withBackrooms } from './probe.mjs';
 import { prepareCorner } from './route.mjs';
+import { compare, readPixels } from './pixels.mjs';
 
 const executable = process.argv[3] && resolve(process.argv[3]);
 assert(executable, 'Pass the css-gpui-planar-preview binary as the second argument');
@@ -218,31 +219,6 @@ async function readNative(rgba, native, width, height) {
     const actual = readPixels(native, width, height);
     assert(actual.equals(expected), `${native}: GPUI readback differs from the Rust frame`);
     return actual;
-}
-
-function readPixels(path, width, height) {
-    const dimensions = execFileSync('identify', ['-format', '%w %h', path], { encoding: 'utf8' });
-    assert.equal(dimensions, `${width} ${height}`, path);
-    return execFileSync('convert', [path, '-alpha', 'on', '-depth', '8', 'rgba:-'], {
-        maxBuffer: width * height * 4 + 1024,
-    });
-}
-
-function compare(native, chromium) {
-    let error = 0;
-    let changed = 0;
-    for (let offset = 0; offset < native.length; offset += 4) {
-        const r = Math.abs(native[offset] - chromium[offset]);
-        const g = Math.abs(native[offset + 1] - chromium[offset + 1]);
-        const b = Math.abs(native[offset + 2] - chromium[offset + 2]);
-        error += r + g + b;
-        changed += Math.max(r, g, b) >= 8;
-    }
-    const pixels = native.length / 4;
-    return {
-        meanAbsoluteRgbError: error / (pixels * 3),
-        changedFraction: changed / pixels,
-    };
 }
 
 function compareCoverage(native, chromium) {
