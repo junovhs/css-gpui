@@ -22,7 +22,7 @@ use interaction::{
     Interaction, StateSelector, StateValueLoss, has_element_children, paint_difference,
     state_value_loss, supports_state_property,
 };
-use selector::{Selector, Specificity};
+use selector::{CheckedSnapshot, Selector, Specificity};
 use std::collections::{BTreeMap, BTreeSet};
 use values::{LengthContext, Variables, cascade_variables, substitute_variables};
 
@@ -48,12 +48,15 @@ pub struct ResolvedScene {
 pub enum ResolverError {
     /// The scene has no HTML nodes at all (empty source graph).
     EmptyGraph,
+    /// A supplied node ID does not identify a supported radio in this graph.
+    UnsupportedRadio(usize),
 }
 
 impl std::fmt::Display for ResolverError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::EmptyGraph => write!(f, "scene source graph contains no HTML nodes"),
+            Self::UnsupportedRadio(id) => write!(f, "node {id} is not a supported radio"),
         }
     }
 }
@@ -68,7 +71,7 @@ impl std::error::Error for ResolverError {}
 /// 3. Apply declarations in order; shorthands are expanded in place.
 /// 4. Propagate inheritable properties from parent elements.
 pub fn resolve_scene(graph: &SceneSourceGraph) -> Result<ResolvedScene, ResolverError> {
-    resolve(graph, None, &mut BTreeSet::new())
+    resolve(graph, None, None, &mut BTreeSet::new())
 }
 
 /// Resolve small viewport and viewport units using logical CSS pixels.
@@ -77,7 +80,29 @@ pub fn resolve_scene_at_viewport(
     width: f32,
     height: f32,
 ) -> Result<ResolvedScene, ResolverError> {
-    resolve(graph, Some((width, height)), &mut BTreeSet::new())
+    resolve(graph, Some((width, height)), None, &mut BTreeSet::new())
+}
+
+/// Resolve a fixed radio-selection snapshot for a source graph at this viewport.
+///
+/// Each supplied node ID selects that supported radio and replaces its group's
+/// authored selection. IDs are applied in order. Groups without an override
+/// retain their authored selection. An empty slice resolves the authored state.
+/// This snapshot supports relational selectors and uses supported radios as
+/// the source of `:checked`. The returned styles can be inspected or used by a
+/// caller that owns input and rendering for successive snapshots.
+pub fn resolve_scene_with_radio_selection(
+    graph: &SceneSourceGraph,
+    width: f32,
+    height: f32,
+    selected_radios: &[usize],
+) -> Result<ResolvedScene, ResolverError> {
+    resolve(
+        graph,
+        Some((width, height)),
+        Some(selected_radios),
+        &mut BTreeSet::new(),
+    )
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -91,13 +116,14 @@ pub(crate) fn state_value_losses(
     graph: &SceneSourceGraph,
 ) -> BTreeSet<(StateDeclaration, StateValueLoss)> {
     let mut losses = BTreeSet::new();
-    let _ = resolve(graph, None, &mut losses);
+    let _ = resolve(graph, None, None, &mut losses);
     losses
 }
 
 fn resolve(
     graph: &SceneSourceGraph,
     viewport: Option<(f32, f32)>,
+    selected_radios: Option<&[usize]>,
     losses: &mut BTreeSet<(StateDeclaration, StateValueLoss)>,
 ) -> Result<ResolvedScene, ResolverError> {
     if graph.html_nodes.is_empty() {
@@ -112,7 +138,24 @@ fn resolve(
     let mut root_font_size = 16.0;
 
     let radios = RadioMarkup::new(&graph.html_nodes);
-    let rules = parse_rules(graph, None);
+    let snapshot = if let Some(overrides) = selected_radios {
+        let mut selection = radios.initial.clone();
+        for &id in overrides {
+            let &name = radios
+                .radios
+                .get(&id)
+                .ok_or(ResolverError::UnsupportedRadio(id))?;
+            selection.insert(name, id);
+        }
+        Some(CheckedSnapshot::new(
+            &graph.html_nodes,
+            selection.into_values().collect(),
+        ))
+    } else {
+        None
+    };
+    let snapshot = snapshot.as_ref();
+    let rules = parse_rules(graph, None, snapshot.is_some());
     let state_rules: Vec<_> = graph
         .css_rules
         .iter()
@@ -121,14 +164,24 @@ fn resolve(
                 .selectors
                 .iter()
                 .enumerate()
-                .filter_map(|(index, text)| Some((index, StateSelector::parse(text)?)))
+                .filter_map(|(index, text)| {
+                    let selector = StateSelector::parse(text)?;
+                    (snapshot.is_none() || selector.state != Interaction::Checked)
+                        .then_some((index, selector))
+                })
                 .collect();
             (!selectors.is_empty()).then_some((rule, selectors))
         })
         .collect();
     let decoration_rules = [
-        ("before", parse_rules(graph, Some("::before"))),
-        ("after", parse_rules(graph, Some("::after"))),
+        (
+            "before",
+            parse_rules(graph, Some("before"), snapshot.is_some()),
+        ),
+        (
+            "after",
+            parse_rules(graph, Some("after"), snapshot.is_some()),
+        ),
     ];
 
     for node in &graph.html_nodes {
@@ -146,7 +199,7 @@ fn resolve(
             percent: None,
         };
         let inherited = parent.map_or(&initial_variables, |(_, variables)| variables);
-        let matches = matching_rules(node, &graph.html_nodes, &rules);
+        let matches = matching_rules(node, &graph.html_nodes, &rules, snapshot);
         let radio = radios.radios.contains_key(&node.id);
         let (mut style, variables) =
             cascade(matches.clone(), inherited, lengths, radio, |_, _, _| true);
@@ -218,15 +271,12 @@ fn resolve(
             }
         }
         for (name, rules) in &decoration_rules {
-            if !rules.iter().any(|(_, selectors)| {
-                selectors
-                    .iter()
-                    .any(|selector| selector.matches(node, &graph.html_nodes))
-            }) {
+            let matches = matching_rules(node, &graph.html_nodes, rules, snapshot);
+            if matches.is_empty() {
                 continue;
             }
             let (decoration, _) = cascade(
-                matching_rules(node, &graph.html_nodes, rules),
+                matches,
                 &variables,
                 LengthContext {
                     em: style.font_size.unwrap_or(lengths.em),
@@ -286,7 +336,8 @@ fn resolve(
 
 fn parse_rules<'a>(
     graph: &'a SceneSourceGraph,
-    suffix: Option<&str>,
+    pseudo_element: Option<&str>,
+    snapshot: bool,
 ) -> Vec<(&'a crate::CssRule, Vec<Selector<'a>>)> {
     graph
         .css_rules
@@ -296,11 +347,20 @@ fn parse_rules<'a>(
                 .selectors
                 .iter()
                 .filter_map(|text| {
-                    let origin = match suffix {
-                        Some(suffix) => text.strip_suffix(suffix)?,
+                    let origin = match pseudo_element {
+                        Some(pseudo_element) => {
+                            let origin = text.strip_suffix(pseudo_element)?;
+                            origin
+                                .strip_suffix("::")
+                                .or_else(|| snapshot.then(|| origin.strip_suffix(":")).flatten())?
+                        }
                         None => text,
                     };
-                    Selector::parse(origin)
+                    if snapshot {
+                        Selector::parse_snapshot(origin)
+                    } else {
+                        Selector::parse(origin)
+                    }
                 })
                 .collect();
             (!selectors.is_empty()).then_some((rule, selectors))
@@ -314,13 +374,14 @@ fn matching_rules<'a>(
     node: &HtmlNode,
     nodes: &[HtmlNode],
     rules: &[(&'a CssRule, Vec<Selector<'_>>)],
+    snapshot: Option<&CheckedSnapshot>,
 ) -> Vec<MatchedRule<'a>> {
     rules
         .iter()
         .filter_map(|(rule, selectors)| {
             let specificity = selectors
                 .iter()
-                .filter(|selector| selector.matches(node, nodes))
+                .filter(|selector| selector.matches_in(node, nodes, snapshot))
                 .map(Selector::specificity)
                 .max()?;
             Some((specificity, *rule, None))

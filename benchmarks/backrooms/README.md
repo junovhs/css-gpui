@@ -33,3 +33,39 @@ The runner checks both fingerprints, puts the full response in a temporary direc
 | --- | ---: | --- |
 | Browser-served HTML | 488,650 | `373084e9cf19f2a62b072eed146a687d2879eac74fa1374b0b3ef865836e1c49` |
 | Inline CSS, including surrounding whitespace | 462,883 | `4b51d48812b2482e70e43501ff00811cd92b2a562e7b8bd7c0e839b98c072354` |
+
+## Radio-selection snapshots
+
+Run the differential snapshot probe with Node.js, curl, the Rust toolchain and
+a local Playwright 1.60.0 installation with Chromium installed.
+
+```sh
+node benchmarks/backrooms/snapshot.mjs /path/to/playwright-install
+```
+
+The probe downloads the same pinned HTML to a temporary directory and compares
+`inspect --radio-snapshot` with Chromium at both viewports. It feeds the
+whole document to each implementation. The browser probe blocks the Pen's
+scripts and external resources, disables animation and transitions, and sets
+the checked property on the original inputs. It compares resting CSS values
+directly. For camera samples, it converts the resolver's authored `rem`
+translations and `rotateY` angle to the units returned by Chromium.
+
+| Radio selection | Menu offset X | Walk offset Z | Turn | Movement label targets | Background | Level-two label |
+| --- | ---: | ---: | ---: | --- | --- | --- |
+| Authored defaults | 480 px | −408 px | 0° | z-8, left1, z-10, right1 | `#6f6d39` | block |
+| Enter | 0 px | −408 px | 0° | z-8, left1, z-10, right1 | `#6f6d39` | block |
+| Walk to z-8 | 0 px | −360 px | 0° | z-7, left1, z-9, right1 | `#6f6d39` | block |
+| Turn right | 0 px | −360 px | 90° | x-6, left4, x-8, right2 | `#6f6d39` | block |
+| Select level two | 0 px | −360 px | 90° | x-6, left4, x-8, right2 | `#6f3939` | none |
+
+All ten comparisons passed, including the ordered movement-label classes and
+targets, the start overlay changing from static to absolute when entering, and
+the level-two label's legacy `:before` content. The pinned CSS
+contains 10,622 flat `:has()` calls. Each includes `:checked`. The
+snapshot exercises checked sibling selectors, compound and negated
+`:has()`, and a grouped override that replaces the authored default.
+Snapshot results establish cascade parity for these samples. Native label
+activation, media-dependent sizing, full 3D projection and frame comparison
+for Backrooms remain open. Strict generation continues to report unsupported
+live relational state.
