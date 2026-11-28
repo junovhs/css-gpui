@@ -16,6 +16,12 @@ pub fn build_css(nodes: &[IrNode]) -> String {
         if let Some(ControlKind::Radio(radio)) = node.control_kind.as_ref() {
             rules.extend(emit_state_rule(node, ":checked", &radio.checked_paint));
         }
+        if let Some(background) = node.paint.radio_background.as_ref() {
+            rules.push(format!(
+                ".{}:has(#{}:checked) {{\n  background-color: {};\n}}",
+                node.id, background.radio, background.color.0
+            ));
+        }
         if let Some(interaction) = node.paint.interaction.as_ref() {
             rules.extend(emit_state_rule(node, ":hover", &interaction.hover));
             rules.extend(emit_state_rule(node, ":focus", &interaction.focus));

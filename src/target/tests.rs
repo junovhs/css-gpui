@@ -73,6 +73,7 @@ fn sample_scene() -> SceneIr {
             placement: Default::default(),
             decorations: Vec::new(),
             interaction: None,
+            radio_background: None,
             background_color: Some(Color("#ffffff".to_string())),
             border: Some(Border {
                 width: 1.0,
@@ -97,6 +98,7 @@ fn sample_scene() -> SceneIr {
             placement: Default::default(),
             decorations: Vec::new(),
             interaction: None,
+            radio_background: None,
             background_color: None,
             border: None,
             border_radius: None,
@@ -129,6 +131,7 @@ fn sample_scene() -> SceneIr {
             placement: Default::default(),
             decorations: Vec::new(),
             interaction: None,
+            radio_background: None,
             background_color: Some(Color("#2563eb".to_string())),
             border: None,
             border_radius: None,

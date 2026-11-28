@@ -108,6 +108,14 @@ impl InteractionPaint {
     }
 }
 
+/// A background override while the referenced descendant radio is selected.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RadioBackground {
+    /// The descendant radio's Scene IR node ID.
+    pub radio: String,
+    pub color: Color,
+}
+
 /// Resolved paint properties for an [`super::IrNode`].
 ///
 /// The resting text color lives in [`super::Typography`]. Interaction paint
@@ -134,4 +142,6 @@ pub struct Paint {
     pub decorations: Vec<Decoration>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interaction: Option<InteractionPaint>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub radio_background: Option<RadioBackground>,
 }

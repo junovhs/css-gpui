@@ -8,13 +8,16 @@ import { join, resolve } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const [playwright, output] = process.argv.slice(2).map(path => resolve(path));
+const [playwright, output] = process.argv.slice(2, 4).map(path => resolve(path));
+const fixtureName = process.argv[4] ?? 'theme-radio';
+assert(['theme-radio', 'radio-ancestor'].includes(fixtureName), 'Unknown radio fixture');
+const checkAncestor = fixtureName === 'radio-ancestor';
 assert(playwright && output, 'Pass the Playwright installation directory and a new output directory');
 const require = createRequire(join(playwright, 'package.json'));
 assert.equal(require('playwright/package.json').version, '1.60.0');
 const { chromium } = require('playwright');
 const root = fileURLToPath(new URL('../../', import.meta.url));
-const fixture = join(root, 'benchmarks/css-compat/probes/theme-radio');
+const fixture = join(root, 'benchmarks/css-compat/probes', fixtureName);
 const html = join(fixture, 'index.html');
 const css = join(fixture, 'style.css');
 const host = join(root, 'benchmarks/css-compat/native/Cargo.toml');
@@ -63,11 +66,14 @@ import sys
 
 image = Image.open(sys.argv[1]).convert("RGB")
 assert image.size == (320, 180), image.size
-print(json.dumps([
+samples = [
     ["#%02x%02x%02x" % image.getpixel((x, y)) for x in (36, 25)]
     for y in (42, 90)
-]))
-`, path]));
+]
+if sys.argv[2] == "true":
+    samples.append(["#%02x%02x%02x" % image.getpixel(point) for point in ((260, 130), (200, 110))])
+print(json.dumps(samples))
+`, path, String(checkAncestor)]));
 
 const chromiumStates = [];
 const browser = await chromium.launch();
@@ -124,7 +130,10 @@ const results = steps.map(({ state, selected }, index) => ({
     state,
     expected: {
         checked: [selected],
-        paint: options.map(option => colors[option === selected ? option : 'off']),
+        paint: [
+            ...options.map(option => colors[option === selected ? option : 'off']),
+            ...(checkAncestor ? [[selected === 'dark' ? '#2f4a66' : '#f5f7fa', '#d2e4f2']] : []),
+        ],
     },
     chromium: chromiumStates[index],
     native: nativeStates[index],

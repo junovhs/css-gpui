@@ -79,6 +79,7 @@ pub fn to_paint(style: &ComputedStyle) -> Paint {
         },
         decorations: style.decorations.clone(),
         interaction,
+        radio_background: None,
     }
 }
 
@@ -269,6 +270,7 @@ pub fn to_paint_default() -> Paint {
         placement: Default::default(),
         decorations: Vec::new(),
         interaction: None,
+        radio_background: None,
     }
 }
 

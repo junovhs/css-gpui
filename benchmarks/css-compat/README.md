@@ -122,7 +122,7 @@ VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a \
 
 The original Light/Dark fixture exercises named HTML radios styled with `appearance: none`. Strict generation carries each option's name, initial checkedness, local checked paint, and explicit label target through Scene IR v7. An empty group stays empty until selection. If several options have the boolean `checked` attribute, the last in document order starts selected.
 
-The supported subset covers enabled, document-owned radio inputs with literal nonempty names, unique IDs for explicit `label for` bindings, and solid background, existing border, and foreground colors on the option itself. Direct and label clicks select a single option in the named group. The selection also follows Space and arrow navigation on a focused option. Native tab order uses the first option when the group starts empty. Author the options and labels in the compiler’s block, flex, or grid layout subset. Native output has GPUI focus and selection, with browser-default widget chrome, browser focus rings, accessibility mapping, and browser form submission, validation, and events outside the subset. Strict generation reports form ownership, disabled or unnamed radios, unsupported label bindings, layout changes in `:checked`, checked selectors with combinators or relational propagation, and hover/focus selectors on radios.
+The supported subset covers enabled, document-owned radio inputs with literal nonempty names, unique IDs for explicit `label for` bindings, and solid background, existing border, and foreground colors on the option itself. Direct and label clicks select a single option in the named group. The selection also follows Space and arrow navigation on a focused option. Native tab order uses the first option when the group starts empty. Author the options and labels in the compiler’s block, flex, or grid layout subset. Native output has GPUI focus and selection, with browser-default widget chrome, browser focus rings, accessibility mapping, and browser form submission, validation, and events outside the subset. Strict generation reports form ownership, disabled or unnamed radios, unsupported label bindings, layout changes in `:checked`, unsupported checked selector shapes, and hover/focus selectors on radios.
 
 The probe captures initial Light, clicking the Dark label, clicking the Light label, and moving both directions with the arrow keys. Chromium checks actual DOM checkedness. The native probe identifies the selected option from distinct fill and border pixels on both controls. It verifies both colors and one selected option on every capture, without comparing text rasterization or focus rings.
 
@@ -132,6 +132,20 @@ VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a \
   --server-args='-screen 0 1600x1200x24' \
   node benchmarks/css-compat/radio-probe.mjs /path/to/playwright-install "$scratch/radio"
 ```
+
+### Ancestor radio background
+
+A standalone selector such as `.panel:has(#dark:checked)` can change the matching
+ancestor box’s `background-color` to a literal hex color, black, white, or transparent.
+Scene IR v10 stores the resolved checked color and the target radio’s node ID.
+The regular cascade still applies when checked, including selector specificity,
+source order, and `!important`. Each painted box can depend on one radio. Strict
+generation reports unsupported selector shapes, competing state on the same box,
+layered backgrounds, and changes to other properties.
+
+Use a fresh output directory and append `radio-ancestor` to the radio probe
+command above. The probe also samples the ancestor that changes and a
+nested ancestor whose higher-precedence static background wins throughout.
 
 ## Holdout and refresh
 

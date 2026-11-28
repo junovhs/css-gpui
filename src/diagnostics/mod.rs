@@ -18,6 +18,7 @@ use crate::resolver::{
         Interaction, StateSelector, StateValueLoss, has_element_children, is_state_color,
         supports_state_property, unsupported_focus_order,
     },
+    relational::{self, Reason},
     selector::Selector,
     state_value_losses,
     values::parse_aspect_ratio,
@@ -61,20 +62,94 @@ pub struct Diagnostic {
 
 /// Analyze `graph` for unsupported CSS constructs.
 pub fn analyze(graph: &SceneSourceGraph) -> Vec<Diagnostic> {
-    if graph.css_rules.iter().any(|rule| {
-        rule.declarations
-            .iter()
-            .any(|decl| decl.property == "aspect-ratio" || inset::is_new_property(&decl.property))
-    }) && let Ok(resolved) = crate::resolver::resolve_scene(graph)
+    if (relational::has_shape(graph)
+        || graph.css_rules.iter().any(|rule| {
+            rule.declarations.iter().any(|decl| {
+                decl.property == "aspect-ratio" || inset::is_new_property(&decl.property)
+            })
+        }))
+        && let Ok(resolved) = crate::resolver::resolve_scene(graph)
     {
         return analyze_resolved(graph, &resolved);
     }
-    analyze_rules(graph)
+    analyze_rules(graph, false)
 }
 
 /// Analyze source rules and layout-dependent diagnostics for the resolved viewport.
 pub fn analyze_resolved(graph: &SceneSourceGraph, resolved: &ResolvedScene) -> Vec<Diagnostic> {
-    let mut out = analyze_rules(graph);
+    // A fixed checked snapshot omits live paint. Source diagnostics still need
+    // to check whether the ordinary generated scene can represent the rule.
+    let live;
+    let relational_losses =
+        if resolved.relational_paint_losses.is_none() && relational::has_shape(graph) {
+            live = crate::resolver::resolve_scene(graph).ok();
+            live.as_ref()
+                .and_then(|scene| scene.relational_paint_losses.as_deref())
+        } else {
+            resolved.relational_paint_losses.as_deref()
+        };
+    let mut out = analyze_rules(graph, relational_losses.is_some());
+    out.extend(relational_losses.unwrap_or_default().iter().map(|loss| {
+        let rule = &graph.css_rules[loss.rule];
+        let declaration = loss.declaration.map(|id| &rule.declarations[id]);
+        let (kind, message) = match loss.reason {
+            Reason::SelectorList => (
+                DiagnosticKind::UnsupportedSelector,
+                "an ancestor radio background requires a standalone selector",
+            ),
+            Reason::MissingRadio => (
+                DiagnosticKind::UnsupportedSelector,
+                "checked descendant must resolve to a supported named radio with a unique ID",
+            ),
+            Reason::MissingAncestor => (
+                DiagnosticKind::UnsupportedSelector,
+                "the named radio is outside the matching ancestor",
+            ),
+            Reason::UnsupportedBox => (
+                DiagnosticKind::UnsupportedSelector,
+                "an ancestor radio background requires a generated box",
+            ),
+            Reason::InlineStyle => (
+                DiagnosticKind::UnsupportedSelector,
+                "inline styles in the radio group or its ancestors are unsupported",
+            ),
+            Reason::Property => (
+                DiagnosticKind::UnsupportedProperty,
+                "an ancestor radio rule can only change background-color",
+            ),
+            Reason::Color => (
+                DiagnosticKind::UnsupportedValue,
+                "an ancestor radio background requires a literal hex color, black, white, or transparent",
+            ),
+            Reason::CompetingRadio => (
+                DiagnosticKind::UnsupportedSelector,
+                "an ancestor background can depend on only one checked radio",
+            ),
+            Reason::CompetingInteraction => (
+                DiagnosticKind::UnsupportedSelector,
+                "an ancestor radio background cannot combine with hover or focus on the same box",
+            ),
+            Reason::RestingBackground => (
+                DiagnosticKind::UnsupportedValue,
+                "an ancestor radio background requires a solid or transparent resting background",
+            ),
+            Reason::InheritedBackground => (
+                DiagnosticKind::UnsupportedValue,
+                "a child cannot inherit an ancestor radio background or have inline styles",
+            ),
+        };
+        Diagnostic {
+            kind,
+            message: declaration.map_or_else(
+                || message.to_owned(),
+                |declaration| format!("{}: {message}", declaration.property),
+            ),
+            rule_id: rule.id,
+            selector: Some(rule.selectors[loss.selector].clone()),
+            property: declaration.map(|declaration| declaration.property.clone()),
+            value: declaration.map(|declaration| declaration.value.clone()),
+        }
+    }));
     let mut reported = std::collections::BTreeSet::new();
     let ratios = resolved.nodes.iter().filter_map(|node| {
         let style = &node.style.used_box_style;
@@ -101,12 +176,12 @@ pub fn analyze_resolved(graph: &SceneSourceGraph, resolved: &ResolvedScene) -> V
     out
 }
 
-fn analyze_rules(graph: &SceneSourceGraph) -> Vec<Diagnostic> {
+fn analyze_rules(graph: &SceneSourceGraph, relational_checked: bool) -> Vec<Diagnostic> {
     let mut out: Vec<Diagnostic> = Vec::new();
     let mut has_state_rules = false;
     let radios = RadioMarkup::new(&graph.html_nodes);
     for rule in &graph.css_rules {
-        has_state_rules |= analyze_rule(rule, graph, &radios, &mut out);
+        has_state_rules |= analyze_rule(rule, graph, &radios, relational_checked, &mut out);
     }
     if has_state_rules {
         for (source, loss) in state_value_losses(graph) {
@@ -215,12 +290,16 @@ fn analyze_rule(
     rule: &CssRule,
     graph: &SceneSourceGraph,
     radios: &RadioMarkup<'_>,
+    relational_checked: bool,
     out: &mut Vec<Diagnostic>,
 ) -> bool {
     let mut has_state = false;
     let mut has_other_selector = false;
     let mut has_static_selector = false;
     for selector in &rule.selectors {
+        if relational_checked && relational::supports_shape(selector) {
+            continue;
+        }
         if let Some(state) = StateSelector::parse(selector) {
             has_state = true;
             analyze_state_selector(rule, selector, &state, &graph.html_nodes, radios, out);

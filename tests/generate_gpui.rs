@@ -335,6 +335,172 @@ fn radio_groups_and_labels_survive_scene_json_and_reference_html() {
 }
 
 #[test]
+fn strict_generation_resolves_ancestor_radio_background_through_the_cascade() {
+    use css_gpui::ir::SceneIr;
+
+    let directory =
+        std::env::temp_dir().join(format!("css-gpui-radio-background-{}", std::process::id()));
+    fs::create_dir_all(&directory).unwrap();
+    let html = directory.join("ancestor.html");
+    let css = directory.join("ancestor.css");
+    fs::write(
+        &html,
+        "<main id='main' class='panel'>
+            <section id='locked' class='panel'>
+                <input type='radio' name='theme' id='light'>
+                <div><input type='radio' name='theme' id='dark' checked></div>
+            </section>
+        </main>",
+    )
+    .unwrap();
+    fs::write(
+        &css,
+        "input { appearance: none; }
+         .panel { background: #223344; }
+         .panel:has(#dark:checked) { background-color: #123456; }
+         .panel:has(#dark:checked) { background-color: #334455 !important; }
+         #main.panel { background-color: #556677; }
+         .panel:has(#dark:checked) { background-color: #789abc; }
+         #locked { background-color: #aabbcc !important; }",
+    )
+    .unwrap();
+
+    let direct = run_example("generate_gpui", &[], &html, &css);
+    assert!(
+        direct.status.success(),
+        "{}",
+        String::from_utf8_lossy(&direct.stderr)
+    );
+    assert!(direct.stderr.is_empty());
+    let inspected = run_example("inspect", &[], &html, &css);
+    assert!(inspected.status.success());
+    let scene = SceneIr::from_json(std::str::from_utf8(&inspected.stdout).unwrap()).unwrap();
+    assert_eq!(scene.schema_version, 10);
+    let main = &scene.nodes[0];
+    let locked = &scene.nodes[1];
+    let state = main.paint.radio_background.as_ref().unwrap();
+    assert_eq!(main.paint.background_color.as_ref().unwrap().0, "#556677");
+    assert_eq!(state.color.0, "#334455");
+    let radio = scene
+        .nodes
+        .iter()
+        .find(|node| node.id == state.radio)
+        .unwrap();
+    assert!(matches!(
+        &radio.control_kind,
+        Some(css_gpui::ir::ControlKind::Radio(radio)) if radio.checked
+    ));
+    assert_eq!(locked.paint.background_color.as_ref().unwrap().0, "#aabbcc");
+    // Both important declarations compete here. The relational selector has
+    // higher specificity, even though the static declaration follows it.
+    assert_eq!(
+        locked.paint.radio_background.as_ref().unwrap().color.0,
+        "#334455"
+    );
+
+    let graph = css_gpui::SceneSourceGraph::from_strings(
+        "ancestor",
+        &fs::read_to_string(&html).unwrap(),
+        &fs::read_to_string(&css).unwrap(),
+    )
+    .unwrap();
+    let authored =
+        css_gpui::resolver::resolve_scene_with_radio_selection(&graph, 320.0, 180.0, &[]).unwrap();
+    let html_main = authored
+        .nodes
+        .iter()
+        .find(|node| node.node.name.as_deref() == Some("main"))
+        .unwrap();
+    assert_eq!(
+        html_main.style.background_color.as_ref(),
+        Some(&state.color.0)
+    );
+
+    let serialized = directory.join("scene.json");
+    fs::write(&serialized, &inspected.stdout).unwrap();
+    let replayed = run_example("generate_gpui", &[], Path::new("--scene-json"), &serialized);
+    fs::remove_dir_all(&directory).unwrap();
+    assert!(replayed.status.success());
+    assert_eq!(direct.stdout, replayed.stdout);
+    let reference = css_gpui::emitter::emit(&scene);
+    assert!(reference.css.contains(&format!(
+        ".{}:has(#{}:checked) {{\n  background-color: #334455;",
+        main.id, radio.id,
+    )));
+}
+
+#[test]
+fn strict_generation_rejects_ancestor_radio_background_losses() {
+    let directory = std::env::temp_dir().join(format!(
+        "css-gpui-radio-background-loss-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&directory).unwrap();
+    let html = directory.join("ancestor.html");
+    let css = directory.join("ancestor.css");
+    fs::write(
+        &html,
+        "<body><input type='radio' id='outside' name='theme'>
+         <main class='layer'>
+          <div class='multi'><div class='hover'><div class='inherited'><section class='panel'>
+            <input type='radio' id='dark' name='theme'>
+            <input type='radio' id='other' name='other'>
+          </section></div></div></div>
+         </main></body>",
+    )
+    .unwrap();
+    fs::write(
+        &css,
+        "input { appearance: none; }
+.panel:has(#dark:checked) { width: 45px; }
+.panel:has(#missing:checked) { background-color: #123456; }
+.panel:has(#outside:checked) { background-color: #123456; }
+body:has(#dark:checked) { background-color: #123456; }
+.panel:has(> #dark:checked) { background-color: #123456; }
+.panel:has(#dark:checked) > input { background-color: #123456; }
+.panel:has(#dark:checked), .panel { background-color: #123456; }
+.panel:has(#dark:checked) { background-color: var(--theme); }
+.multi:has(#dark:checked) { background-color: #123456; }
+.multi:has(#other:checked) { background-color: #abcdef; }
+.hover:has(#dark:checked) { background-color: #123456; }
+.hover:hover { background-color: #abcdef; }
+.layer:has(#dark:checked) { background-color: #123456; }
+.layer { background-image: url(texture.png); }
+.inherited:has(#dark:checked) { background-color: #123456; }
+.inherited > .panel { background-color: inherit; }",
+    )
+    .unwrap();
+    let strict = run_example("generate_gpui", &[], &html, &css);
+    fs::remove_dir_all(&directory).unwrap();
+    assert!(!strict.status.success());
+    assert!(strict.stdout.is_empty());
+    let stderr = String::from_utf8_lossy(&strict.stderr);
+    for (line, message) in [
+        (2, "can only change background-color"),
+        (3, "supported named radio"),
+        (4, "outside the matching ancestor"),
+        (5, "requires a generated box"),
+        (6, "outside the static selector subset"),
+        (7, "outside the static selector subset"),
+        (8, "requires a standalone selector"),
+        (9, "requires a literal hex color"),
+        (10, "only one checked radio"),
+        (11, "only one checked radio"),
+        (12, "cannot combine with hover or focus"),
+        (14, "requires a solid or transparent resting background"),
+        (16, "a child cannot inherit an ancestor radio background"),
+    ] {
+        let location = format!("{}:{line}:", css.display());
+        assert!(
+            stderr
+                .lines()
+                .any(|error| error.starts_with(&location) && error.contains(message)),
+            "{location} {message}\n{stderr}"
+        );
+    }
+}
+
+#[test]
 fn strict_generation_reports_unsupported_radio_markup_and_checked_selectors() {
     let directory =
         std::env::temp_dir().join(format!("css-gpui-radio-losses-{}", std::process::id()));

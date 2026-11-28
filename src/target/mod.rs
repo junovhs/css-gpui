@@ -191,6 +191,13 @@ fn node_capabilities(node: &IrNode) -> BTreeSet<Capability> {
     if node.paint.interaction.is_some() {
         caps.insert(Capability::InteractionPaint);
     }
+    if node.paint.radio_background.is_some() {
+        caps.extend([
+            Capability::InteractionPaint,
+            Capability::Background,
+            Capability::RadioControl,
+        ]);
+    }
     if let Some(LetterSpacing::Length { value }) = node.letter_spacing
         && value != 0.0
         && (node.text_content.is_some()
@@ -316,6 +323,9 @@ pub fn collect_resources(scene: &SceneIr) -> SceneResources {
         }
         if let Some(border) = &node.paint.border {
             colors.insert(border.color.0.clone());
+        }
+        if let Some(background) = &node.paint.radio_background {
+            colors.insert(background.color.0.clone());
         }
         if let Some(interaction) = &node.paint.interaction {
             if let Some(color) = &interaction.resting_text_color {

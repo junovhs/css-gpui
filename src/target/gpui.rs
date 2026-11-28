@@ -9,7 +9,7 @@ use crate::ir::{
 };
 
 use crate::ir::layout::ratio_border_size;
-use crate::ir::paint::{InteractionPaint, StatePaint};
+use crate::ir::paint::{InteractionPaint, RadioBackground, StatePaint};
 
 use super::{Capability, CapabilityGap, TargetCapabilities, TargetEmission, TargetEmitter};
 
@@ -108,9 +108,20 @@ fn emit_scene(
             )
             .unwrap();
         }
-        rust.push_str(
-            "        ],\n        render: move |radios: gpui::Entity<SceneRadioState>| {\n",
-        );
+        let app = if scene
+            .nodes
+            .iter()
+            .any(|node| radio_background(scene, node).is_some())
+        {
+            "cx"
+        } else {
+            "_cx"
+        };
+        writeln!(
+            rust,
+            "        ],\n        render: move |radios: gpui::Entity<SceneRadioState>, {app}: &gpui::App| {{"
+        )
+        .unwrap();
         12
     } else {
         4
@@ -173,6 +184,16 @@ fn emit_scene(
     }
 }
 
+fn radio_background<'a>(scene: &SceneIr, node: &'a IrNode) -> Option<&'a RadioBackground> {
+    let background = node.paint.radio_background.as_ref()?;
+    (node.kind == NodeKind::Box
+        && node.paint.interaction.is_none()
+        && scene.nodes.iter().any(|node| {
+            node.id == background.radio && matches!(node.control_kind, Some(ControlKind::Radio(_)))
+        }))
+    .then_some(background)
+}
+
 // A long builder chain stores each intermediate Div on the Windows debug
 // stack. Wide sibling lists build and erase each element in its own closure.
 fn emit_children(
@@ -217,6 +238,13 @@ fn emit_child(
     losses: &mut Vec<CapabilityGap>,
     array_item: bool,
 ) {
+    let checked_background = context
+        .standard_interactivity
+        .then(|| radio_background(context.scene, node))
+        .flatten();
+    if node.paint.radio_background.is_some() && checked_background.is_none() {
+        declare_loss(node, Capability::InteractionPaint, losses);
+    }
     let positioned_text = node.kind == NodeKind::Text
         && matches!(node.layout.position, Position::Absolute | Position::Fixed);
     if node.kind == NodeKind::Text
@@ -281,6 +309,21 @@ fn emit_child(
             "bg",
             Capability::Background,
             &mut method,
+            losses,
+        );
+    }
+    if let Some(background) = checked_background {
+        emit_color(
+            node,
+            &background.color,
+            "bg",
+            Capability::Background,
+            &mut |call| {
+                method(&format!(
+                    "when(radios.read(cx).is_checked({:?}), |element| element.{call})",
+                    background.radio,
+                ))
+            },
             losses,
         );
     }

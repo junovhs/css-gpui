@@ -30,6 +30,10 @@ impl SceneRadioState {
         self.options.iter().find(|option| option.id == id).unwrap()
     }
 
+    fn is_checked(&self, id: &str) -> bool {
+        self.selected.get(self.target(id).name).copied() == Some(id)
+    }
+
     fn select(
         &mut self,
         id: &'static str,
@@ -71,17 +75,17 @@ impl SceneRadioState {
 }
 
 #[derive(gpui::IntoElement)]
-struct SceneRadioScene<F: FnOnce(gpui::Entity<SceneRadioState>) -> SceneTabNavigation + 'static> {
+struct SceneRadioScene<F: FnOnce(gpui::Entity<SceneRadioState>, &gpui::App) -> SceneTabNavigation + 'static> {
     options: &'static [SceneRadioOption],
     render: F,
 }
 
-impl<F: FnOnce(gpui::Entity<SceneRadioState>) -> SceneTabNavigation + 'static> RenderOnce
+impl<F: FnOnce(gpui::Entity<SceneRadioState>, &gpui::App) -> SceneTabNavigation + 'static> RenderOnce
     for SceneRadioScene<F>
 {
     fn render(self, window: &mut gpui::Window, cx: &mut gpui::App) -> impl IntoElement {
         let state = window.use_state(cx, |_, cx| SceneRadioState::new(self.options, cx));
-        (self.render)(state)
+        (self.render)(state, cx)
     }
 }
 
@@ -107,7 +111,7 @@ impl RenderOnce for SceneRadio {
                 .find(|option| option.name == name)
                 .is_some_and(|option| option.id == self.id),
         };
-        if selection == Some(self.id) {
+        if state.is_checked(self.id) {
             let style = element.style();
             *style = (self.checked_paint)(std::mem::take(style));
         }

@@ -38,6 +38,7 @@ fn default_paint() -> Paint {
         placement: Default::default(),
         decorations: Vec::new(),
         interaction: None,
+        radio_background: None,
         background_color: None,
         border: None,
         border_radius: None,

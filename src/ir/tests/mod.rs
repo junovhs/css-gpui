@@ -36,6 +36,7 @@ pub(super) fn minimal_paint() -> Paint {
         placement: Default::default(),
         decorations: Vec::new(),
         interaction: None,
+        radio_background: None,
         background_color: None,
         border: None,
         border_radius: None,
@@ -62,6 +63,7 @@ pub(super) fn minimal_scene() -> SceneIr {
                 placement: Default::default(),
                 decorations: Vec::new(),
                 interaction: None,
+                radio_background: None,
                 background_color: Some(Color("#ffffff".to_string())),
                 ..minimal_paint()
             },

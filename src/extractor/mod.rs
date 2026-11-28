@@ -121,8 +121,28 @@ pub fn extract_ir(
         }
     }
 
+    for laid_out in &laid_out.nodes {
+        if let Some((radio, color)) = &laid_out.style.radio_background
+            && let (Some(id), Some(radio)) = (
+                html_to_ir_id.get(&laid_out.node.id),
+                html_to_ir_id.get(radio),
+            )
+            && let Some(node) = ir_nodes.iter_mut().find(|node| &node.id == id)
+        {
+            node.paint.radio_background = Some(crate::ir::paint::RadioBackground {
+                radio: radio.clone(),
+                color: color.clone(),
+            });
+        }
+    }
+
     Ok(SceneIr {
         schema_version: if ir_nodes
+            .iter()
+            .any(|node| node.paint.radio_background.is_some())
+        {
+            10
+        } else if ir_nodes
             .iter()
             .any(|node| node.layout.right.is_some() || node.layout.bottom.is_some())
         {

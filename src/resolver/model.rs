@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::ir::{
     FlexWrap, LetterSpacing, TextAlign,
-    paint::{Decoration, InteractionPaint, StatePaint},
+    paint::{Color, Decoration, InteractionPaint, StatePaint},
 };
 
 /// Cascaded physical sizing and positioning values for the bounded box layout.
@@ -88,6 +88,8 @@ pub struct ComputedStyle {
     pub decorations: Vec<Decoration>,
     pub interaction: Option<InteractionPaint>,
     pub checked_paint: StatePaint,
+    /// Source node ID and background while that radio is selected.
+    pub(crate) radio_background: Option<(usize, Color)>,
     pub appearance_none: bool,
 
     // --- Typography — inheritable ---
@@ -146,6 +148,7 @@ impl Default for ComputedStyle {
             decorations: Vec::new(),
             interaction: None,
             checked_paint: StatePaint::default(),
+            radio_background: None,
             appearance_none: false,
             color: None,
             font_family: None,

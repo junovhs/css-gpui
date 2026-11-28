@@ -20,6 +20,7 @@ fn elem(id: usize, name: &str) -> HtmlNode {
 fn scene_with(style: ComputedStyle) -> ResolvedScene {
     ResolvedScene {
         scene_id: "test".to_owned(),
+        relational_paint_losses: None,
         nodes: vec![ResolvedNode {
             node: elem(0, "div"),
             style,

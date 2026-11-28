@@ -12,6 +12,7 @@ pub(crate) mod cascade;
 pub(crate) mod inset;
 pub(crate) mod interaction;
 mod model;
+pub(crate) mod relational;
 mod rule_index;
 pub(crate) mod selector;
 pub(crate) mod values;
@@ -46,6 +47,7 @@ pub struct ResolvedNode {
 pub struct ResolvedScene {
     pub scene_id: String,
     pub nodes: Vec<ResolvedNode>,
+    pub(crate) relational_paint_losses: Option<Vec<relational::Loss>>,
 }
 
 /// Errors that can occur during style resolution.
@@ -217,6 +219,11 @@ fn resolve(
         .transpose()?;
     let snapshot = snapshot.as_ref();
     let rules = RuleIndex::parse(graph, None, snapshot.is_some());
+    let mut relational = if snapshot.is_none() {
+        relational::Rules::collect(graph, &radios)
+    } else {
+        relational::Rules::default()
+    };
     let state_rules: Vec<_> = graph
         .css_rules
         .iter()
@@ -268,6 +275,61 @@ fn resolve(
             apply_inheritance(&mut style, parent_style);
         } else if node.name.as_deref() == Some("html") {
             root_font_size = style.font_size.unwrap_or(16.0);
+        }
+        if let Some(sources) = relational.by_node.get(&node.id) {
+            use relational::Reason;
+            let competing = state_rules.iter().any(|(_, selectors)| {
+                selectors.iter().any(|(_, selector)| {
+                    selector.state != Interaction::Checked
+                        && selector.matches(node, &graph.html_nodes)
+                })
+            });
+            let unsupported_resting = style
+                .paint_effects
+                .keys()
+                .any(|property| property.starts_with("background"))
+                || resting_backgrounds(&matches, &variables).any(|(property, value)| {
+                    value.is_none_or(|value| !interaction::is_state_color(property, &value))
+                });
+            if let Some(reason) = if competing {
+                Some(Reason::CompetingInteraction)
+            } else if unsupported_resting {
+                Some(Reason::RestingBackground)
+            } else {
+                None
+            } {
+                relational
+                    .losses
+                    .extend(sources.iter().map(|source| source.at(None, reason)));
+            } else {
+                // The anchor needs precisely two cascade results. Reuse the
+                // snapshot selector specificity and the ordinary declaration
+                // cascade so a static rule can still win while checked.
+                let mut active = matches.clone();
+                active.extend(
+                    sources
+                        .iter()
+                        .map(|source| (source.specificity, &graph.css_rules[source.id], None)),
+                );
+                let (checked, _) = cascade(active, inherited, lengths, radio, |_, _, _| true);
+                if let Some(color) = paint_difference(&style, &checked).background_color {
+                    style.radio_background = Some((sources[0].radio, color));
+                }
+            }
+        }
+
+        if let Some(sources) = node.parent_id.and_then(|id| relational.by_node.get(&id))
+            && parent.is_some_and(|(style, _)| style.radio_background.is_some())
+            && (crate::extractor::input_attribute(node, "style").is_some()
+                || resting_backgrounds(&matches, &variables).any(|(_, value)| {
+                    value.is_some_and(|value| value.eq_ignore_ascii_case("inherit"))
+                }))
+        {
+            relational.losses.extend(
+                sources
+                    .iter()
+                    .map(|source| source.at(None, relational::Reason::InheritedBackground)),
+            );
         }
         if !state_rules.is_empty() {
             let active: Vec<_> = state_rules
@@ -400,10 +462,33 @@ fn resolve(
     Ok(ResolvedScene {
         scene_id: graph.scene_id.clone(),
         nodes,
+        relational_paint_losses: snapshot
+            .is_none()
+            .then(|| relational.losses.into_iter().collect()),
     })
 }
 
 type MatchedRule<'a> = (Specificity, &'a CssRule, Option<usize>);
+
+fn resting_backgrounds<'a>(
+    matches: &'a [MatchedRule<'a>],
+    variables: &'a Variables,
+) -> impl Iterator<Item = (&'a str, Option<String>)> {
+    matches
+        .iter()
+        .flat_map(|(_, rule, _)| &rule.declarations)
+        .filter_map(move |declaration| {
+            let property = declaration.property.as_str();
+            if !matches!(property, "background" | "background-color") {
+                return None;
+            }
+            let (value, _) = split_important(&declaration.value);
+            Some((
+                property,
+                substitute_variables(value, &mut |name| variables.get(name).cloned()),
+            ))
+        })
+}
 
 /// Apply matched rules in cascade order and return the style before inheritance.
 fn cascade(

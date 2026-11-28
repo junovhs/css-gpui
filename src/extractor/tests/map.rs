@@ -26,6 +26,7 @@ fn elem(id: usize) -> HtmlNode {
 fn laid_out_single(style: ComputedStyle) -> LaidOutScene {
     let scene = ResolvedScene {
         scene_id: "test".to_owned(),
+        relational_paint_losses: None,
         nodes: vec![ResolvedNode {
             node: elem(0),
             style,

@@ -170,6 +170,28 @@ impl<'a> Selector<'a> {
         }
     }
 
+    /// The live target can vary paint on the anchor of one checked descendant.
+    pub(super) fn checked_descendant_id(&self) -> Option<&'a str> {
+        let [anchor @ .., Condition::Has(relative)] = self.head.conditions.as_slice() else {
+            return None;
+        };
+        if !self.is_compound()
+            || (self.head.tag.is_none() && anchor.is_empty())
+            || !anchor
+                .iter()
+                .all(|part| matches!(part, Condition::Class(_) | Condition::Id(_)))
+        {
+            return None;
+        }
+        let [(Combinator::Descendant, descendant)] = relative.as_slice() else {
+            return None;
+        };
+        let [Condition::Id(id), Condition::Checked] = descendant.head.conditions.as_slice() else {
+            return None;
+        };
+        (descendant.is_compound() && descendant.head.tag.is_none()).then_some(id)
+    }
+
     pub(super) fn is_compound(&self) -> bool {
         self.tail.is_empty()
     }
