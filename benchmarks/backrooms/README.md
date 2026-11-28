@@ -69,3 +69,40 @@ Snapshot results establish cascade parity for these samples. Native label
 activation, media-dependent sizing, full 3D projection and frame comparison
 for Backrooms remain open. Strict generation continues to report unsupported
 live relational state.
+
+## Corner projection snapshots
+
+```sh
+node benchmarks/backrooms/projection.mjs /path/to/playwright-install
+```
+
+The projection probe uses the same pinned document and Playwright setup. At
+390 × 844 and 1440 × 900 it samples the floor, tiles in columns 6–9 and rows
+6–10, their spans, and their generated faces after entering, walking to z-8,
+turning right, and selecting level two. Those states use the original radio
+IDs. The Rust resolver reads the original cascaded transforms and handles
+the portrait media query that changes the camera scale. The projector
+composes the nested transform lists, transform origins and parent perspective
+in a continuous `preserve-3d` context.
+
+Chromium supplies the untransformed border boxes to Rust as layout inputs,
+including the positions produced by the original floor's changing flex wrap.
+A separate Chromium DevTools measurement of the original transformed border
+quads supplies the reference. Across eight snapshots the probe compared
+1,372 finite vertices, including 436 on wall faces, and 282 viewport polygons
+for boxes whose four corners were in front of the eye. Of those polygons,
+106 came from wall faces. The maximum coordinate error was 0.00224 CSS px
+against a 0.035 CSS px tolerance.
+
+Another 218 sampled boxes had at least one vertex on or behind the eye.
+The probe compares their finite vertices and checks the output stays in the
+viewport. Twenty-nine of those boxes retained a viewport polygon. The Rust
+test `a_face_crossing_the_eye_is_clipped_before_perspective_division` checks
+the exact clipped outline of an independent wall crossing the eye.
+
+This isolates projected geometry. Standalone layout still needs a native
+source of the responsive, wrapped border boxes. Rendering still needs backface
+culling, visibility and depth ordering, authored paints, and motion. Live
+navigation and browser/native frame comparison remain open. At both viewports,
+ordinary strict GPUI conversion still exits at the source diagnostic stage
+with 5,102 losses and emits zero bytes of Rust.

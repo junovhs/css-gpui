@@ -59,6 +59,8 @@ pub struct ComputedStyle {
     pub paint_placement: BTreeMap<String, String>,
     /// Cascaded CSS values consumed by the bounded 3D compiler projection.
     pub projection_properties: BTreeMap<String, String>,
+    /// Cascaded projection properties of generated pseudo-elements.
+    pub decoration_projection_properties: BTreeMap<String, BTreeMap<String, String>>,
     pub decorations: Vec<Decoration>,
     pub interaction: Option<InteractionPaint>,
     pub checked_paint: StatePaint,
@@ -111,6 +113,7 @@ impl Default for ComputedStyle {
             paint_effects: BTreeMap::new(),
             paint_placement: BTreeMap::new(),
             projection_properties: BTreeMap::new(),
+            decoration_projection_properties: BTreeMap::new(),
             decorations: Vec::new(),
             interaction: None,
             checked_paint: StatePaint::default(),

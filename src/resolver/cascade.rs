@@ -58,7 +58,13 @@ pub(super) fn apply_with_lengths(
 
     if matches!(
         property,
-        "margin" | "perspective" | "transform" | "transform-style" | "transition"
+        "margin"
+            | "perspective"
+            | "perspective-origin"
+            | "transform"
+            | "transform-origin"
+            | "transform-style"
+            | "transition"
     ) {
         style
             .projection_properties

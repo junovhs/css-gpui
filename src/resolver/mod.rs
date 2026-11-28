@@ -11,7 +11,7 @@ pub(crate) mod cascade;
 pub(crate) mod interaction;
 mod model;
 pub(crate) mod selector;
-mod values;
+pub(crate) mod values;
 
 pub use model::ComputedStyle;
 
@@ -289,6 +289,9 @@ fn resolve(
             if matches!(content, None | Some("none" | "normal")) {
                 continue;
             }
+            style
+                .decoration_projection_properties
+                .insert((*name).to_owned(), decoration.projection_properties);
             let mut placement = decoration.paint_placement;
             for corner in ["border-top-right-radius", "border-bottom-left-radius"] {
                 if !placement.contains_key(corner)

@@ -88,7 +88,7 @@ pub(super) fn substitute_variables(
 }
 
 /// Top-level characters, excluding quoted text and nested function arguments.
-fn tokens(value: &str) -> impl Iterator<Item = (usize, char)> + '_ {
+pub(crate) fn tokens(value: &str) -> impl Iterator<Item = (usize, char)> + '_ {
     let mut depth = 0usize;
     unquoted(value).filter(move |&(_, ch)| {
         if ch == '(' {
@@ -129,7 +129,7 @@ fn unquoted(value: &str) -> impl Iterator<Item = (usize, char)> + '_ {
     })
 }
 
-pub(super) fn value_parts(value: &str) -> impl Iterator<Item = &str> {
+pub(crate) fn value_parts(value: &str) -> impl Iterator<Item = &str> {
     let mut start = 0;
     tokens(value)
         .filter(|(_, ch)| ch.is_ascii_whitespace())
@@ -143,7 +143,7 @@ pub(super) fn value_parts(value: &str) -> impl Iterator<Item = &str> {
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct LengthContext {
+pub(crate) struct LengthContext {
     pub em: f32,
     pub rem: f32,
     pub viewport: Option<(f32, f32)>,
@@ -205,7 +205,7 @@ impl Quantity {
 }
 
 impl LengthContext {
-    pub(super) fn pixels(self, value: &str) -> Option<f32> {
+    pub(crate) fn pixels(self, value: &str) -> Option<f32> {
         match self.quantity(value.trim())? {
             Quantity::Length(value) if value.is_finite() => Some(value),
             Quantity::Number(0.0) => Some(0.0),

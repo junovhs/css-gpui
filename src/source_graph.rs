@@ -60,7 +60,24 @@ impl SceneSourceGraph {
             PathBuf::from("."),
             SourceDocument::new_html(0, PathBuf::from("<html>"), html_str.to_owned()),
             SourceDocument::new_css(1, PathBuf::from("<css>"), css_str.to_owned()),
-            Some(viewport_width),
+            Some((viewport_width, None)),
+        )
+    }
+
+    /// Build a fixed-size snapshot, including supported orientation media queries.
+    pub fn from_strings_at_viewport_size(
+        scene_id: &str,
+        html_str: &str,
+        css_str: &str,
+        width: f32,
+        height: f32,
+    ) -> Result<Self, SourceGraphError> {
+        Self::from_documents(
+            scene_id.to_owned(),
+            PathBuf::from("."),
+            SourceDocument::new_html(0, PathBuf::from("<html>"), html_str.to_owned()),
+            SourceDocument::new_css(1, PathBuf::from("<css>"), css_str.to_owned()),
+            Some((width, Some(height))),
         )
     }
 
@@ -79,18 +96,13 @@ impl SceneSourceGraph {
         scene_root: PathBuf,
         html: SourceDocument,
         css: SourceDocument,
-        viewport_width: Option<f32>,
+        viewport: Option<(f32, Option<f32>)>,
     ) -> Result<Self, SourceGraphError> {
         let parsed_html = parse_html_document(html.id, &html.contents)?;
         let mut css_rules =
-            parse_css_region(css.id, &css.contents, 0..css.contents.len(), viewport_width)?;
+            parse_css_region(css.id, &css.contents, 0..css.contents.len(), viewport)?;
         for region in parsed_html.styles {
-            css_rules.extend(parse_css_region(
-                html.id,
-                &html.contents,
-                region,
-                viewport_width,
-            )?);
+            css_rules.extend(parse_css_region(html.id, &html.contents, region, viewport)?);
         }
         for (id, rule) in css_rules.iter_mut().enumerate() {
             rule.id = id;

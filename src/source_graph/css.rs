@@ -6,7 +6,7 @@ pub(super) fn parse_css_region(
     document_id: usize,
     source: &str,
     region: Range<usize>,
-    viewport_width: Option<f32>,
+    viewport: Option<(f32, Option<f32>)>,
 ) -> Result<Vec<CssRule>, SourceGraphError> {
     let (masked, comments) = mask_css_comments(&source[region.clone()], region.start)?;
     let mut parser = Parser {
@@ -15,7 +15,7 @@ pub(super) fn parse_css_region(
         comments: &comments,
         document_id,
         offset: region.start,
-        viewport_width,
+        viewport,
         rules: Vec::new(),
     };
     parser.parse_block(0..masked.len(), None)?;
@@ -28,7 +28,7 @@ struct Parser<'a> {
     comments: &'a [Range<usize>],
     document_id: usize,
     offset: usize,
-    viewport_width: Option<f32>,
+    viewport: Option<(f32, Option<f32>)>,
     rules: Vec<CssRule>,
 }
 
@@ -150,17 +150,22 @@ impl Parser<'_> {
     }
 
     fn media_matches(&self, prelude: &str) -> Option<bool> {
-        let width = self.viewport_width?;
+        let (width, height) = self.viewport?;
         let condition = prelude.strip_prefix("@media ")?.trim();
         let condition = condition.strip_prefix("screen and ").unwrap_or(condition);
         let (property, value) = condition
             .strip_prefix('(')?
             .strip_suffix(')')?
             .split_once(':')?;
-        let pixels: f32 = value.trim().strip_suffix("px")?.parse().ok()?;
+        let value = value.trim();
         match property.trim() {
-            "min-width" => Some(width >= pixels),
-            "max-width" => Some(width <= pixels),
+            "orientation" => match value {
+                "portrait" => Some(width <= height?),
+                "landscape" => Some(width > height?),
+                _ => None,
+            },
+            "min-width" => Some(width >= value.strip_suffix("px")?.parse().ok()?),
+            "max-width" => Some(width <= value.strip_suffix("px")?.parse().ok()?),
             _ => None,
         }
     }

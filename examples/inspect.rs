@@ -6,18 +6,26 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use css_gpui::{SceneSourceGraph, diagnostics, extractor, layout, resolver};
+use css_gpui::{SceneSourceGraph, diagnostics, extractor, layout, projection, resolver};
 use serde_json::json;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let paths: Vec<PathBuf> = env::args_os().skip(1).map(PathBuf::from).collect();
-    if let [mode, viewport, html, css, selection @ ..] = paths.as_slice()
-        && mode.as_os_str() == "--radio-snapshot"
-    {
-        return inspect_radio_snapshot(viewport, html, css, selection);
+    if let [mode, viewport, html, css, selection @ ..] = paths.as_slice() {
+        match mode.to_str() {
+            Some("--radio-snapshot") => {
+                let (scene, _) = resolve_snapshot(viewport, html, css, selection, false)?;
+                return inspect_radio_snapshot(&scene);
+            }
+            Some("--projection-snapshot") => {
+                let (scene, viewport) = resolve_snapshot(viewport, html, css, selection, true)?;
+                return inspect_projection_snapshot(&scene, viewport);
+            }
+            _ => {}
+        }
     }
     let [html_path, css_path] = paths.as_slice() else {
-        return Err("usage: inspect [--radio-snapshot WIDTHxHEIGHT] <component.html> <component.css> [radio ID ...]".into());
+        return Err("usage: inspect [--radio-snapshot|--projection-snapshot WIDTHxHEIGHT] <component.html> <component.css> [radio ID ...]".into());
     };
 
     let html = fs::read_to_string(html_path)?;
@@ -39,12 +47,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn inspect_radio_snapshot(
+fn resolve_snapshot(
     viewport: &Path,
     html: &Path,
     css: &Path,
     selection: &[PathBuf],
-) -> Result<(), Box<dyn Error>> {
+    include_orientation: bool,
+) -> Result<(resolver::ResolvedScene, [f64; 2]), Box<dyn Error>> {
     let (width, height) = viewport
         .to_str()
         .and_then(|size| size.split_once('x'))
@@ -53,12 +62,19 @@ fn inspect_radio_snapshot(
     if width == 0 || height == 0 {
         return Err("snapshot viewport dimensions must be positive".into());
     }
-    let graph = SceneSourceGraph::from_strings_at_viewport(
-        "component",
-        &fs::read_to_string(html)?,
-        &fs::read_to_string(css)?,
-        width as f32,
-    )?;
+    let html = fs::read_to_string(html)?;
+    let css = fs::read_to_string(css)?;
+    let graph = if include_orientation {
+        SceneSourceGraph::from_strings_at_viewport_size(
+            "component",
+            &html,
+            &css,
+            width as f32,
+            height as f32,
+        )?
+    } else {
+        SceneSourceGraph::from_strings_at_viewport("component", &html, &css, width as f32)?
+    };
     let overrides = selection
         .iter()
         .map(|id| {
@@ -81,6 +97,10 @@ fn inspect_radio_snapshot(
         height as f32,
         &overrides,
     )?;
+    Ok((scene, [f64::from(width), f64::from(height)]))
+}
+
+fn inspect_radio_snapshot(scene: &resolver::ResolvedScene) -> Result<(), Box<dyn Error>> {
     let output: Vec<_> = scene
         .nodes
         .iter()
@@ -106,6 +126,88 @@ fn inspect_radio_snapshot(
             })
         })
         .collect();
+    serde_json::to_writer(io::stdout().lock(), &output)?;
+    println!();
+    Ok(())
+}
+
+#[derive(serde::Deserialize)]
+struct BorderBox {
+    origin: [f64; 2],
+    size: [f64; 2],
+}
+
+#[derive(serde::Deserialize)]
+struct ProjectionInput {
+    bounds: BTreeMap<String, BorderBox>,
+    chains: Vec<Vec<String>>,
+}
+
+fn inspect_projection_snapshot(
+    scene: &resolver::ResolvedScene,
+    viewport: [f64; 2],
+) -> Result<(), Box<dyn Error>> {
+    let input: ProjectionInput = serde_json::from_reader(io::stdin().lock())?;
+    let root_font_size = scene
+        .nodes
+        .iter()
+        .find(|node| node.node.name.as_deref() == Some("html"))
+        .and_then(|node| node.style.font_size)
+        .unwrap_or(16.0);
+
+    let mut paths = BTreeMap::new();
+    let mut counts = BTreeMap::new();
+    let mut nodes = BTreeMap::new();
+    for node in &scene.nodes {
+        let tag = node.node.name.as_deref().unwrap_or_default();
+        let count = counts.entry((node.node.parent_id, tag)).or_insert(0);
+        *count += 1;
+        let parent = node
+            .node
+            .parent_id
+            .and_then(|id| paths.get(&id))
+            .map_or("", String::as_str);
+        let path = format!("{parent}/{tag}:{count}");
+        paths.insert(node.node.id, path.clone());
+        nodes.insert(path, node);
+    }
+
+    let mut output = BTreeMap::new();
+    for chain in &input.chains {
+        let target = chain.last().ok_or("empty projection chain")?;
+        let layers = chain
+            .iter()
+            .map(|key| {
+                let (path, pseudo) = key
+                    .split_once("::")
+                    .map_or((key.as_str(), None), |(path, pseudo)| (path, Some(pseudo)));
+                let node = nodes
+                    .get(path)
+                    .ok_or_else(|| format!("unknown projection path {path}"))?;
+                let css = match pseudo {
+                    Some(pseudo) => node
+                        .style
+                        .decoration_projection_properties
+                        .get(pseudo)
+                        .ok_or_else(|| format!("unknown pseudo-element {key}"))?,
+                    None => &node.style.projection_properties,
+                };
+                let bounds = input
+                    .bounds
+                    .get(key)
+                    .ok_or_else(|| format!("missing box {key}"))?;
+                Ok::<_, String>(projection::Layer {
+                    origin: bounds.origin,
+                    size: bounds.size,
+                    font_size: node.style.font_size.unwrap_or(16.0),
+                    css,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let projected = projection::project_box(&layers, viewport, root_font_size)
+            .map_err(|error| format!("{target}: {error}"))?;
+        output.insert(target, projected);
+    }
     serde_json::to_writer(io::stdout().lock(), &output)?;
     println!();
     Ok(())
