@@ -12,6 +12,7 @@ pub(super) fn minimal_layout() -> Layout {
         left: None,
         width: None,
         height: None,
+        aspect_ratio: None,
         min_width: None,
         min_height: None,
         grid: None,

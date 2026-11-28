@@ -28,6 +28,7 @@ fn base_layout() -> Layout {
         left: None,
         width: None,
         height: None,
+        aspect_ratio: None,
         min_width: None,
         min_height: None,
         grid: None,
@@ -240,6 +241,7 @@ fn scene_capabilities_reports_every_required_family() {
                 capability,
                 Capability::SvgArtwork
                     | Capability::GridLayout
+                    | Capability::AspectRatio
                     | Capability::TextInputControl
                     | Capability::RadioControl
                     | Capability::LetterSpacing
@@ -343,6 +345,7 @@ fn expected_conformance_strips_provenance_and_round_trips_through_json() {
                 capability,
                 Capability::SvgArtwork
                     | Capability::GridLayout
+                    | Capability::AspectRatio
                     | Capability::TextInputControl
                     | Capability::RadioControl
                     | Capability::LetterSpacing

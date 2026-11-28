@@ -138,3 +138,19 @@ VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a \
 The holdout is frozen with the evaluation sources. Keep it out of routine runs and out of compiler tuning. Run the same browser and native commands on that split with `--holdout` passed to `run.mjs` when evaluating a later candidate. Record holdout results separately and retire each disclosed holdout from future gate decisions.
 
 For each breadth re-evaluation, sample fresh output from at least two independent AI tools using ordinary application design prompts. Save the exact prompts, raw outputs, tool and model identifiers, and any transport-level source extraction. Keep the first complete result, including designs that use CSS the compiler cannot consume. Archive old corpus versions and freeze the updated bytes, feature tags, interactions, thresholds and split before running the compiler. Refresh the holdout independently. Leave fixes driven by evaluation failures out of the frozen source and log any exclusion with its scope.
+
+## Aspect ratio probe
+
+The probe compiles the same authored boxes at 400×600 and 500×700. It
+compares Chromium border boxes with native GPUI client pixels within one
+pixel at 1× scale. The fixtures exercise a padded content-box with a
+viewport-relative width, a bordered absolute box with an automatic width,
+and a border box whose declared height falls below its padding and border.
+
+Use the same Playwright, Xvfb and Vulkan setup as the native pass.
+
+```sh
+scratch=$(mktemp -d)
+VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a \
+  node benchmarks/css-compat/aspect-ratio-probe.mjs /path/to/playwright-install "$scratch/aspect-ratio"
+```

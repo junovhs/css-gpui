@@ -8,6 +8,7 @@ use crate::ir::{
     SceneIr, TextAlign, Typography,
 };
 
+use crate::ir::layout::ratio_border_size;
 use crate::ir::paint::{InteractionPaint, StatePaint};
 
 use super::{Capability, CapabilityGap, TargetCapabilities, TargetEmission, TargetEmitter};
@@ -585,26 +586,39 @@ fn emit_layout(
         length(method, "left", layout.left);
         length(method, "top", layout.top);
     }
-    let (inline_extra, block_extra) = if layout.box_sizing == BoxSizing::ContentBox {
-        let border = node
-            .paint
-            .border
-            .as_ref()
-            .map_or(0.0, |border| border.width);
-        let padding = &layout.padding;
-        (
-            padding.left + padding.right + 2.0 * border,
-            padding.top + padding.bottom + 2.0 * border,
-        )
+    let border = node
+        .paint
+        .border
+        .as_ref()
+        .map_or(0.0, |border| 2.0 * border.width);
+    let padding = &layout.padding;
+    let insets = [
+        padding.left + padding.right + border,
+        padding.top + padding.bottom + border,
+    ];
+    let [inline_extra, block_extra] = if layout.box_sizing == BoxSizing::ContentBox {
+        insets
     } else {
-        (0.0, 0.0)
+        [0.0; 2]
     };
-    length(method, "w", layout.width.map(|width| width + inline_extra));
-    length(
-        method,
-        "h",
+    let mut sizes = [
+        layout.width.map(|width| width + inline_extra),
         layout.height.map(|height| height + block_extra),
-    );
+    ];
+    if let Some(ratio) = layout.aspect_ratio {
+        if let Some(border_size) = ratio_border_size(
+            [layout.width, layout.height],
+            ratio,
+            insets,
+            &layout.box_sizing,
+        ) {
+            sizes = border_size.map(Some);
+        } else {
+            declare_loss(node, Capability::AspectRatio, losses);
+        }
+    }
+    length(method, "w", sizes[0]);
+    length(method, "h", sizes[1]);
     length(
         method,
         "min_w",

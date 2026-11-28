@@ -142,6 +142,38 @@ pub(crate) fn value_parts(value: &str) -> impl Iterator<Item = &str> {
         })
 }
 
+/// Parse a positive preferred width-to-height ratio.
+pub(crate) fn parse_positive_ratio(value: &str) -> Option<f64> {
+    let (width, height) = value.split_once('/').unwrap_or((value, "1"));
+    let positive = |value: &str| {
+        value
+            .trim()
+            .parse::<f64>()
+            .ok()
+            .filter(|value| value.is_finite() && *value > 0.0)
+    };
+    Some(positive(width)? / positive(height)?)
+}
+
+/// Interpret the bounded CSS property as an optional preferred ratio.
+pub(crate) fn parse_aspect_ratio(value: &str) -> Option<Option<f64>> {
+    if value.trim().eq_ignore_ascii_case("auto") {
+        return Some(None);
+    }
+    // A CSS number with a decimal point requires a digit immediately after it.
+    if value
+        .as_bytes()
+        .windows(2)
+        .any(|pair| pair[0] == b'.' && !pair[1].is_ascii_digit())
+        || value.ends_with('.')
+    {
+        return None;
+    }
+    parse_positive_ratio(value)
+        .filter(|ratio| ratio.is_finite() && *ratio > 0.0)
+        .map(Some)
+}
+
 #[derive(Clone, Copy)]
 pub(crate) struct LengthContext {
     pub em: f32,

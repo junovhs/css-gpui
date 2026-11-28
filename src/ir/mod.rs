@@ -169,7 +169,8 @@ pub struct IrNode {
 pub struct SceneIr {
     /// Version `1` for the original schema, `2` for authored text input values,
     /// `3` for explicit flex wrapping, `4` for text alignment, `5` for letter spacing,
-    /// `6` for hover and focus paint, and `7` for radios and checked paint.
+    /// `6` for hover and focus paint, `7` for radios and checked paint, and
+    /// `8` for preferred aspect ratios.
     pub schema_version: u32,
     /// Matches the `id` field in `manifest.toml`, e.g. `"profile_card_absolute"`.
     pub scene_id: String,

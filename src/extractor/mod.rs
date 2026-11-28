@@ -124,6 +124,11 @@ pub fn extract_ir(
     Ok(SceneIr {
         schema_version: if ir_nodes
             .iter()
+            .any(|node| node.layout.aspect_ratio.is_some())
+        {
+            8
+        } else if ir_nodes
+            .iter()
             .any(|node| matches!(node.control_kind, Some(ControlKind::Radio(_))))
         {
             7

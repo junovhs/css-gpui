@@ -21,6 +21,13 @@ portrait and landscape orientation, and pixel-based minimum and maximum width
 and height, including conditions joined with `and`. Strict generation reports
 unevaluated queries at their source locations.
 
+Strict generation also supports a positive CSS `aspect-ratio` in block
+flow and for absolute boxes with top and left offsets and a directly
+positioned parent. The box must have one resolved dimension, one auto
+dimension, and no in-flow content or min/max size constraints. GPUI
+generation accounts for padding and a supported solid border using the
+authored `box-sizing`. See the [browser and native bounds probe](benchmarks/css-compat/README.md#aspect-ratio-probe).
+
 ## Build the standalone toolbar
 
 On Linux with X11 or XWayland, edit [the toolbar CSS](fixtures/toolbar/source.css) and run `python3 fixtures/toolbar/build.py` from the repository root. The command writes readable Rust and a runnable GPUI executable. See the [toolbar build instructions](docs/first-milestone.md#build-and-run-the-toolbar) for prerequisites and output paths.

@@ -1,0 +1,38 @@
+body { margin: 0; }
+main {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background-color: #ffffff;
+}
+#phone {
+    width: 47.05vw;
+    aspect-ratio: 941 / 1672;
+    padding: 3px 8px;
+    border: 2px solid #e02040;
+    background-color: #e02040;
+}
+#control {
+    position: absolute;
+    left: 12px;
+    top: 470px;
+    height: 10vh;
+    width: auto;
+    box-sizing: border-box;
+    --control-ratio: 1.5;
+    aspect-ratio: var(--control-ratio);
+    padding: 5px 12px;
+    border: 2px solid #20a060;
+    background-color: #20a060;
+}
+#border-floor {
+    position: absolute;
+    left: 200px;
+    top: 470px;
+    height: 20px;
+    box-sizing: border-box;
+    aspect-ratio: 2;
+    padding: 20px 35px;
+    border: 2px solid #4050e0;
+    background-color: #4050e0;
+}

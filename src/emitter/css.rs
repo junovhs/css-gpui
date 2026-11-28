@@ -131,6 +131,9 @@ fn layout_decls(l: &Layout) -> Vec<String> {
     if let Some(v) = l.height {
         d.push(format!("height: {}", px(v)));
     }
+    if let Some(ratio) = l.aspect_ratio {
+        d.push(format!("aspect-ratio: {ratio}"));
+    }
     if let Some(v) = l.min_width {
         d.push(format!("min-width: {}", px(v)));
     }

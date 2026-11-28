@@ -284,17 +284,7 @@ impl<'a> UsedBoxLayout<'a> {
             if !transfer_ratio {
                 return Err(invalid(id, format!("unsupported aspect-ratio: {ratio}")));
             }
-            let (width, height) = ratio.split_once('/').unwrap_or((ratio, "1"));
-            let positive = |value: &str| {
-                value
-                    .trim()
-                    .parse::<f64>()
-                    .ok()
-                    .filter(|value| value.is_finite() && *value > 0.0)
-            };
-            let ratio = positive(width)
-                .zip(positive(height))
-                .map(|(width, height)| width / height)
+            let ratio = crate::resolver::values::parse_positive_ratio(ratio)
                 .ok_or_else(|| invalid(id, "unsupported aspect-ratio"))?;
             // Transfer an explicit dimension only when the other axis is
             // auto-sized from content, rather than stretched between insets.

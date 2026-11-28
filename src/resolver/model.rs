@@ -10,6 +10,8 @@ use crate::ir::{
 pub struct UsedBoxStyle {
     pub(crate) properties: BTreeMap<String, String>,
     pub(crate) font_size: Option<f32>,
+    pub(crate) ratio_origin: Option<(usize, usize)>,
+    pub(crate) ratio_loss: Option<&'static str>,
 }
 
 impl UsedBoxStyle {
@@ -40,6 +42,8 @@ pub struct ComputedStyle {
     pub height: Option<f32>,
     pub min_width: Option<f32>,
     pub min_height: Option<f32>,
+    /// Preferred width-to-height ratio for the supported native layout subset.
+    pub aspect_ratio: Option<f64>,
 
     // --- Box model edges ---
     pub margin_top: f32,
@@ -104,6 +108,7 @@ impl Default for ComputedStyle {
             height: None,
             min_width: None,
             min_height: None,
+            aspect_ratio: None,
             margin_top: 0.0,
             margin_right: 0.0,
             margin_bottom: 0.0,

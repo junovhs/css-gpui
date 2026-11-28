@@ -55,7 +55,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             css_path.display()
         ))
     })?;
-    let losses = diagnostics::analyze(&graph);
+    let resolved = match viewport {
+        Some((width, height)) => resolver::resolve_scene_at_viewport(&graph, width, height),
+        None => resolver::resolve_scene(&graph),
+    }?;
+    let losses = diagnostics::analyze_resolved(&graph, &resolved);
     for loss in &losses {
         let rule = &graph.css_rules[loss.rule_id];
         let span = loss
@@ -96,10 +100,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     if has_source_losses && !allow_loss {
         return Err("GPUI conversion has source losses".into());
     }
-    let resolved = match viewport {
-        Some((width, height)) => resolver::resolve_scene_at_viewport(&graph, width, height),
-        None => resolver::resolve_scene(&graph),
-    }?;
     let scene = extractor::extract_ir(&layout::compute_layout(&resolved), &graph)?;
     emit_scene(&scene, html_path, allow_loss)
 }

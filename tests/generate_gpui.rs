@@ -398,3 +398,125 @@ fn strict_generation_reports_unsupported_radio_markup_and_checked_selectors() {
         );
     }
 }
+
+#[test]
+fn strict_generation_preserves_bounded_aspect_ratios() {
+    let fixture = Path::new("benchmarks/css-compat/probes/aspect-ratio");
+    let html = fixture.join("probe.html");
+    let css = fixture.join("probe.css");
+
+    let source_html = fs::read_to_string(&html).unwrap();
+    let source_css = fs::read_to_string(&css).unwrap();
+    let graph = css_gpui::SceneSourceGraph::from_strings_at_viewport_size(
+        "aspect-ratio",
+        &source_html,
+        &source_css,
+        400.0,
+        600.0,
+    )
+    .unwrap();
+    let resolved = css_gpui::resolver::resolve_scene_at_viewport(&graph, 400.0, 600.0).unwrap();
+    let scene =
+        css_gpui::extractor::extract_ir(&css_gpui::layout::compute_layout(&resolved), &graph)
+            .unwrap();
+    let decoded = css_gpui::ir::SceneIr::from_json(&scene.to_json().unwrap()).unwrap();
+    assert_eq!(decoded.schema_version, 8);
+    let phone = &decoded.nodes[1].layout;
+    assert_eq!(phone.aspect_ratio, Some(941.0 / 1672.0));
+    assert!(phone.width.is_some());
+    assert_eq!(phone.height, None);
+    assert!(
+        css_gpui::emitter::emit(&decoded)
+            .css
+            .contains("aspect-ratio: ")
+    );
+
+    for (viewport, expected) in [
+        ("400x600", [(208.2, 344.4), (90.0, 60.0), (88.0, 44.0)]),
+        ("500x700", [(255.25, 428.0), (105.0, 70.0), (88.0, 44.0)]),
+    ] {
+        let output = run_example("generate_gpui", &["--viewport", viewport], &html, &css);
+        assert!(
+            output.status.success(),
+            "{viewport}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(output.stderr.is_empty());
+        let rust = String::from_utf8(output.stdout).unwrap();
+        let calls: Vec<_> = rust.lines().map(str::trim).collect();
+        for (width, height) in expected {
+            let width = format!(".w(gpui::px({width:?}))");
+            let height = format!(".h(gpui::px({height:?}))");
+            assert!(
+                calls
+                    .windows(2)
+                    .any(|pair| pair == [width.as_str(), height.as_str()]),
+                "{viewport}: expected {width} and {height} in {rust}"
+            );
+        }
+    }
+}
+
+#[test]
+fn strict_generation_reports_unsupported_aspect_ratio_sources() {
+    let directory =
+        std::env::temp_dir().join(format!("css-gpui-aspect-ratio-{}", std::process::id()));
+    fs::create_dir_all(&directory).unwrap();
+    let html = directory.join("probe.html");
+    let css = directory.join("probe.css");
+    fs::write(
+        &html,
+        "<main><div id='mixed'></div><div id='invalid'></div><div id='indefinite'></div>
+        <div id='prefilled'></div><div id='flex'><div id='item'></div></div>
+        <div id='content'>Text</div><div id='stretched'></div><div id='unknown-size'></div>
+        <div id='invalid-var'></div><div id='constrained'></div></main>",
+    )
+    .unwrap();
+    fs::write(
+        &css,
+        "\
+main { position: relative; }
+#mixed { width: 40px; aspect-ratio: auto 2; }
+#invalid { width: 40px; aspect-ratio: 1 / 0; }
+#indefinite { aspect-ratio: 2; }
+#prefilled { width: 40px; height: 40px; aspect-ratio: 2; }
+#flex { display: flex; }
+#item { width: 40px; aspect-ratio: 2; }
+#content { width: 40px; aspect-ratio: 2; }
+#stretched { position: absolute; top: 0; bottom: 0; left: 0; width: 40px; aspect-ratio: 2; }
+#unknown-size { height: 40px; width: 50%; aspect-ratio: 2; }
+#invalid-var { width: 40px; aspect-ratio: var(--missing); }
+#constrained { width: 40px; min-height: 100px; aspect-ratio: 2; }
+#content::before { width: 40px; aspect-ratio: 2; }
+",
+    )
+    .unwrap();
+
+    let output = run_example("generate_gpui", &["--viewport", "500x700"], &html, &css);
+    fs::remove_dir_all(&directory).unwrap();
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    let errors = String::from_utf8_lossy(&output.stderr);
+    for (line, reason) in [
+        (2, "positive numeric"),
+        (3, "positive numeric"),
+        (4, "one resolved length and one auto"),
+        (5, "one resolved length and one auto"),
+        (7, "require a block container"),
+        (8, "without in-flow content"),
+        (9, "require top and left offsets"),
+        (10, "one resolved length and one auto"),
+        (11, "positive finite numeric ratio"),
+        (12, "min/max size constraints"),
+        (13, "supported static element selector"),
+    ] {
+        let location = format!("{}:{line}:", css.display());
+        assert!(
+            errors.lines().any(|line| line.starts_with(&location)
+                && line.contains("source loss")
+                && line.contains("aspect-ratio")
+                && line.contains(reason)),
+            "expected {reason:?} at {location}\n{errors}"
+        );
+    }
+}

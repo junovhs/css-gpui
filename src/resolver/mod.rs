@@ -7,6 +7,7 @@
 //!
 //! This is the output contract consumed by `EXT-01`.
 
+mod aspect_ratio;
 pub(crate) mod cascade;
 pub(crate) mod interaction;
 mod model;
@@ -381,6 +382,8 @@ fn resolve(
         styles[node.id] = Some((style, variables));
     }
 
+    aspect_ratio::validate_layout(&graph.html_nodes, &mut styles, viewport, root_font_size);
+
     let nodes = graph
         .html_nodes
         .iter()
@@ -427,29 +430,29 @@ fn cascade(
                         return None;
                     }
                     let (value, important) = split_important(&declaration.value);
-                    Some((property, value, important, source))
+                    Some((property, value, important, source, (rule.id, index)))
                 })
         })
         .collect();
-    declarations.sort_by_key(|(_, _, important, _)| *important);
+    declarations.sort_by_key(|(_, _, important, _, _)| *important);
 
     let custom: BTreeMap<_, _> = declarations
         .iter()
-        .filter(|(name, _, _, _)| name.starts_with("--"))
-        .map(|(name, value, _, _)| (*name, *value))
+        .filter(|(name, _, _, _, _)| name.starts_with("--"))
+        .map(|(name, value, _, _, _)| (*name, *value))
         .collect();
     let variables = cascade_variables(inherited, &custom);
     let declarations: Vec<_> = declarations
         .into_iter()
-        .filter(|(name, _, _, _)| !name.starts_with("--"))
-        .filter_map(|(name, value, _, source)| {
+        .filter(|(name, _, _, _, _)| !name.starts_with("--"))
+        .filter_map(|(name, value, _, source, origin)| {
             let value = substitute_variables(value, &mut |name| variables.get(name).cloned());
             if let Some(source) = source
                 && !validate_state_value(source, name, value.as_deref())
             {
                 return None;
             }
-            Some((name, value))
+            Some((name, value, origin))
         })
         .collect();
 
@@ -462,10 +465,10 @@ fn cascade(
         style.margin_right = 3.0;
         style.margin_left = 5.0;
     }
-    if let Some((_, value)) = declarations
+    if let Some((_, value, _)) = declarations
         .iter()
         .rev()
-        .find(|(name, _)| *name == "font-size")
+        .find(|(name, _, _)| *name == "font-size")
     {
         style.font_size = value.as_deref().and_then(|value| {
             LengthContext {
@@ -476,10 +479,13 @@ fn cascade(
         });
         lengths.em = style.font_size.unwrap_or(lengths.em);
     }
-    for (property, value) in declarations
+    for (property, value, origin) in declarations
         .into_iter()
-        .filter(|(name, _)| *name != "font-size")
+        .filter(|(name, _, _)| *name != "font-size")
     {
+        if property == "aspect-ratio" {
+            aspect_ratio::apply(&mut style, origin, value.as_deref());
+        }
         if let Some(value) = value {
             apply_with_lengths(&mut style, property, &value, lengths);
         }

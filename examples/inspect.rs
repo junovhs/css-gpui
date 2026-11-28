@@ -35,7 +35,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let html = fs::read_to_string(html_path)?;
     let css = fs::read_to_string(css_path)?;
     let graph = SceneSourceGraph::from_strings("component", &html, &css)?;
-    for diagnostic in diagnostics::analyze(&graph) {
+    let resolved = resolver::resolve_scene(&graph)?;
+    for diagnostic in diagnostics::analyze_resolved(&graph, &resolved) {
         eprintln!(
             "{}: rule {}: {}",
             css_path.display(),
@@ -44,7 +45,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
-    let resolved = resolver::resolve_scene(&graph)?;
     let scene = extractor::extract_ir(&layout::compute_layout(&resolved), &graph)?;
     serde_json::to_writer_pretty(io::stdout().lock(), &scene)?;
     println!();

@@ -93,6 +93,8 @@ pub enum Capability {
     GridLayout,
     /// Absolute and fixed positioning with `top`/`left` offsets.
     AbsolutePositioning,
+    /// A preferred width-to-height ratio with one definite dimension.
+    AspectRatio,
     /// A solid border on a box.
     Border,
     /// Rounded corners (`border-radius`).
@@ -124,6 +126,7 @@ impl Capability {
             FlexLayout,
             GridLayout,
             AbsolutePositioning,
+            AspectRatio,
             Border,
             BorderRadius,
             Background,
@@ -220,6 +223,9 @@ fn node_capabilities(node: &IrNode) -> BTreeSet<Capability> {
             }
             if matches!(node.layout.position, Position::Absolute | Position::Fixed) {
                 caps.insert(Capability::AbsolutePositioning);
+            }
+            if node.layout.aspect_ratio.is_some() {
+                caps.insert(Capability::AspectRatio);
             }
             if node.paint.background_color.is_some() {
                 caps.insert(Capability::Background);

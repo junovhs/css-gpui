@@ -200,6 +200,9 @@ pub struct Layout {
     pub width: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub height: Option<f32>,
+    /// Preferred width-to-height ratio applied on the box named by box-sizing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aspect_ratio: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_width: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -226,4 +229,54 @@ pub struct Layout {
     /// CSS `gap` in pixels, present only on flex containers.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gap: Option<f32>,
+}
+
+/// Resolve one auto axis from a ratio, then express both sizes as border-box sizes.
+/// GPUI sizing uses the border box, even when the source ratio uses the content box.
+pub(crate) fn ratio_border_size(
+    sizes: [Option<f32>; 2],
+    ratio: f64,
+    insets: [f32; 2],
+    box_sizing: &BoxSizing,
+) -> Option<[f32; 2]> {
+    if !ratio.is_finite()
+        || ratio <= 0.0
+        || !insets
+            .iter()
+            .all(|inset| inset.is_finite() && *inset >= 0.0)
+    {
+        return None;
+    }
+    let [horizontal, vertical] = insets.map(f64::from);
+    let border_box = *box_sizing == BoxSizing::BorderBox;
+    let [width, height] = match sizes {
+        [Some(width), None] if width >= 0.0 => {
+            let width = f64::from(width);
+            let width = if border_box {
+                width.max(horizontal)
+            } else {
+                width
+            };
+            [width, width / ratio]
+        }
+        [None, Some(height)] if height >= 0.0 => {
+            let height = f64::from(height);
+            let height = if border_box {
+                height.max(vertical)
+            } else {
+                height
+            };
+            [height * ratio, height]
+        }
+        _ => return None,
+    };
+    let outer = |size: f64, inset: f64| {
+        (if border_box {
+            size.max(inset)
+        } else {
+            size + inset
+        }) as f32
+    };
+    let (width, height) = (outer(width, horizontal), outer(height, vertical));
+    (width.is_finite() && height.is_finite()).then_some([width, height])
 }
